@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Engine Intern - Code Review Dashboard</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Prism.js Tomorrow Night Theme for Code Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    <!-- Custom Style -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-logo">
+                    <span class="logo-dot"></span>
+                    <span class="logo-pulse"></span>
+                </div>
+                <div class="brand-text">
+                    <h1>AI Engine Intern</h1>
+                    <p>Self-Healing Workflow Execution API</p>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-indicator online"></span>
+                <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Left Panel: Configuration & Code Editor -->
+            <section class="panel-left">
+                <!-- API Settings Card -->
+                <div class="card glass">
+                    <div class="card-header">
+                        <h2>Engine Configuration</h2>
+                        <span class="step-num">01</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="api-key">Gemini API Key</label>
+                            <div class="api-key-container">
+                                <input type="password" id="api-key" placeholder="Enter API Key to enable Live Mode..." autocomplete="new-password">
+                                <button type="button" id="toggle-key-visibility" class="btn-icon">👁️</button>
+                            </div>
+                            <span class="input-hint">Leave blank to use AST-based Offline Simulator (No key required)</span>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group half">
+                                <label for="threshold">Quality Threshold (%)</label>
+                                <div class="slider-container">
+                                    <input type="range" id="threshold" min="50" max="95" value="80">
+                                    <span id="threshold-val">80%</span>
+                                </div>
+                            </div>
+                            <div class="form-group half">
+                                <label for="model">Model Engine</label>
+                                <select id="model">
+                                    <option value="gemini-1.5-flash">Gemini 1.5 Flash (Fast)</option>
+                                    <option value="gemini-1.5-pro">Gemini 1.5 Pro (In-depth)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Editor Card -->
+                <div class="card glass editor-card">
+                    <div class="card-header">
+                        <h2>Source Code Input (Python)</h2>
+                        <span class="step-num">02</span>
+                    </div>
+                    <div class="card-body editor-body">
+                        <div class="editor-container">
+                            <div class="line-numbers" id="line-numbers"></div>
+                            <textarea id="code-input" spellcheck="false">def process_user_data(user_id, email):
+    # TODO: Add authentication checks
+    print("Fetching user: " + str(user_id))
+    
+    try:
+        user = get_database().fetch_user(user_id)
+    except:
+        pass
+        
+    print("User fetch attempt complete")
+    return user
+</textarea>
+                        </div>
+                        <button id="btn-run" class="btn btn-primary pulse-btn">
+                            <span class="btn-text">Execute Workflow</span>
+                            <div class="btn-glow"></div>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel: Execution Visualizer & Results -->
+            <section class="panel-right">
+                <!-- Visual Pipeline Card -->
+                <div class="card glass visualizer-card">
+                    <div class="card-header">
+                        <h2>Active Workflow Pipeline Graph</h2>
+                        <span class="step-num">03</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="pipeline-graph">
+                            <!-- Node 1: Extract -->
+                            <div class="node-container" id="node-extract">
+                                <div class="node">
+                                    <div class="node-icon">🔍</div>
+                                    <div class="node-title">Extract Functions</div>
+                                    <div class="node-status-badge">Idle</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pipeline-arrow" id="arrow-1"></div>
+
+                            <!-- Node 2: Complexity -->
+                            <div class="node-container" id="node-complexity">
+                                <div class="node">
+                                    <div class="node-icon">📊</div>
+                                    <div class="node-title">Complexity Analysis</div>
+                                    <div class="node-status-badge">Idle</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pipeline-arrow" id="arrow-2"></div>
+
+                            <!-- Node 3: Detect -->
+                            <div class="node-container" id="node-detect">
+                                <div class="node">
+                                    <div class="node-icon">🛡️</div>
+                                    <div class="node-title">Issue Detection</div>
+                                    <div class="node-status-badge">Idle</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pipeline-arrow" id="arrow-3"></div>
+
+                            <!-- Node 4: Suggest -->
+                            <div class="node-container" id="node-suggest_improvements">
+                                <div class="node">
+                                    <div class="node-icon">🔧</div>
+                                    <div class="node-title">Refactor & Suggest</div>
+                                    <div class="node-status-badge">Idle</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Loop Tracker -->
+                        <div class="loop-indicator-bar" id="loop-indicator" style="display: none;">
+                            <span class="loop-icon">🔄</span> Self-Healing Loop Triggered: Refining Code for Quality Check...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabbed Results Card -->
+                <div class="card glass results-card">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" data-tab="tab-summary">Review Summary</button>
+                        <button class="tab-btn" data-tab="tab-bugs">Bugs & Security <span class="badge" id="badge-bugs">0</span></button>
+                        <button class="tab-btn" data-tab="tab-code">Refactored Code</button>
+                        <button class="tab-btn" data-tab="tab-logs">Execution Logs</button>
+                    </div>
+                    <div class="tabs-content">
+                        <!-- Tab: Summary -->
+                        <div class="tab-pane active" id="tab-summary">
+                            <div class="summary-dashboard">
+                                <div class="metric-row">
+                                    <div class="metric-box">
+                                        <span class="metric-label">Quality Score</span>
+                                        <span class="metric-value" id="val-quality">--</span>
+                                        <div class="progress-bar-container">
+                                            <div class="progress-bar" id="bar-quality" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                    <div class="metric-box">
+                                        <span class="metric-label">Complexity Score</span>
+                                        <span class="metric-value" id="val-complexity">--</span>
+                                    </div>
+                                    <div class="metric-box">
+                                        <span class="metric-label">Functions Found</span>
+                                        <span class="metric-value" id="val-funcs">--</span>
+                                    </div>
+                                </div>
+                                <div class="summary-details">
+                                    <h3>Project Summary</h3>
+                                    <p id="summary-text" class="placeholder-text">Run the workflow execution to generate an AI project review report...</p>
+                                    <div id="functions-list-container" style="display: none;">
+                                        <h4>Detected Functions:</h4>
+                                        <ul id="functions-list" class="function-pills"></ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Bugs -->
+                        <div class="tab-pane" id="tab-bugs">
+                            <div class="table-container">
+                                <table class="bugs-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Severity</th>
+                                            <th>Description</th>
+                                            <th>Location</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="bugs-tbody">
+                                        <tr class="empty-row">
+                                            <td colspan="4">No issues scanned yet. Click "Execute Workflow" to start analysis.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Refactored Code -->
+                        <div class="tab-pane" id="tab-code">
+                            <div class="refactor-layout">
+                                <div class="refactor-meta">
+                                    <h3>Optimized Implementation</h3>
+                                    <button class="btn btn-secondary btn-sm" id="btn-copy">Copy Code</button>
+                                </div>
+                                <div class="refactor-improvements">
+                                    <h4>Key Improvements Applied:</h4>
+                                    <ul id="improvements-list">
+                                        <li class="placeholder-li">Execute workflow to generate suggested improvements.</li>
+                                    </ul>
+                                </div>
+                                <div class="code-views">
+                                    <div class="code-view-container">
+                                        <div class="code-view-header">Refactored Code</div>
+                                        <pre><code class="language-python" id="refactored-code-block"># Refactored output will appear here...</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Tab: Logs -->
+                        <div class="tab-pane" id="tab-logs">
+                            <div class="console-log" id="console-logs">
+                                <div class="console-line system">> System initialized. Waiting for input...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Prism JS for Code Highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <!-- Custom Application Logic -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

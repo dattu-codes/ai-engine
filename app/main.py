@@ -1,5 +1,10 @@
 import asyncio
-from fastapi import FastAPI, HTTPException
+import os
+import mimetypes
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.models.schemas import CreateGraphRequest, RunGraphRequest
 from app.db import GraphStore, RunStore
 from app.workflows.code_review import build_code_review_graph
@@ -9,11 +14,37 @@ from app.engine.runner import Runner
 # FastAPI app
 app = FastAPI(title="Mini Workflow Engine")
 
+# Add CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # In-memory stores
 graph_store = GraphStore()
 run_store = RunStore()
 runner = Runner(graph_store, run_store)
 
+# Custom static file endpoints to avoid aiofiles/starlette async file dependencies
+@app.get("/")
+async def read_index():
+    path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>AI Engine Intern UI not found.</h1><p>Please create the app/static folder structure.</p>")
+
+@app.get("/static/{file_path:path}")
+async def get_static_file(file_path: str):
+    path = os.path.join(os.path.dirname(__file__), "static", file_path)
+    if os.path.exists(path) and os.path.isfile(path):
+        mime_type, _ = mimetypes.guess_type(path)
+        with open(path, "rb") as f:
+            return Response(content=f.read(), media_type=mime_type)
+    raise HTTPException(status_code=404, detail="File not found")
 
 @app.post("/graph/create")
 async def create_graph(req: CreateGraphRequest):

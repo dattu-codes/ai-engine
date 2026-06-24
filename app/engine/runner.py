@@ -49,6 +49,11 @@ class Runner:
                 else:
                     state, log = node.fn(state)
 
+                # Add physical server timestamp to log
+                import datetime
+                if isinstance(log, dict):
+                    log["timestamp"] = datetime.datetime.now().strftime("%I:%M:%S %p").lower()
+
                 # Save update & log
                 self.run_store.update_run(run_id, state=state, log=log)
 
