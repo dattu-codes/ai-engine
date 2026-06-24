@@ -1,75 +1,99 @@
-AI Engine Intern – Workflow Execution API
+# AI Engine Intern – Self-Healing Workflow Dashboard
 
-A lightweight workflow engine built using FastAPI that executes AI-driven tasks through a modular and extensible pipeline. This project demonstrates how to build, register, and run workflows programmatically using a clean API structure.
+A lightweight, premium workflow orchestration engine built on FastAPI that conducts automated, AI-driven Python code reviews. It features real-time graph visualization, self-healing execution loops, and an interactive, glassmorphic dark-mode web dashboard.
 
-Tech Stack
+---
 
-Python 3.10+
+## Key Features
 
-FastAPI
+- **Interactive Visual Dashboard**: Input source code, tweak quality thresholds, watch pipeline stages execute in real-time, inspect security warnings, and review syntax-highlighted code recommendations.
+- **Dual Review Engines**:
+  - **Live API Mode**: Connects directly to the Gemini 1.5 Flash or Pro model for logical bug audits, security assessments, and custom refactoring.
+  - **Offline AST Mode**: Uses Python's standard `ast` (Abstract Syntax Tree) module to structurally parse functions and run static code reviews locally with zero configuration.
+- **Self-Healing Loop Routing**: If the estimated code quality score falls below the configured threshold on the first pass, the backend refactors the code and automatically loops back to the start node to re-verify the codebase's final quality.
+- **Retro Log Terminal**: Displays real-time, chronological execution step logs synced directly with backend timestamps.
 
-Pydantic
+---
 
-Uvicorn
+## Tech Stack
 
-Custom Workflow Engine Core
+- **Backend**: FastAPI, Python 3.10+, Pydantic
+- **AI Integration**: Google Gemini API (standard HTTP/JSON client)
+- **Frontend**: HTML5, Vanilla CSS, Javascript (Prism.js CDN for code highlighting)
 
-Project Structure
+---
 
+## Project Structure
+
+```
 ai_engine_intern/
-app/
-main.py – FastAPI app entrypoint
-router.py – API routes
-workflow_registry.py – Registers workflows
-tasks_manager.py – Task execution manager
-workflows/
-example_workflow.py – Sample workflow
-steps/ – Individual workflow steps
-requirements.txt
-README.md
+│
+├── app/
+│   ├── engine/
+│   │   ├── graph.py       # Graph and node structure definitions
+│   │   └── runner.py      # Async graph step runner with timestamped logging
+│   │
+│   ├── models/
+│   │   └── schemas.py     # Pydantic API request schemas
+│   │
+│   ├── services/
+│   │   └── ai.py          # Gemini API client & offline AST simulator
+│   │
+│   ├── static/
+│   │   ├── index.html     # Dashboard layout page
+│   │   ├── style.css      # Glassmorphic dark-theme styles & animations
+│   │   └── app.js         # Frontend state, polling, & UI event listeners
+│   │
+│   ├── workflows/
+│   │   └── code_review.py # Modular review nodes & self-healing logic
+│   │
+│   ├── db.py              # In-memory stores for graphs and executions
+│   ├── main.py            # FastAPI entry point & custom file endpoints
+│   └── registry.py        # Generic node function registry
+│
+├── README.md
+└── requirements.txt
+```
 
-Running the Application
+---
 
-Create virtual environment
+## Running the Application
+
+### 1. Set Up the Virtual Environment
+```bash
+# Create virtual environment
 python -m venv venv
-source venv/bin/activate (Linux/Mac)
-venv\Scripts\activate (Windows)
 
-Install dependencies
+# Activate virtual environment (Windows PowerShell)
+.\venv\Scripts\Activate.ps1
+
+# Activate virtual environment (Mac/Linux)
+source venv/bin/activate
+```
+
+### 2. Install Dependencies
+```bash
 pip install -r requirements.txt
+```
 
-Start server
-uvicorn ai_engine_intern.app.main:app --reload
+### 3. Run the Server
+```bash
+uvicorn app.main:app --reload
+```
 
-Open API docs
-http://127.0.0.1:8000/docs
+### 4. Access the App
+- Open your browser and navigate to: **`http://127.0.0.1:8000/`**
+- Interactive API Documentation: **`http://127.0.0.1:8000/docs`**
 
-Example: Running a Workflow
+---
 
-Send a POST request:
+## Live vs. Offline Demo Mode
 
-POST /run-workflow
-{
-"workflow_name": "example_workflow",
-"input": {
-"text": "Hello AI Engine"
-}
-}
+- **Demo Mode**: Keep the "Gemini API Key" field blank. The dashboard will run fully locally using the AST simulator to perform reviews.
+- **Live Mode**: Paste your Gemini API Key in the Engine Configuration panel, select your model, and run reviews. Keys are passed safely in the request payload.
 
-Features
+---
 
-Easy workflow registration
-
-Modular step-based design
-
-FastAPI-powered clean API
-
-Extensible for ML/AI task orchestration
-
-License
+## License
 
 MIT License
-
-Author
-
-Dattatreya Teella
