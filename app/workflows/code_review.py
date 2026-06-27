@@ -19,6 +19,7 @@ def clean_json_response(text: str) -> str:
 async def extract_functions(state):
     code = state.get("code", "")
     api_key = state.get("api_key", "").strip()
+    model = state.get("model", "gemini-2.5-flash")
     
     # 1. Structural extraction is always best done via AST (100% accurate)
     ast_res = MockAISimulator.extract_functions(code)
@@ -32,7 +33,7 @@ async def extract_functions(state):
                 "Do not include any formatting or other text, just the paragraph itself.\n\n"
                 f"{code}"
             )
-            summary = await GeminiClient.call_gemini(prompt, api_key)
+            summary = await GeminiClient.call_gemini(prompt, api_key, model=model)
             state["summary"] = summary
         except Exception as e:
             state["summary"] = f"AI summary failed: {str(e)}. Fallback: {ast_res['summary']}"
@@ -50,6 +51,7 @@ async def extract_functions(state):
 async def check_complexity(state):
     code = state.get("code", "")
     api_key = state.get("api_key", "").strip()
+    model = state.get("model", "gemini-2.5-flash")
     
     if api_key:
         try:
@@ -60,7 +62,7 @@ async def check_complexity(state):
                 '"metrics": {"readability": <int 1-10>, "modularity": <int 1-10>, "maintainability": <int 1-10>}}\n\n'
                 f"Code:\n{code}"
             )
-            raw_res = await GeminiClient.call_gemini(prompt, api_key, json_mode=True)
+            raw_res = await GeminiClient.call_gemini(prompt, api_key, model=model, json_mode=True)
             clean_res = clean_json_response(raw_res)
             res_dict = json.loads(clean_res)
             
@@ -90,6 +92,7 @@ async def check_complexity(state):
 async def detect_issues(state):
     code = state.get("code", "")
     api_key = state.get("api_key", "").strip()
+    model = state.get("model", "gemini-2.5-flash")
     
     if api_key:
         try:
@@ -100,7 +103,7 @@ async def detect_issues(state):
                 '"description": "<text>", "location": "<line or function>"}]}\n\n'
                 f"Code:\n{code}"
             )
-            raw_res = await GeminiClient.call_gemini(prompt, api_key, json_mode=True)
+            raw_res = await GeminiClient.call_gemini(prompt, api_key, model=model, json_mode=True)
             clean_res = clean_json_response(raw_res)
             res_dict = json.loads(clean_res)
             state["issues"] = res_dict.get("issues", [])
@@ -129,6 +132,7 @@ async def detect_issues(state):
 async def suggest_improvements(state):
     code = state.get("code", "")
     api_key = state.get("api_key", "").strip()
+    model = state.get("model", "gemini-2.5-flash")
     issues = state.get("issues", [])
     
     # Calculate quality score
@@ -165,7 +169,7 @@ async def suggest_improvements(state):
                     f"Original Code:\n{code}\n\n"
                     f"Issues to Resolve:\n{issues_str}"
                 )
-                raw_res = await GeminiClient.call_gemini(prompt, api_key, json_mode=True)
+                raw_res = await GeminiClient.call_gemini(prompt, api_key, model=model, json_mode=True)
                 clean_res = clean_json_response(raw_res)
                 res_dict = json.loads(clean_res)
                 

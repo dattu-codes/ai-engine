@@ -11,8 +11,11 @@ class GeminiClient:
     Runs HTTP requests in a separate thread pool to prevent blocking the async loop.
     """
     @staticmethod
-    async def call_gemini(prompt: str, api_key: str, json_mode: bool = False) -> str:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    async def call_gemini(prompt: str, api_key: str, model: str = "gemini-2.5-flash", json_mode: bool = False) -> str:
+        model_name = model
+        if not model_name.startswith("models/"):
+            model_name = f"models/{model_name}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={api_key}"
         headers = {"Content-Type": "application/json"}
         
         data = {
