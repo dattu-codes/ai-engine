@@ -34,7 +34,7 @@ class GeminiClient:
         
         def _execute():
             try:
-                with urllib.request.urlopen(req, timeout=15) as response:
+                with urllib.request.urlopen(req, timeout=30) as response:
                     return response.read().decode("utf-8")
             except urllib.error.HTTPError as e:
                 error_body = e.read().decode("utf-8")
