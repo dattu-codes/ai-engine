@@ -12,6 +12,7 @@ from app.auth.schemas.auth_schemas import (
 from app.auth.services.auth_service import AuthService
 from app.auth.services.rate_limiter import rate_limiter
 from app.auth.dependencies import get_current_user, require_admin_role
+from app.auth.config.settings import settings
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 

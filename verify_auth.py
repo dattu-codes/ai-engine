@@ -186,7 +186,7 @@ def run_tests():
     print()
 
     print("=========================================================")
-    print("     🎉 SUCCESS: ALL AUTHENTICATION TESTS PASSED!        ")
+    print("     SUCCESS: ALL AUTHENTICATION TESTS PASSED!        ")
     print("=========================================================")
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import threading
 from datetime import datetime, timedelta
 from typing import Dict, List
 from fastapi import HTTPException, status
+from app.auth.config.settings import settings
 
 class LoginRateLimiter:
     def __init__(self):
@@ -12,15 +13,15 @@ class LoginRateLimiter:
     def check_rate_limit(self, username: str, ip_address: str):
         key = f"{username}:{ip_address}"
         now = datetime.utcnow()
-        one_minute_ago = now - timedelta(minutes=1)
+        window_ago = now - timedelta(seconds=settings.RATE_LIMIT_WINDOW_SECONDS)
 
         with self._lock:
             if key not in self._failed_attempts:
                 return
 
-            # Keep only attempts in the last 60 seconds
+            # Keep only attempts in the last window
             self._failed_attempts[key] = [
-                t for t in self._failed_attempts[key] if t > one_minute_ago
+                t for t in self._failed_attempts[key] if t > window_ago
             ]
 
             # Enforce 5 failed attempts per minute limit
