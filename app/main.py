@@ -11,6 +11,12 @@ from app.workflows.code_review import build_code_review_graph
 from app.engine.graph import Graph
 from app.engine.runner import Runner
 
+from app.auth.database.connection import Base, engine
+from app.auth.routes.auth_routes import auth_router
+
+# Create database tables automatically on startup
+Base.metadata.create_all(bind=engine)
+
 # FastAPI app
 app = FastAPI(title="Mini Workflow Engine")
 
@@ -22,6 +28,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register Authentication router
+app.include_router(auth_router)
 
 # In-memory stores
 graph_store = GraphStore()
