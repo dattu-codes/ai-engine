@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float
 from sqlalchemy.orm import relationship
 from app.auth.database.connection import Base
 
@@ -25,6 +25,12 @@ class Analysis(Base):
     status = Column(String(50), default="pending", nullable=False)  # pending, completed, failed
     source_type = Column(String(50), nullable=False)  # paste, zip, repository
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Tracking fields for analysis run execution metrics
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    duration = Column(Float, nullable=True)  # duration in seconds
+    model_used = Column(String(100), nullable=True)
 
     # Relationships
     project = relationship("Project", back_populates="analyses")

@@ -813,6 +813,9 @@ function initProjectsTab() {
         });
     });
 
+    // Run AI Review click binding
+    document.getElementById('btn-start-project-analysis').addEventListener('click', startProjectAnalysis);
+
     // Ingest Paste Code Form
     document.getElementById('form-ingest-paste').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1014,15 +1017,19 @@ async function selectProject(id) {
             statusEl.className = 'stat-value';
             if (details.last_analysis.status === 'completed') {
                 statusEl.style.color = 'var(--accent-green)';
+                loadProjectReport(details.last_analysis.id);
             } else if (details.last_analysis.status === 'failed') {
                 statusEl.style.color = 'var(--accent-red)';
+                document.getElementById('project-report-card').style.display = 'none';
             } else {
                 statusEl.style.color = 'var(--accent-orange)';
+                document.getElementById('project-report-card').style.display = 'none';
             }
         } else {
             document.getElementById('detail-project-last-run').textContent = '--';
             document.getElementById('detail-project-status').textContent = 'UNANALYZED';
             document.getElementById('detail-project-status').style.color = '';
+            document.getElementById('project-report-card').style.display = 'none';
         }
 
         document.getElementById('active-project-details').style.display = 'flex';
@@ -1123,4 +1130,184 @@ function escapeHtml(text) {
         "'": '&#039;'
     };
     return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
+/* ==========================================================================
+   AI REVIEW RUN & REPORT RENDERING FUNCTIONS
+   ========================================================================== */
+
+let analysisPollInterval = null;
+
+async function startProjectAnalysis() {
+    if (!activeProjectId) return;
+
+    const apiKey = document.getElementById('project-analysis-key').value;
+    const btn = document.getElementById('btn-start-project-analysis');
+    const progressContainer = document.getElementById('analysis-progress-container');
+    const progressLabel = document.getElementById('analysis-progress-label');
+    const progressPct = document.getElementById('analysis-progress-pct');
+    const progressBar = document.getElementById('analysis-progress-bar');
+    const reportCard = document.getElementById('project-report-card');
+
+    btn.disabled = true;
+    reportCard.style.display = 'none';
+    progressContainer.style.display = 'block';
+    
+    progressLabel.textContent = 'Enqueuing run...';
+    progressPct.textContent = '10%';
+    progressBar.style.width = '10%';
+
+    try {
+        const res = await authorizedFetch(`/analysis/${activeProjectId}/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey || null })
+        });
+
+        if (!res.ok) {
+            const data = await res.json();
+            alert(data.detail || 'Failed to start analysis.');
+            progressContainer.style.display = 'none';
+            btn.disabled = false;
+            return;
+        }
+
+        const analysis = await res.json();
+        const analysisId = analysis.id;
+
+        // Poll analysis run status
+        progressLabel.textContent = 'Reviewing codebase...';
+        progressPct.textContent = '30%';
+        progressBar.style.width = '30%';
+
+        if (analysisPollInterval) clearInterval(analysisPollInterval);
+        
+        analysisPollInterval = setInterval(async () => {
+            try {
+                const statusRes = await authorizedFetch(`/analysis/${analysisId}`);
+                if (!statusRes.ok) return;
+
+                const run = await statusRes.json();
+                if (run.status === 'running') {
+                    progressLabel.textContent = 'AI is writing the report...';
+                    progressPct.textContent = '65%';
+                    progressBar.style.width = '65%';
+                } else if (run.status === 'completed') {
+                    clearInterval(analysisPollInterval);
+                    progressLabel.textContent = 'Analysis Completed!';
+                    progressPct.textContent = '100%';
+                    progressBar.style.width = '100%';
+
+                    // Load the report details
+                    await loadProjectReport(analysisId);
+                    
+                    // Refresh project stats (updates status badge & last run time)
+                    await selectProject(activeProjectId);
+
+                    setTimeout(() => {
+                        progressContainer.style.display = 'none';
+                        btn.disabled = false;
+                    }, 2000);
+                } else if (run.status === 'failed') {
+                    clearInterval(analysisPollInterval);
+                    alert('AI Review run encountered an error or timed out.');
+                    progressContainer.style.display = 'none';
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error('Error polling status:', err);
+            }
+        }, 1500);
+
+    } catch (err) {
+        alert('Error starting review: ' + err.message);
+        progressContainer.style.display = 'none';
+        btn.disabled = false;
+    }
+}
+
+async function loadProjectReport(analysisId) {
+    try {
+        const res = await authorizedFetch(`/analysis/${analysisId}/report`);
+        if (!res.ok) return;
+
+        const report = await res.json();
+        renderProjectReport(report);
+    } catch (err) {
+        console.error('Failed to load project report:', err);
+    }
+}
+
+function renderProjectReport(report) {
+    let data;
+    try {
+        data = typeof report.details_json === 'string' 
+            ? jsonParseSafe(report.details_json) 
+            : report.details_json;
+    } catch (err) {
+        data = report;
+    }
+
+    if (!data) return;
+
+    // Set score and badge color
+    const scoreBadge = document.getElementById('report-score-badge');
+    scoreBadge.textContent = `${data.score || 0}/100`;
+    
+    // Set Executive Summary
+    document.getElementById('report-summary-text').textContent = data.summary || 'No summary text available.';
+
+    // Populate lists helper
+    const populateList = (elementId, items) => {
+        const el = document.getElementById(elementId);
+        el.innerHTML = '';
+        if (items && items.length > 0) {
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = item;
+                el.appendChild(li);
+            });
+        } else {
+            el.innerHTML = '<li style="color: var(--text-muted);">None noted.</li>';
+        }
+    };
+
+    populateList('report-strengths-list', data.strengths);
+    populateList('report-weaknesses-list', data.weaknesses);
+    populateList('report-recommendations-list', data.recommendations);
+
+    // Populate Issues table
+    const tbody = document.getElementById('report-issues-tbody');
+    tbody.innerHTML = '';
+    const issues = data.issues || [];
+
+    if (issues.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No issues detected by the AI Review Engine. Excellent!</td></tr>';
+    } else {
+        issues.forEach(issue => {
+            const tr = document.createElement('tr');
+            const severityClass = `badge-severity-${(issue.severity || 'low').toLowerCase()}`;
+            tr.innerHTML = `
+                <td><span class="pill outline" style="font-size: 11px;">${escapeHtml(issue.category)}</span></td>
+                <td><span class="${severityClass}">${escapeHtml(issue.severity)}</span></td>
+                <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-bright);">${escapeHtml(issue.file)}</td>
+                <td>
+                    <div style="font-weight: 600; color: var(--text-bright); margin-bottom: 4px;">${escapeHtml(issue.title)}</div>
+                    <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">${escapeHtml(issue.description)}</div>
+                </td>
+                <td style="font-size: 12px; color: var(--accent-teal); line-height: 1.4;">${escapeHtml(issue.recommendation)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    document.getElementById('project-report-card').style.display = 'block';
+}
+
+function jsonParseSafe(str) {
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        return {};
+    }
 }

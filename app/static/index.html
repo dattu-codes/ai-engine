@@ -329,6 +329,22 @@
                                             <span class="stat-value" id="detail-project-status">--</span>
                                         </div>
                                     </div>
+                                    <div class="card-footer" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+                                        <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+                                            <label for="project-analysis-key" style="font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap;">Gemini API Key</label>
+                                            <input type="password" id="project-analysis-key" placeholder="Enter key (leave empty for offline)..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                                        </div>
+                                        <button class="btn btn-primary" id="btn-start-project-analysis" style="margin: 0; padding: 8px 16px;">Run AI Review</button>
+                                    </div>
+                                    <div id="analysis-progress-container" style="display: none; margin-top: 12px; width: 100%;">
+                                        <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--accent-purple); font-weight: 600; margin-bottom: 6px;">
+                                            <span id="analysis-progress-label">Starting Analysis...</span>
+                                            <span id="analysis-progress-pct">0%</span>
+                                        </div>
+                                        <div class="progress-bar-container" style="height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+                                            <div class="progress-bar" id="analysis-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--accent-purple), var(--accent-teal)); transition: width 0.3s ease;"></div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -383,6 +399,58 @@
                                             <span class="input-hint" style="margin-top: -6px; margin-bottom: 12px; display: block;">Cloning and indexing architecture setup (Simulation only)</span>
                                             <button type="submit" class="btn btn-primary">Link Repository</button>
                                         </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Project Analysis Report Card -->
+                            <div class="card glass" id="project-report-card" style="display: none;">
+                                <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                                    <h2>AI Code Review Report</h2>
+                                    <div class="report-score-badge" id="report-score-badge" style="background: linear-gradient(135deg, var(--accent-purple), var(--accent-teal)); color: white; padding: 4px 10px; border-radius: 20px; font-size: 14px; font-weight: 700; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">--</div>
+                                </div>
+                                <div class="card-body" style="display: flex; flex-direction: column; gap: 20px; padding-top: 16px;">
+                                    <div class="report-summary-box">
+                                        <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-teal); margin-bottom: 8px;">Executive Summary</h3>
+                                        <p id="report-summary-text" style="color: var(--text-main); font-size: 14px; line-height: 1.6;">No report loaded.</p>
+                                    </div>
+                                    <div class="report-grids" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                        <div class="report-column">
+                                            <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-bright); margin-bottom: 8px;">Key Strengths</h3>
+                                            <ul id="report-strengths-list" style="padding-left: 20px; color: var(--text-main); font-size: 13px; line-height: 1.6;">
+                                            </ul>
+                                        </div>
+                                        <div class="report-column">
+                                            <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #ef4444; margin-bottom: 8px;">Key Weaknesses</h3>
+                                            <ul id="report-weaknesses-list" style="padding-left: 20px; color: var(--text-main); font-size: 13px; line-height: 1.6;">
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    <div class="report-recommendations">
+                                        <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-purple); margin-bottom: 8px;">Recommendations</h3>
+                                        <ul id="report-recommendations-list" style="padding-left: 20px; color: var(--text-main); font-size: 13px; line-height: 1.6;">
+                                        </ul>
+                                    </div>
+                                    <div class="report-issues">
+                                        <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-bright); margin-bottom: 8px;">Detected Code Issues</h3>
+                                        <div class="table-container">
+                                            <table class="bugs-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Category</th>
+                                                        <th>Severity</th>
+                                                        <th>File</th>
+                                                        <th>Description</th>
+                                                        <th>Recommendation</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="report-issues-tbody">
+                                                    <tr class="empty-row">
+                                                        <td colspan="5">No issues detected.</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

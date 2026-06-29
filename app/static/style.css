@@ -1480,4 +1480,48 @@ textarea#code-input {
     color: var(--text-muted);
 }
 
+/* AI Review Report Styling */
+#project-report-card h3 {
+    margin-top: 0;
+}
+
+#project-report-card ul {
+    margin: 0;
+}
+
+#project-report-card li {
+    margin-bottom: 6px;
+}
+
+.badge-severity-high {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-severity-medium {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-severity-low {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+
 
