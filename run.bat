@@ -1,6 +1,6 @@
 @echo off
 echo ===================================================
-echo   Starting AI Engine Intern Backend Server...
+echo   Starting AI Engine Backend Server...
 echo ===================================================
 echo.
 

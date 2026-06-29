@@ -45,7 +45,7 @@ async def read_index():
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>AI Engine Intern UI not found.</h1><p>Please create the app/static folder structure.</p>")
+    return HTMLResponse(content="<h1>AI Engine UI not found.</h1><p>Please create the app/static folder structure.</p>")
 
 @app.get("/static/{file_path:path}")
 async def get_static_file(file_path: str):

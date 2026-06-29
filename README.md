@@ -1,4 +1,4 @@
-# AI Engine Intern – Self-Healing Workflow Dashboard
+# AI Engine – Self-Healing Workflow Dashboard
 
 A lightweight, premium workflow orchestration engine built on FastAPI that conducts automated, AI-driven Python code reviews. It features real-time graph visualization, self-healing execution loops, and an interactive, glassmorphic dark-mode web dashboard.
 
@@ -42,7 +42,7 @@ We have added a secure, modular, and production-ready JSON Web Token (JWT) Authe
 ## Project Structure
 
 ```
-ai-engine-intern/
+ai-engine/
 │
 ├── app/
 │   ├── auth/              # Authentication System (Clean Architecture)
