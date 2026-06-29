@@ -1,7 +1,7 @@
 import asyncio
 import os
 import mimetypes
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Response, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,6 +13,7 @@ from app.engine.runner import Runner
 
 from app.auth.database.connection import Base, engine
 from app.auth.routes.auth_routes import auth_router
+from app.auth.dependencies import get_current_user
 
 # Create database tables automatically on startup
 Base.metadata.create_all(bind=engine)

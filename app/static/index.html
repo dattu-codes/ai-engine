@@ -27,9 +27,15 @@
                     <p>Self-Healing Workflow Execution API</p>
                 </div>
             </div>
-            <div class="system-status">
-                <span class="status-indicator online"></span>
-                <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div class="header-auth" id="header-auth" style="display: none;">
+                    <span>User: <strong id="user-display-name">...</strong> (<span id="user-display-role">...</span>)</span>
+                    <button id="btn-logout">Logout</button>
+                </div>
+                <div class="system-status">
+                    <span class="status-indicator online"></span>
+                    <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+                </div>
             </div>
         </header>
 
@@ -256,6 +262,41 @@
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- Authentication Overlay Gate -->
+    <div class="auth-overlay" id="auth-overlay">
+        <div class="auth-card glass">
+            <div class="auth-card-header">
+                <h2>Secure Access Gateway</h2>
+                <p>AI Engine Self-Healing Workflow Platform</p>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" id="tab-login-btn">Login</button>
+                <button class="auth-tab-btn" id="tab-signup-btn">Sign Up</button>
+            </div>
+            <div class="auth-card-body">
+                <form id="auth-form">
+                    <div class="form-group">
+                        <label for="auth-username">Username</label>
+                        <input type="text" id="auth-username" required placeholder="Enter username...">
+                    </div>
+                    <div class="form-group">
+                        <label for="auth-password">Password</label>
+                        <input type="password" id="auth-password" required placeholder="Enter password (min. 6 chars)...">
+                    </div>
+                    <div class="form-group" id="signup-role-group" style="display: none;">
+                        <label for="auth-role">Access Role</label>
+                        <select id="auth-role">
+                            <option value="user">Standard User</option>
+                            <option value="admin">Administrator</option>
+                        </select>
+                    </div>
+                    <div id="auth-error-msg" class="auth-error" style="display: none;"></div>
+                    <button type="submit" id="btn-auth-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Login</button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Prism JS for Code Highlighting -->

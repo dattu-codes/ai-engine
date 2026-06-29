@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initFormControls();
     initLineNumbers();
     initDemoSetup();
+    initAuth();
 });
 
 // Tab Navigation logic
@@ -220,7 +221,7 @@ async  function executeWorkflow() {
 
     try {
         // 1. Create Graph preset
-        const createRes = await fetch('/graph/create', {
+        const createRes = await authorizedFetch('/graph/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ preset: 'code_review' })
@@ -231,7 +232,7 @@ async  function executeWorkflow() {
         appendLog(`Workflow Graph registered. ID: ${graph_id.slice(0, 8)}...`, 'success');
 
         // 2. Start Graph Run
-        const runRes = await fetch('/graph/run', {
+        const runRes = await authorizedFetch('/graph/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -271,7 +272,7 @@ async  function executeWorkflow() {
 // Poll state endpoint
 async function pollState(runId) {
     try {
-        const res = await fetch(`/graph/state/${runId}`);
+        const res = await authorizedFetch(`/graph/state/${runId}`);
         if (!res.ok) throw new Error('State fetch rejected by backend.');
         const data = await res.json();
         
@@ -468,4 +469,246 @@ function finalizeWorkflow(runData) {
         li.textContent = imp;
         impsList.appendChild(li);
     });
+}
+
+/* ==========================================================================
+   AUTHENTICATION LOGIC & UTILITIES
+   ========================================================================== */
+
+let activeAuthTab = 'login'; // 'login' or 'signup'
+
+function initAuth() {
+    const tabLogin = document.getElementById('tab-login-btn');
+    const tabSignup = document.getElementById('tab-signup-btn');
+    const signupRoleGroup = document.getElementById('signup-role-group');
+    const authSubmitBtn = document.getElementById('btn-auth-submit');
+    const authForm = document.getElementById('auth-form');
+    const logoutBtn = document.getElementById('btn-logout');
+
+    // Tab toggling
+    tabLogin.addEventListener('click', () => {
+        activeAuthTab = 'login';
+        tabLogin.classList.add('active');
+        tabSignup.classList.remove('active');
+        signupRoleGroup.style.display = 'none';
+        authSubmitBtn.textContent = 'Login';
+        clearAuthError();
+    });
+
+    tabSignup.addEventListener('click', () => {
+        activeAuthTab = 'signup';
+        tabSignup.classList.add('active');
+        tabLogin.classList.remove('active');
+        signupRoleGroup.style.display = 'block';
+        authSubmitBtn.textContent = 'Sign Up';
+        clearAuthError();
+    });
+
+    // Form Submission
+    authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('auth-username').value.trim();
+        const password = document.getElementById('auth-password').value;
+        const role = document.getElementById('auth-role').value;
+
+        clearAuthError();
+
+        if (activeAuthTab === 'login') {
+            await handleLogin(username, password);
+        } else {
+            await handleSignup(username, password, role);
+        }
+    });
+
+    // Logout Action
+    logoutBtn.addEventListener('click', handleLogout);
+
+    // Initial session verification
+    checkUserSession();
+}
+
+function clearAuthError() {
+    const errorMsg = document.getElementById('auth-error-msg');
+    errorMsg.style.display = 'none';
+    errorMsg.textContent = '';
+}
+
+function showAuthError(message) {
+    const errorMsg = document.getElementById('auth-error-msg');
+    errorMsg.style.display = 'block';
+    errorMsg.textContent = message;
+}
+
+async function handleLogin(username, password) {
+    try {
+        const res = await fetch('/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+            await checkUserSession();
+            
+            // Reset input values
+            document.getElementById('auth-username').value = '';
+            document.getElementById('auth-password').value = '';
+        } else {
+            showAuthError(data.detail || 'Login failed. Please check credentials.');
+        }
+    } catch (e) {
+        showAuthError('Connection error: Failed to reach backend server.');
+    }
+}
+
+async function handleSignup(username, password, role) {
+    try {
+        const res = await fetch('/auth/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password, role })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            // Success: Switch to login tab and auto-fill username
+            activeAuthTab = 'login';
+            document.getElementById('tab-login-btn').click();
+            document.getElementById('auth-username').value = username;
+            document.getElementById('auth-password').value = '';
+            showAuthError('Signup successful! Please enter your password to log in.');
+            document.getElementById('auth-error-msg').style.background = 'rgba(16, 185, 129, 0.08)';
+            document.getElementById('auth-error-msg').style.borderColor = 'var(--accent-green)';
+            document.getElementById('auth-error-msg').style.color = '#a7f3d0';
+        } else {
+            showAuthError(data.detail || 'Signup failed.');
+        }
+    } catch (e) {
+        showAuthError('Connection error: Failed to reach backend server.');
+    }
+}
+
+async function handleLogout() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    
+    // Clear tokens immediately on frontend
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    
+    // Reset UI
+    document.getElementById('auth-overlay').classList.remove('hidden');
+    document.getElementById('header-auth').style.display = 'none';
+
+    if (refreshToken) {
+        try {
+            await fetch('/auth/logout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ refresh_token: refreshToken })
+            });
+        } catch (e) {
+            console.error('Logout request failed on backend:', e);
+        }
+    }
+}
+
+async function checkUserSession() {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+        showLoginOverlay();
+        return;
+    }
+
+    try {
+        const res = await fetch('/auth/profile', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (res.ok) {
+            const user = await res.json();
+            
+            // Set header authentication state
+            document.getElementById('user-display-name').textContent = user.username;
+            document.getElementById('user-display-role').textContent = user.role.toUpperCase();
+            
+            // Adjust visual system indicators if needed
+            document.getElementById('header-auth').style.display = 'flex';
+            document.getElementById('auth-overlay').classList.add('hidden');
+        } else if (res.status === 401) {
+            // Attempt rotation
+            const refreshed = await attemptTokenRefresh();
+            if (refreshed) {
+                await checkUserSession();
+            } else {
+                showLoginOverlay();
+            }
+        } else {
+            showLoginOverlay();
+        }
+    } catch (e) {
+        showLoginOverlay();
+        showAuthError('Connection lost: Unable to check credentials session.');
+    }
+}
+
+function showLoginOverlay() {
+    document.getElementById('auth-overlay').classList.remove('hidden');
+    document.getElementById('header-auth').style.display = 'none';
+}
+
+// Custom authenticated fetch utility
+async function authorizedFetch(url, options = {}) {
+    let accessToken = localStorage.getItem('access_token');
+    
+    if (!options.headers) {
+        options.headers = {};
+    }
+    if (accessToken) {
+        options.headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    let response = await fetch(url, options);
+
+    if (response.status === 401 && localStorage.getItem('refresh_token')) {
+        const refreshed = await attemptTokenRefresh();
+        if (refreshed) {
+            // Retry
+            options.headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`;
+            response = await fetch(url, options);
+        } else {
+            showLoginOverlay();
+            throw new Error('Session expired. Please log in again.');
+        }
+    }
+
+    return response;
+}
+
+async function attemptTokenRefresh() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return false;
+
+    try {
+        const res = await fetch('/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+            return true;
+        }
+    } catch (e) {
+        console.error('Session token refresh failed:', e);
+    }
+    
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    return false;
 }
