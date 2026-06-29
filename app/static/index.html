@@ -39,56 +39,75 @@
             </div>
         </header>
 
-        <!-- Main Workspace -->
-        <main class="workspace">
-            <!-- Left Panel: Configuration & Code Editor -->
-            <section class="panel-left">
-                <!-- API Settings Card -->
-                <div class="card glass">
-                    <div class="card-header">
-                        <h2>Engine Configuration</h2>
-                        <span class="step-num">01</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-group">
-                            <label for="api-key">Gemini API Key</label>
-                            <div class="api-key-container">
-                                <input type="password" id="api-key" placeholder="Enter API Key to enable Live Mode..." autocomplete="new-password">
-                                <button type="button" id="toggle-key-visibility" class="btn-icon">👁️</button>
-                            </div>
-                            <span class="input-hint">Leave blank to use AST-based Offline Simulator (No key required)</span>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group half">
-                                <label for="threshold">Quality Threshold (%)</label>
-                                <div class="slider-container">
-                                    <input type="range" id="threshold" min="50" max="95" value="80">
-                                    <span id="threshold-val">80%</span>
+        <!-- Main Layout with Sidebar -->
+        <div class="app-layout">
+            <!-- Sidebar -->
+            <aside class="app-sidebar glass">
+                <nav class="sidebar-nav">
+                    <button class="nav-item active" data-view="view-dashboard">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-text">Dashboard</span>
+                    </button>
+                    <button class="nav-item" data-view="view-projects">
+                        <span class="nav-icon">📁</span>
+                        <span class="nav-text">Projects</span>
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="main-content">
+                <!-- View: Dashboard (The original single code analysis view) -->
+                <div class="view-pane active" id="view-dashboard">
+                    <div style="display: flex; gap: 20px; align-items: start;">
+                        <!-- Left Panel: Configuration & Code Editor -->
+                        <section class="panel-left" style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+                            <!-- API Settings Card -->
+                            <div class="card glass">
+                                <div class="card-header">
+                                    <h2>Engine Configuration</h2>
+                                    <span class="step-num">01</span>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-group">
+                                        <label for="api-key">Gemini API Key</label>
+                                        <div class="api-key-container">
+                                            <input type="password" id="api-key" placeholder="Enter API Key to enable Live Mode..." autocomplete="new-password">
+                                            <button type="button" id="toggle-key-visibility" class="btn-icon">👁️</button>
+                                        </div>
+                                        <span class="input-hint">Leave blank to use AST-based Offline Simulator (No key required)</span>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group half">
+                                            <label for="threshold">Quality Threshold (%)</label>
+                                            <div class="slider-container">
+                                                <input type="range" id="threshold" min="50" max="95" value="80">
+                                                <span id="threshold-val">80%</span>
+                                            </div>
+                                        </div>
+                                        <div class="form-group half">
+                                            <label for="model">Model Engine</label>
+                                            <select id="model">
+                                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
+                                                 <option value="gemini-2.5-pro">Gemini 2.5 Pro (In-depth)</option>
+                                                 <option value="gemini-3.5-flash">Gemini 3.5 Flash (Latest)</option>
+                                                 <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                                             </select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="form-group half">
-                                <label for="model">Model Engine</label>
-                                <select id="model">
-                                     <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
-                                     <option value="gemini-2.5-pro">Gemini 2.5 Pro (In-depth)</option>
-                                     <option value="gemini-3.5-flash">Gemini 3.5 Flash (Latest)</option>
-                                     <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-                                 </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Code Editor Card -->
-                <div class="card glass editor-card">
-                    <div class="card-header">
-                        <h2>Source Code Input (Python)</h2>
-                        <span class="step-num">02</span>
-                    </div>
-                    <div class="card-body editor-body">
-                        <div class="editor-container">
-                            <div class="line-numbers" id="line-numbers"></div>
-                            <textarea id="code-input" spellcheck="false">def process_user_data(user_id, email):
+                            <!-- Code Editor Card -->
+                            <div class="card glass editor-card">
+                                <div class="card-header">
+                                    <h2>Source Code Input (Python)</h2>
+                                    <span class="step-num">02</span>
+                                </div>
+                                <div class="card-body editor-body">
+                                    <div class="editor-container">
+                                        <div class="line-numbers" id="line-numbers"></div>
+                                        <textarea id="code-input" spellcheck="false">def process_user_data(user_id, email):
     # TODO: Add authentication checks
     print("Fetching user: " + str(user_id))
     
@@ -100,169 +119,304 @@
     print("User fetch attempt complete")
     return user
 </textarea>
-                        </div>
-                        <button id="btn-run" class="btn btn-primary pulse-btn">
-                            <span class="btn-text">Execute Workflow</span>
-                            <div class="btn-glow"></div>
-                        </button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Right Panel: Execution Visualizer & Results -->
-            <section class="panel-right">
-                <!-- Visual Pipeline Card -->
-                <div class="card glass visualizer-card">
-                    <div class="card-header">
-                        <h2>Active Workflow Pipeline Graph</h2>
-                        <span class="step-num">03</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="pipeline-graph">
-                            <!-- Node 1: Extract -->
-                            <div class="node-container" id="node-extract">
-                                <div class="node">
-                                    <div class="node-icon">🔍</div>
-                                    <div class="node-title">Extract Functions</div>
-                                    <div class="node-status-badge">Idle</div>
+                                    </div>
+                                    <button id="btn-run" class="btn btn-primary pulse-btn">
+                                        <span class="btn-text">Execute Workflow</span>
+                                        <div class="btn-glow"></div>
+                                    </button>
                                 </div>
                             </div>
-                            
-                            <div class="pipeline-arrow" id="arrow-1"></div>
+                        </section>
 
-                            <!-- Node 2: Complexity -->
-                            <div class="node-container" id="node-complexity">
-                                <div class="node">
-                                    <div class="node-icon">📊</div>
-                                    <div class="node-title">Complexity Analysis</div>
-                                    <div class="node-status-badge">Idle</div>
+                        <!-- Right Panel: Execution Visualizer & Results -->
+                        <section class="panel-right" style="flex: 1.2; display: flex; flex-direction: column; gap: 20px;">
+                            <!-- Visual Pipeline Card -->
+                            <div class="card glass visualizer-card">
+                                <div class="card-header">
+                                    <h2>Active Workflow Pipeline Graph</h2>
+                                    <span class="step-num">03</span>
                                 </div>
-                            </div>
-                            
-                            <div class="pipeline-arrow" id="arrow-2"></div>
+                                <div class="card-body">
+                                    <div class="pipeline-graph">
+                                        <!-- Node 1: Extract -->
+                                        <div class="node-container" id="node-extract">
+                                            <div class="node">
+                                                <div class="node-icon">🔍</div>
+                                                <div class="node-title">Extract Functions</div>
+                                                <div class="node-status-badge">Idle</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="pipeline-arrow" id="arrow-1"></div>
 
-                            <!-- Node 3: Detect -->
-                            <div class="node-container" id="node-detect">
-                                <div class="node">
-                                    <div class="node-icon">🛡️</div>
-                                    <div class="node-title">Issue Detection</div>
-                                    <div class="node-status-badge">Idle</div>
-                                </div>
-                            </div>
-                            
-                            <div class="pipeline-arrow" id="arrow-3"></div>
+                                        <!-- Node 2: Complexity -->
+                                        <div class="node-container" id="node-complexity">
+                                            <div class="node">
+                                                <div class="node-icon">📊</div>
+                                                <div class="node-title">Complexity Analysis</div>
+                                                <div class="node-status-badge">Idle</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="pipeline-arrow" id="arrow-2"></div>
 
-                            <!-- Node 4: Suggest -->
-                            <div class="node-container" id="node-suggest_improvements">
-                                <div class="node">
-                                    <div class="node-icon">🔧</div>
-                                    <div class="node-title">Refactor & Suggest</div>
-                                    <div class="node-status-badge">Idle</div>
-                                </div>
-                            </div>
-                        </div>
+                                        <!-- Node 3: Detect -->
+                                        <div class="node-container" id="node-detect">
+                                            <div class="node">
+                                                <div class="node-icon">🛡️</div>
+                                                <div class="node-title">Issue Detection</div>
+                                                <div class="node-status-badge">Idle</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="pipeline-arrow" id="arrow-3"></div>
 
-                        <!-- Loop Tracker -->
-                        <div class="loop-indicator-bar" id="loop-indicator" style="display: none;">
-                            <span class="loop-icon">🔄</span> Self-Healing Loop Triggered: Refining Code for Quality Check...
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tabbed Results Card -->
-                <div class="card glass results-card">
-                    <div class="tabs-header">
-                        <button class="tab-btn active" data-tab="tab-summary">Review Summary</button>
-                        <button class="tab-btn" data-tab="tab-bugs">Bugs & Security <span class="badge" id="badge-bugs">0</span></button>
-                        <button class="tab-btn" data-tab="tab-code">Refactored Code</button>
-                        <button class="tab-btn" data-tab="tab-logs">Execution Logs</button>
-                    </div>
-                    <div class="tabs-content">
-                        <!-- Tab: Summary -->
-                        <div class="tab-pane active" id="tab-summary">
-                            <div class="summary-dashboard">
-                                <div class="metric-row">
-                                    <div class="metric-box">
-                                        <span class="metric-label">Quality Score</span>
-                                        <span class="metric-value" id="val-quality">--</span>
-                                        <div class="progress-bar-container">
-                                            <div class="progress-bar" id="bar-quality" style="width: 0%"></div>
+                                        <!-- Node 4: Suggest -->
+                                        <div class="node-container" id="node-suggest_improvements">
+                                            <div class="node">
+                                                <div class="node-icon">🔧</div>
+                                                <div class="node-title">Refactor & Suggest</div>
+                                                <div class="node-status-badge">Idle</div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="metric-box">
-                                        <span class="metric-label">Complexity Score</span>
-                                        <span class="metric-value" id="val-complexity">--</span>
-                                    </div>
-                                    <div class="metric-box">
-                                        <span class="metric-label">Functions Found</span>
-                                        <span class="metric-value" id="val-funcs">--</span>
+
+                                    <!-- Loop Tracker -->
+                                    <div class="loop-indicator-bar" id="loop-indicator" style="display: none;">
+                                        <span class="loop-icon">🔄</span> Self-Healing Loop Triggered: Refining Code for Quality Check...
                                     </div>
                                 </div>
-                                <div class="summary-details">
-                                    <h3>Project Summary</h3>
-                                    <p id="summary-text" class="placeholder-text">Run the workflow execution to generate an AI project review report...</p>
-                                    <div id="functions-list-container" style="display: none;">
-                                        <h4>Detected Functions:</h4>
-                                        <ul id="functions-list" class="function-pills"></ul>
+                            </div>
+
+                            <!-- Tabbed Results Card -->
+                            <div class="card glass results-card">
+                                <div class="tabs-header">
+                                    <button class="tab-btn active" data-tab="tab-summary">Review Summary</button>
+                                    <button class="tab-btn" data-tab="tab-bugs">Bugs & Security <span class="badge" id="badge-bugs">0</span></button>
+                                    <button class="tab-btn" data-tab="tab-code">Refactored Code</button>
+                                    <button class="tab-btn" data-tab="tab-logs">Execution Logs</button>
+                                </div>
+                                <div class="tabs-content">
+                                    <!-- Tab: Summary -->
+                                    <div class="tab-pane active" id="tab-summary">
+                                        <div class="summary-dashboard">
+                                            <div class="metric-row">
+                                                <div class="metric-box">
+                                                    <span class="metric-label">Quality Score</span>
+                                                    <span class="metric-value" id="val-quality">--</span>
+                                                    <div class="progress-bar-container">
+                                                        <div class="progress-bar" id="bar-quality" style="width: 0%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="metric-box">
+                                                    <span class="metric-label">Complexity Score</span>
+                                                    <span class="metric-value" id="val-complexity">--</span>
+                                                </div>
+                                                <div class="metric-box">
+                                                    <span class="metric-label">Functions Found</span>
+                                                    <span class="metric-value" id="val-funcs">--</span>
+                                                </div>
+                                            </div>
+                                            <div class="summary-details">
+                                                <h3>Project Summary</h3>
+                                                <p id="summary-text" class="placeholder-text">Run the workflow execution to generate an AI project review report...</p>
+                                                <div id="functions-list-container" style="display: none;">
+                                                    <h4>Detected Functions:</h4>
+                                                    <ul id="functions-list" class="function-pills"></ul>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
+
+                                    <!-- Tab: Bugs -->
+                                    <div class="tab-pane" id="tab-bugs">
+                                        <div class="table-container">
+                                            <table class="bugs-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Type</th>
+                                                        <th>Severity</th>
+                                                        <th>Description</th>
+                                                        <th>Location</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="bugs-tbody">
+                                                    <tr class="empty-row">
+                                                        <td colspan="4">No issues scanned yet. Click "Execute Workflow" to start analysis.</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab: Refactored Code -->
+                                    <div class="tab-pane" id="tab-code">
+                                        <div class="refactor-layout">
+                                            <div class="refactor-meta">
+                                                <h3>Optimized Implementation</h3>
+                                                <button class="btn btn-secondary btn-sm" id="btn-copy">Copy Code</button>
+                                            </div>
+                                            <div class="refactor-improvements">
+                                                <h4>Key Improvements Applied:</h4>
+                                                <ul id="improvements-list">
+                                                    <li class="placeholder-li">Execute workflow to generate suggested improvements.</li>
+                                                </ul>
+                                            </div>
+                                            <div class="code-views">
+                                                <div class="code-view-container">
+                                                    <div class="code-view-header">Refactored Code</div>
+                                                    <pre><code class="language-python" id="refactored-code-block"># Refactored output will appear here...</code></pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Tab: Logs -->
+                                    <div class="tab-pane" id="tab-logs">
+                                        <div class="console-log" id="console-logs">
+                                            <div class="console-line system">> System initialized. Waiting for input...</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- View: Projects -->
+                <div class="view-pane" id="view-projects">
+                    <div class="projects-layout">
+                        <!-- Left column: Projects list -->
+                        <div class="card glass" style="align-self: stretch; display: flex; flex-direction: column;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                                <h2>My Projects</h2>
+                                <button class="btn btn-primary btn-sm" id="btn-create-project-modal" style="margin: 0; padding: 6px 12px;">+ New</button>
+                            </div>
+                            <div class="card-body" style="flex: 1; padding: 12px 0;">
+                                <div class="project-items" id="projects-list-container">
+                                    <p class="placeholder-text" style="padding: 0 16px;">Loading projects...</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Tab: Bugs -->
-                        <div class="tab-pane" id="tab-bugs">
-                            <div class="table-container">
-                                <table class="bugs-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Type</th>
-                                            <th>Severity</th>
-                                            <th>Description</th>
-                                            <th>Location</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="bugs-tbody">
-                                        <tr class="empty-row">
-                                            <td colspan="4">No issues scanned yet. Click "Execute Workflow" to start analysis.</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- Tab: Refactored Code -->
-                        <div class="tab-pane" id="tab-code">
-                            <div class="refactor-layout">
-                                <div class="refactor-meta">
-                                    <h3>Optimized Implementation</h3>
-                                    <button class="btn btn-secondary btn-sm" id="btn-copy">Copy Code</button>
+                        <!-- Right column: Active Project Details & Ingestions -->
+                        <div class="project-details-container" id="active-project-details" style="display: none;">
+                            <!-- Details Card -->
+                            <div class="card glass">
+                                <div class="card-header project-detail-header">
+                                    <h2 id="detail-project-name" style="font-size: 20px; font-weight: 700;">Select a Project</h2>
+                                    <div class="project-detail-actions">
+                                        <button class="btn btn-secondary btn-sm" id="btn-rename-project">Rename</button>
+                                        <button class="btn btn-secondary btn-sm btn-danger" id="btn-delete-project" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #fca5a5;">Delete</button>
+                                    </div>
                                 </div>
-                                <div class="refactor-improvements">
-                                    <h4>Key Improvements Applied:</h4>
-                                    <ul id="improvements-list">
-                                        <li class="placeholder-li">Execute workflow to generate suggested improvements.</li>
-                                    </ul>
-                                </div>
-                                <div class="code-views">
-                                    <div class="code-view-container">
-                                        <div class="code-view-header">Refactored Code</div>
-                                        <pre><code class="language-python" id="refactored-code-block"># Refactored output will appear here...</code></pre>
+                                <div class="card-body">
+                                    <div class="project-stats-grid">
+                                        <div class="stat-item">
+                                            <span class="stat-label">Main Language</span>
+                                            <span class="stat-value" id="detail-project-lang">--</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Total Files</span>
+                                            <span class="stat-value" id="detail-project-files">0</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Last Analysis</span>
+                                            <span class="stat-value" id="detail-project-last-run">--</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">Status</span>
+                                            <span class="stat-value" id="detail-project-status">--</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- Tab: Logs -->
-                        <div class="tab-pane" id="tab-logs">
-                            <div class="console-log" id="console-logs">
-                                <div class="console-line system">> System initialized. Waiting for input...</div>
+                            <!-- Ingestion Card -->
+                            <div class="card glass">
+                                <div class="tabs-header ingestion-tabs">
+                                    <button class="tab-btn active" data-tab="ingest-paste">Paste Code</button>
+                                    <button class="tab-btn" data-tab="ingest-zip">Upload ZIP</button>
+                                    <button class="tab-btn" data-tab="ingest-git">GitHub Repository</button>
+                                </div>
+                                <div class="tabs-content" style="padding-top: 16px;">
+                                    <!-- Tab: Paste Code -->
+                                    <div class="tab-pane active" id="ingest-paste">
+                                        <form id="form-ingest-paste">
+                                            <div class="form-group">
+                                                <label for="paste-filename">Filename</label>
+                                                <input type="text" id="paste-filename" placeholder="e.g. main.py, Calculator.java" required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="paste-content">Source Code</label>
+                                                <textarea id="paste-content" placeholder="Paste python, java, javascript, or typescript code here..." style="min-height: 150px; font-family: var(--font-mono); font-size: 13px;" required></textarea>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Ingest Code</button>
+                                        </form>
+                                    </div>
+
+                                    <!-- Tab: ZIP Ingestion -->
+                                    <div class="tab-pane" id="ingest-zip">
+                                        <form id="form-ingest-zip">
+                                            <div class="form-group">
+                                                <label>Upload ZIP Project File</label>
+                                                <div class="zip-drop-zone" id="zip-drop-zone">
+                                                    <div class="drop-zone-content">
+                                                        <span class="drop-zone-icon">📁</span>
+                                                        <span class="drop-zone-text" id="zip-drop-text">Drag and drop ZIP archive or click to browse</span>
+                                                        <input type="file" id="zip-file-input" accept=".zip" style="display: none;">
+                                                    </div>
+                                                </div>
+                                                <div id="zip-file-selected-name" style="margin-top: 12px; font-size: 13px; color: var(--accent-teal); display: none;"></div>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary" id="btn-ingest-zip" style="margin-top: 10px;" disabled>Ingest ZIP</button>
+                                        </form>
+                                    </div>
+
+                                    <!-- Tab: Git URL -->
+                                    <div class="tab-pane" id="ingest-git">
+                                        <form id="form-ingest-git">
+                                            <div class="form-group">
+                                                <label for="git-repo-url">GitHub Repository HTTPS URL</label>
+                                                <input type="url" id="git-repo-url" placeholder="https://github.com/username/repository.git" required>
+                                            </div>
+                                            <span class="input-hint" style="margin-top: -6px; margin-bottom: 12px; display: block;">Cloning and indexing architecture setup (Simulation only)</span>
+                                            <button type="submit" class="btn btn-primary">Link Repository</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Files Card -->
+                            <div class="card glass">
+                                <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px;">
+                                    <h2>Project Files</h2>
+                                </div>
+                                <div class="card-body" style="padding: 12px 0;">
+                                    <div class="table-container">
+                                        <table class="bugs-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Filename</th>
+                                                    <th>Extension</th>
+                                                    <th>Size (Bytes)</th>
+                                                    <th>Language</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="project-files-tbody">
+                                                <tr class="empty-row">
+                                                    <td colspan="4">No files enqueued. Ingest code to display files.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </section>
-        </main>
-    </div>
+            </main>
+        </div>
 
     <!-- Authentication Overlay Gate -->
     <div class="auth-overlay" id="auth-overlay">
@@ -294,6 +448,27 @@
                     </div>
                     <div id="auth-error-msg" class="auth-error" style="display: none;"></div>
                     <button type="submit" id="btn-auth-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Login</button>
+                </form>
+            </div>
+    </div>
+
+    <!-- Create Project Modal Dialog -->
+    <div class="auth-overlay hidden" id="project-modal">
+        <div class="auth-card glass">
+            <div class="auth-card-header">
+                <h2>Create New Project</h2>
+                <p>Initialize a project node container</p>
+            </div>
+            <div class="auth-card-body">
+                <form id="project-create-form">
+                    <div class="form-group">
+                        <label for="project-modal-name">Project Name</label>
+                        <input type="text" id="project-modal-name" required placeholder="Enter project name...">
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 10px;">
+                        <button type="button" class="btn btn-secondary" id="btn-project-modal-cancel" style="flex: 1;">Cancel</button>
+                        <button type="submit" class="btn btn-primary" style="flex: 1; margin: 0;">Create</button>
+                    </div>
                 </form>
             </div>
         </div>

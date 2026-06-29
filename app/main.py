@@ -15,6 +15,9 @@ from app.auth.database.connection import Base, engine
 from app.auth.routes.auth_routes import auth_router
 from app.auth.dependencies import get_current_user
 
+from app.projects.routes.project_routes import project_router
+from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report
+
 # Create database tables automatically on startup
 Base.metadata.create_all(bind=engine)
 
@@ -30,8 +33,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register Authentication router
+# Register routers
 app.include_router(auth_router)
+app.include_router(project_router)
 
 # In-memory stores
 graph_store = GraphStore()

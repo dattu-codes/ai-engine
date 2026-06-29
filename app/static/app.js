@@ -8,11 +8,13 @@ const NODE_FLOW = ['extract', 'complexity', 'detect', 'suggest_improvements'];
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
+    initSidebar();
     initTabs();
     initFormControls();
     initLineNumbers();
     initDemoSetup();
     initAuth();
+    initProjectsTab();
 });
 
 // Tab Navigation logic
@@ -637,6 +639,9 @@ async function checkUserSession() {
             // Adjust visual system indicators if needed
             document.getElementById('header-auth').style.display = 'flex';
             document.getElementById('auth-overlay').classList.add('hidden');
+            
+            // Auto-load projects on login
+            loadProjects();
         } else if (res.status === 401) {
             // Attempt rotation
             const refreshed = await attemptTokenRefresh();
@@ -711,4 +716,411 @@ async function attemptTokenRefresh() {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     return false;
+}
+
+/* ==========================================================================
+   SIDEBAR & PROJECT COMPONENT LOGIC
+   ========================================================================== */
+
+let activeProjectId = null;
+let selectedZipFile = null;
+
+function initSidebar() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const targetView = item.getAttribute('data-view');
+            
+            navItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            
+            const panes = document.querySelectorAll('.view-pane');
+            panes.forEach(pane => {
+                if (pane.id === targetView) {
+                    pane.classList.add('active');
+                } else {
+                    pane.classList.remove('active');
+                }
+            });
+
+            if (targetView === 'view-projects') {
+                loadProjects();
+            }
+        });
+    });
+}
+
+function initProjectsTab() {
+    // Project Modal bindings
+    const btnCreateModal = document.getElementById('btn-create-project-modal');
+    const btnModalCancel = document.getElementById('btn-project-modal-cancel');
+    const projectModal = document.getElementById('project-modal');
+    const projectCreateForm = document.getElementById('project-create-form');
+
+    btnCreateModal.addEventListener('click', () => {
+        projectModal.classList.remove('hidden');
+        document.getElementById('project-modal-name').value = '';
+    });
+
+    btnModalCancel.addEventListener('click', () => {
+        projectModal.classList.add('hidden');
+    });
+
+    projectCreateForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('project-modal-name').value.trim();
+        if (!name) return;
+
+        try {
+            const res = await authorizedFetch('/projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+
+            if (res.ok) {
+                projectModal.classList.add('hidden');
+                loadProjects();
+            } else {
+                const data = await res.json();
+                alert(data.detail || 'Failed to create project.');
+            }
+        } catch (err) {
+            alert('Error creating project: ' + err.message);
+        }
+    });
+
+    // Project Actions: Rename & Delete
+    document.getElementById('btn-rename-project').addEventListener('click', renameActiveProject);
+    document.getElementById('btn-delete-project').addEventListener('click', deleteActiveProject);
+
+    // Ingestion tabs inside project page
+    const ingestionTabBtns = document.querySelectorAll('.ingestion-tabs .tab-btn');
+    ingestionTabBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const targetTab = btn.getAttribute('data-tab');
+            ingestionTabBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const panes = btn.closest('.card').querySelectorAll('.tab-pane');
+            panes.forEach(pane => {
+                if (pane.id === targetTab) {
+                    pane.classList.add('active');
+                } else {
+                    pane.classList.remove('active');
+                }
+            });
+        });
+    });
+
+    // Ingest Paste Code Form
+    document.getElementById('form-ingest-paste').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!activeProjectId) return;
+
+        const filename = document.getElementById('paste-filename').value.trim();
+        const content = document.getElementById('paste-content').value;
+
+        const formData = new FormData();
+        formData.append('pasted_filename', filename);
+        formData.append('pasted_content', content);
+
+        try {
+            const res = await authorizedFetch(`/projects/${activeProjectId}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.ok) {
+                document.getElementById('paste-filename').value = '';
+                document.getElementById('paste-content').value = '';
+                alert('Source code ingested successfully!');
+                selectProject(activeProjectId);
+            } else {
+                const data = await res.json();
+                alert(data.detail || 'Failed to ingest pasted code.');
+            }
+        } catch (err) {
+            alert('Ingestion error: ' + err.message);
+        }
+    });
+
+    // Ingest ZIP Drag & Drop + Browse
+    const zipDropZone = document.getElementById('zip-drop-zone');
+    const zipFileInput = document.getElementById('zip-file-input');
+    const zipSelectedName = document.getElementById('zip-file-selected-name');
+    const btnIngestZip = document.getElementById('btn-ingest-zip');
+
+    zipDropZone.addEventListener('click', () => zipFileInput.click());
+    
+    zipDropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zipDropZone.classList.add('dragover');
+    });
+
+    zipDropZone.addEventListener('dragleave', () => {
+        zipDropZone.classList.remove('dragover');
+    });
+
+    zipDropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zipDropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) {
+            handleZipFileSelection(e.dataTransfer.files[0]);
+        }
+    });
+
+    zipFileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleZipFileSelection(e.target.files[0]);
+        }
+    });
+
+    function handleZipFileSelection(file) {
+        if (!file.name.endsWith('.zip')) {
+            alert('Please select a valid .zip archive.');
+            return;
+        }
+        selectedZipFile = file;
+        zipSelectedName.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        zipSelectedName.style.display = 'block';
+        btnIngestZip.disabled = false;
+    }
+
+    document.getElementById('form-ingest-zip').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!activeProjectId || !selectedZipFile) return;
+
+        btnIngestZip.disabled = true;
+        btnIngestZip.textContent = 'Processing ZIP...';
+
+        const formData = new FormData();
+        formData.append('file', selectedZipFile);
+
+        try {
+            const res = await authorizedFetch(`/projects/${activeProjectId}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.ok) {
+                alert('ZIP archive successfully parsed and metadata indexed!');
+                selectedZipFile = null;
+                zipFileInput.value = '';
+                zipSelectedName.style.display = 'none';
+                btnIngestZip.textContent = 'Ingest ZIP';
+                btnIngestZip.disabled = true;
+                selectProject(activeProjectId);
+            } else {
+                const data = await res.json();
+                alert(data.detail || 'Failed to ingest ZIP file.');
+                btnIngestZip.disabled = false;
+                btnIngestZip.textContent = 'Ingest ZIP';
+            }
+        } catch (err) {
+            alert('Ingestion error: ' + err.message);
+            btnIngestZip.disabled = false;
+            btnIngestZip.textContent = 'Ingest ZIP';
+        }
+    });
+
+    // Link Git Repository Form
+    document.getElementById('form-ingest-git').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!activeProjectId) return;
+
+        const repoUrl = document.getElementById('git-repo-url').value.trim();
+
+        try {
+            const res = await authorizedFetch(`/projects/${activeProjectId}/repository`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ repo_url: repoUrl })
+            });
+
+            if (res.ok) {
+                document.getElementById('git-repo-url').value = '';
+                alert('GitHub repository metadata linked successfully (Architecture setup complete)!');
+                selectProject(activeProjectId);
+            } else {
+                const data = await res.json();
+                alert(data.detail || 'Failed to link repository.');
+            }
+        } catch (err) {
+            alert('Link error: ' + err.message);
+        }
+    });
+}
+
+async function loadProjects() {
+    try {
+        const res = await authorizedFetch('/projects');
+        if (!res.ok) return;
+
+        const projects = await res.json();
+        const container = document.getElementById('projects-list-container');
+        
+        if (projects.length === 0) {
+            container.innerHTML = '<p class="placeholder-text" style="padding: 0 16px;">No projects registered. Click "+ New" to begin.</p>';
+            document.getElementById('active-project-details').style.display = 'none';
+            activeProjectId = null;
+            return;
+        }
+
+        container.innerHTML = '';
+        projects.forEach(p => {
+            const card = document.createElement('div');
+            card.className = `project-card ${activeProjectId === p.id ? 'active' : ''}`;
+            card.innerHTML = `
+                <h3>${escapeHtml(p.name)}</h3>
+                <p>Created: ${new Date(p.created_at).toLocaleDateString()}</p>
+            `;
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.project-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                selectProject(p.id);
+            });
+            container.appendChild(card);
+        });
+
+        // Auto-select first project if none is active
+        if (!activeProjectId && projects.length > 0) {
+            container.firstElementChild.click();
+        }
+    } catch (err) {
+        console.error('Failed to load projects list:', err);
+    }
+}
+
+async function selectProject(id) {
+    activeProjectId = id;
+    try {
+        const res = await authorizedFetch(`/projects/${id}`);
+        if (!res.ok) return;
+
+        const details = await res.json();
+        
+        // Update detail headers
+        document.getElementById('detail-project-name').textContent = details.name;
+        document.getElementById('detail-project-lang').textContent = details.languages.join(', ') || 'None Detected';
+        document.getElementById('detail-project-files').textContent = details.total_files;
+        
+        if (details.last_analysis) {
+            document.getElementById('detail-project-last-run').textContent = new Date(details.last_analysis.created_at).toLocaleString();
+            document.getElementById('detail-project-status').textContent = details.last_analysis.status.toUpperCase();
+            
+            // Apply color classes for status
+            const statusEl = document.getElementById('detail-project-status');
+            statusEl.className = 'stat-value';
+            if (details.last_analysis.status === 'completed') {
+                statusEl.style.color = 'var(--accent-green)';
+            } else if (details.last_analysis.status === 'failed') {
+                statusEl.style.color = 'var(--accent-red)';
+            } else {
+                statusEl.style.color = 'var(--accent-orange)';
+            }
+        } else {
+            document.getElementById('detail-project-last-run').textContent = '--';
+            document.getElementById('detail-project-status').textContent = 'UNANALYZED';
+            document.getElementById('detail-project-status').style.color = '';
+        }
+
+        document.getElementById('active-project-details').style.display = 'flex';
+
+        // Load files list
+        await loadProjectFiles(id);
+    } catch (err) {
+        console.error('Failed to select project details:', err);
+    }
+}
+
+async function loadProjectFiles(id) {
+    try {
+        const res = await authorizedFetch(`/projects/${id}/files`);
+        const tbody = document.getElementById('project-files-tbody');
+
+        if (!res.ok) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Failed to load files list.</td></tr>';
+            return;
+        }
+
+        const files = await res.json();
+        if (files.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No source files parsed. Ingest code to display files.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = '';
+        files.forEach(f => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-family: var(--font-mono); font-size: 13px; color: var(--text-bright);">${escapeHtml(f.filename)}</td>
+                <td><span class="pill outline">${escapeHtml(f.extension)}</span></td>
+                <td>${f.size}</td>
+                <td><span class="pill" style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.2); color: var(--accent-purple);">${escapeHtml(f.language)}</span></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Failed to load project files list:', err);
+    }
+}
+
+async function renameActiveProject() {
+    if (!activeProjectId) return;
+
+    const newName = prompt('Enter a new name for this project:');
+    if (!newName || !newName.trim()) return;
+
+    try {
+        const res = await authorizedFetch(`/projects/${activeProjectId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: newName.trim() })
+        });
+
+        if (res.ok) {
+            loadProjects();
+            selectProject(activeProjectId);
+        } else {
+            const data = await res.json();
+            alert(data.detail || 'Failed to rename project.');
+        }
+    } catch (err) {
+        alert('Rename error: ' + err.message);
+    }
+}
+
+async function deleteActiveProject() {
+    if (!activeProjectId) return;
+
+    const confirmDelete = confirm('Are you sure you want to permanently delete this project? This will delete all files and reports.');
+    if (!confirmDelete) return;
+
+    try {
+        const res = await authorizedFetch(`/projects/${activeProjectId}`, {
+            method: 'DELETE'
+        });
+
+        if (res.ok) {
+            activeProjectId = null;
+            loadProjects();
+        } else {
+            alert('Failed to delete project.');
+        }
+    } catch (err) {
+        alert('Delete error: ' + err.message);
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
 }

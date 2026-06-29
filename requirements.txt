@@ -4,3 +4,4 @@ pydantic
 pyjwt
 bcrypt
 sqlalchemy
+python-multipart
