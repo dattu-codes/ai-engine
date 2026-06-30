@@ -1010,19 +1010,28 @@ async function selectProject(id) {
         
         if (details.last_analysis) {
             document.getElementById('detail-project-last-run').textContent = new Date(details.last_analysis.created_at).toLocaleString();
-            document.getElementById('detail-project-status').textContent = details.last_analysis.status.toUpperCase();
             
-            // Apply color classes for status
+            // Check if it's a real AI Review analysis (has model_used)
+            const isAnalyzed = !!details.last_analysis.model_used;
             const statusEl = document.getElementById('detail-project-status');
             statusEl.className = 'stat-value';
-            if (details.last_analysis.status === 'completed') {
-                statusEl.style.color = 'var(--accent-green)';
-                loadProjectReport(details.last_analysis.id);
-            } else if (details.last_analysis.status === 'failed') {
-                statusEl.style.color = 'var(--accent-red)';
-                document.getElementById('project-report-card').style.display = 'none';
+
+            if (isAnalyzed) {
+                document.getElementById('detail-project-status').textContent = details.last_analysis.status.toUpperCase();
+                if (details.last_analysis.status === 'completed') {
+                    statusEl.style.color = 'var(--accent-green)';
+                    loadProjectReport(details.last_analysis.id);
+                } else if (details.last_analysis.status === 'failed') {
+                    statusEl.style.color = 'var(--accent-red)';
+                    document.getElementById('project-report-card').style.display = 'none';
+                } else {
+                    statusEl.style.color = 'var(--accent-orange)';
+                    document.getElementById('project-report-card').style.display = 'none';
+                }
             } else {
-                statusEl.style.color = 'var(--accent-orange)';
+                // Ingested but not analyzed yet
+                document.getElementById('detail-project-status').textContent = 'UNANALYZED';
+                statusEl.style.color = '';
                 document.getElementById('project-report-card').style.display = 'none';
             }
         } else {
@@ -1232,13 +1241,24 @@ async function loadProjectReport(analysisId) {
         if (!res.ok) return;
 
         const report = await res.json();
-        renderProjectReport(report);
+        
+        // Query the analysis details to read model_used and duration
+        const runRes = await authorizedFetch(`/analysis/${analysisId}`);
+        let modelUsed = "mock-simulator";
+        let durationStr = "0.00s";
+        if (runRes.ok) {
+            const run = await runRes.json();
+            modelUsed = run.model_used || "mock-simulator";
+            durationStr = run.duration !== null ? `${run.duration.toFixed(3)}s` : "0.000s";
+        }
+
+        renderProjectReport(report, modelUsed, durationStr);
     } catch (err) {
         console.error('Failed to load project report:', err);
     }
 }
 
-function renderProjectReport(report) {
+function renderProjectReport(report, modelUsed = "--", durationStr = "--") {
     let data;
     try {
         data = typeof report.details_json === 'string' 
@@ -1249,6 +1269,10 @@ function renderProjectReport(report) {
     }
 
     if (!data) return;
+
+    // Render metadata labels
+    document.getElementById('report-meta-engine').textContent = modelUsed;
+    document.getElementById('report-meta-duration').textContent = durationStr;
 
     // Set score and badge color
     const scoreBadge = document.getElementById('report-score-badge');

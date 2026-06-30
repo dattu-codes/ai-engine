@@ -128,18 +128,22 @@ class AnalysisService:
                 # Direct offline simulation
                 response_json = MockAnalysisSimulator.simulate_review(project_name, files)
 
-            # 3. Validate structured response format
+            # 3. Validate structured response format and calculate metrics
+            end_time = time.time()
+            duration = float(end_time - start_time)
             score = int(response_json.get("score", 80))
             summary = response_json.get("summary", "Analysis completed successfully.")
             
-            # Serialize report details
+            # Serialize report details with duration and status metrics
             report_data = {
                 "summary": summary,
                 "score": score,
                 "strengths": response_json.get("strengths", []),
                 "weaknesses": response_json.get("weaknesses", []),
                 "recommendations": response_json.get("recommendations", []),
-                "issues": response_json.get("issues", [])
+                "issues": response_json.get("issues", []),
+                "execution_time": duration,
+                "status": "completed"
             }
 
             # 4. Save Report record in database
@@ -152,10 +156,9 @@ class AnalysisService:
             db.add(report)
 
             # 5. Finalize Analysis run logs
-            end_time = time.time()
             analysis.status = "completed"
             analysis.completed_at = datetime.utcnow()
-            analysis.duration = float(end_time - start_time)
+            analysis.duration = duration
             analysis.model_used = model_used
             db.commit()
 
