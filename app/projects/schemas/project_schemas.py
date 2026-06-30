@@ -4,6 +4,7 @@ from typing import Optional, List
 
 class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
+    repo_url: Optional[str] = Field(None, description="Optional public GitHub Repository URL")
 
 
 class ProjectRename(BaseModel):
@@ -72,6 +73,16 @@ class ProjectDetailsResponse(BaseModel):
     total_files: int
     last_analysis: Optional[AnalysisResponse] = None
     languages: List[str] = []
+    
+    # GitHub Repository Metadata
+    repo_url: Optional[str] = None
+    repo_name: Optional[str] = None
+    repo_owner: Optional[str] = None
+    default_branch: Optional[str] = None
+    current_branch: Optional[str] = None
+    last_commit_sha: Optional[str] = None
+    last_commit_message: Optional[str] = None
+    last_sync_time: Optional[datetime] = None
 
     class Config:
         from_attributes = True

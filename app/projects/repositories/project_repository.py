@@ -1,3 +1,4 @@
+from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report
@@ -12,8 +13,31 @@ class ProjectRepository:
         return db.query(Project).filter(Project.user_id == user_id).order_by(Project.created_at.desc()).all()
 
     @staticmethod
-    def create_project(db: Session, user_id: int, name: str) -> Project:
-        project = Project(user_id=user_id, name=name)
+    def create_project(
+        db: Session, 
+        user_id: int, 
+        name: str,
+        repo_url: Optional[str] = None,
+        repo_name: Optional[str] = None,
+        repo_owner: Optional[str] = None,
+        default_branch: Optional[str] = None,
+        current_branch: Optional[str] = None,
+        last_commit_sha: Optional[str] = None,
+        last_commit_message: Optional[str] = None,
+        last_sync_time: Optional[datetime] = None
+    ) -> Project:
+        project = Project(
+            user_id=user_id, 
+            name=name,
+            repo_url=repo_url,
+            repo_name=repo_name,
+            repo_owner=repo_owner,
+            default_branch=default_branch,
+            current_branch=current_branch,
+            last_commit_sha=last_commit_sha,
+            last_commit_message=last_commit_message,
+            last_sync_time=last_sync_time
+        )
         db.add(project)
         db.commit()
         db.refresh(project)

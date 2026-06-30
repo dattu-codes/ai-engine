@@ -1,0 +1,242 @@
+import re
+import os
+import shutil
+import stat
+import subprocess
+import uuid
+import hashlib
+from typing import List, Dict, Any, Tuple, Optional
+from app.projects.services.zip_processor import ZipProcessor
+
+GITHUB_URL_PATTERN = re.compile(
+    r'^https?://(?:www\.)?github\.com/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_.-]+?)(?:\.git)?/?$'
+)
+
+def remove_readonly(func, path, excinfo):
+    """
+    On-error callback for shutil.rmtree to handle Windows read-only file locks.
+    """
+    try:
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    except Exception:
+        pass
+
+class GitService:
+    @staticmethod
+    def validate_url(repo_url: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Validates the URL and returns (is_valid, owner, repo).
+        """
+        match = GITHUB_URL_PATTERN.match(repo_url.strip())
+        if not match:
+            return False, None, None
+        return True, match.group(1), match.group(2)
+
+    @staticmethod
+    def is_public_repo(repo_url: str) -> bool:
+        """
+        Checks if the repository is public and accessible.
+        """
+        try:
+            result = subprocess.run(
+                ["git", "ls-remote", repo_url.strip(), "HEAD"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=15
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def clone_repository(repo_url: str, dest_dir: str) -> bool:
+        """
+        Clones the repository at repo_url into dest_dir with --depth 1.
+        """
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+            result = subprocess.run(
+                ["git", "clone", "--depth", "1", repo_url.strip(), dest_dir],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=60
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def get_repo_metadata(dest_dir: str) -> Dict[str, str]:
+        """
+        Extracts repository metadata from a cloned repository.
+        """
+        metadata = {
+            "current_branch": "main",
+            "default_branch": "main",
+            "last_commit_sha": "",
+            "last_commit_message": ""
+        }
+        
+        # 1. Last commit SHA
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=dest_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+            if res.returncode == 0:
+                metadata["last_commit_sha"] = res.stdout.strip()
+        except Exception:
+            pass
+
+        # 2. Last commit message
+        try:
+            res = subprocess.run(
+                ["git", "log", "-1", "--pretty=%B"],
+                cwd=dest_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+            if res.returncode == 0:
+                metadata["last_commit_message"] = res.stdout.strip()
+        except Exception:
+            pass
+
+        # 3. Current branch
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=dest_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+            if res.returncode == 0:
+                metadata["current_branch"] = res.stdout.strip()
+        except Exception:
+            pass
+
+        # 4. Default branch
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "origin/HEAD"],
+                cwd=dest_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=5
+            )
+            if res.returncode == 0:
+                val = res.stdout.strip()
+                if val.startswith("origin/"):
+                    metadata["default_branch"] = val[len("origin/"):]
+                else:
+                    metadata["default_branch"] = val
+            else:
+                metadata["default_branch"] = metadata["current_branch"]
+        except Exception:
+            metadata["default_branch"] = metadata["current_branch"]
+
+        return metadata
+
+    @staticmethod
+    def parse_files(dest_dir: str) -> List[Dict[str, Any]]:
+        """
+        Walks dest_dir, parses files matching supported extensions,
+        and skips ignored directories.
+        """
+        extracted_files = []
+        ignored_dirs = ZipProcessor.IGNORED_DIRS
+        supported_exts = ZipProcessor.SUPPORTED_EXTENSIONS
+
+        for root, dirs, files in os.walk(dest_dir):
+            # Modify dirs in-place to prune ignored directories
+            dirs[:] = [d for d in dirs if d not in ignored_dirs]
+            
+            relative_root = os.path.relpath(root, dest_dir)
+            if relative_root != ".":
+                path_parts = relative_root.replace("\\", "/").split("/")
+                if any(part in ignored_dirs for part in path_parts):
+                    continue
+
+            for file in files:
+                dot_idx = file.rfind(".")
+                if dot_idx == -1:
+                    continue
+                
+                extension = file[dot_idx:].lower()
+                if extension not in supported_exts:
+                    continue
+
+                language = supported_exts[extension]
+                full_path = os.path.join(root, file)
+                rel_filename = os.path.relpath(full_path, dest_dir).replace("\\", "/")
+
+                try:
+                    with open(full_path, "rb") as f:
+                        content_bytes = f.read()
+                except Exception:
+                    continue
+
+                file_size = len(content_bytes)
+                file_hash = hashlib.sha256(content_bytes).hexdigest()
+
+                try:
+                    content_str = content_bytes.decode("utf-8")
+                except UnicodeDecodeError:
+                    content_str = content_bytes.decode("utf-8", errors="replace")
+
+                extracted_files.append({
+                    "filename": rel_filename,
+                    "extension": extension,
+                    "size": file_size,
+                    "language": language,
+                    "hash": file_hash,
+                    "content": content_str
+                })
+
+        return extracted_files
+
+    @classmethod
+    def clone_and_parse_repository(cls, repo_url: str) -> Tuple[Dict[str, str], List[Dict[str, Any]]]:
+        """
+        Validates, clones, parses, and cleans up a repository.
+        Returns (metadata, files).
+        """
+        is_valid, owner, repo = cls.validate_url(repo_url)
+        if not is_valid:
+            raise ValueError("Invalid GitHub Repository URL format.")
+
+        if not cls.is_public_repo(repo_url):
+            raise ValueError("Repository does not exist or is not publicly accessible.")
+
+        # Set up a secure workspace under app/temp_clones
+        base_temp_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "temp_clones"))
+        os.makedirs(base_temp_path, exist_ok=True)
+        dest_dir = os.path.join(base_temp_path, str(uuid.uuid4()))
+
+        try:
+            success = cls.clone_repository(repo_url, dest_dir)
+            if not success:
+                raise ValueError("Failed to clone the Git repository.")
+
+            metadata = cls.get_repo_metadata(dest_dir)
+            metadata["repo_url"] = repo_url
+            metadata["repo_name"] = repo
+            metadata["repo_owner"] = owner
+            
+            files = cls.parse_files(dest_dir)
+            return metadata, files
+        finally:
+            # Secure clean-up
+            if os.path.exists(dest_dir):
+                shutil.rmtree(dest_dir, onerror=remove_readonly)

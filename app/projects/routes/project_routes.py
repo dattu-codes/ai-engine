@@ -24,7 +24,7 @@ class RepositoryLinkRequest(BaseModel):
 @project_router.post("", status_code=status.HTTP_201_CREATED, response_model=ProjectResponse)
 def create_project(req: ProjectCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Creates a new project for the authenticated user."""
-    return ProjectService.create_project(db, current_user.id, req.name)
+    return ProjectService.create_project(db, current_user.id, req.name, req.repo_url)
 
 
 @project_router.get("", response_model=List[ProjectResponse])
@@ -81,6 +81,12 @@ async def upload_source(
 def link_repository(id: int, req: RepositoryLinkRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Saves a Git repository URL linkage metadata (architecture placeholder)."""
     return ProjectService.save_project_repository(db, id, current_user.id, req.repo_url)
+
+
+@project_router.post("/{id}/sync")
+def sync_repository(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Synchronizes a GitHub-linked project, pulling the latest commit changes."""
+    return ProjectService.sync_project_repository(db, id, current_user.id)
 
 
 @project_router.get("/{id}/files", response_model=List[FileMetadataResponse])

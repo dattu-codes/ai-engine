@@ -760,6 +760,8 @@ function initProjectsTab() {
     btnCreateModal.addEventListener('click', () => {
         projectModal.classList.remove('hidden');
         document.getElementById('project-modal-name').value = '';
+        const repoInput = document.getElementById('project-modal-repo-url');
+        if (repoInput) repoInput.value = '';
     });
 
     btnModalCancel.addEventListener('click', () => {
@@ -769,13 +771,20 @@ function initProjectsTab() {
     projectCreateForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('project-modal-name').value.trim();
+        const repoInput = document.getElementById('project-modal-repo-url');
+        const repoUrl = repoInput ? repoInput.value.trim() : '';
         if (!name) return;
+
+        const submitBtn = projectCreateForm.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = repoUrl ? 'Cloning & Ingesting...' : 'Creating...';
 
         try {
             const res = await authorizedFetch('/projects', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
+                body: JSON.stringify({ name, repo_url: repoUrl || null })
             });
 
             if (res.ok) {
@@ -787,12 +796,46 @@ function initProjectsTab() {
             }
         } catch (err) {
             alert('Error creating project: ' + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         }
     });
 
     // Project Actions: Rename & Delete
     document.getElementById('btn-rename-project').addEventListener('click', renameActiveProject);
     document.getElementById('btn-delete-project').addEventListener('click', deleteActiveProject);
+
+    // Sync Repository click handler
+    const btnSyncRepo = document.getElementById('btn-sync-repository');
+    if (btnSyncRepo) {
+        btnSyncRepo.addEventListener('click', async () => {
+            if (!activeProjectId) return;
+
+            const originalHtml = btnSyncRepo.innerHTML;
+            btnSyncRepo.disabled = true;
+            btnSyncRepo.innerHTML = '🔄 Syncing...';
+
+            try {
+                const res = await authorizedFetch(`/projects/${activeProjectId}/sync`, {
+                    method: 'POST'
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'Repository sync completed.');
+                    await selectProject(activeProjectId);
+                } else {
+                    alert(data.detail || 'Failed to synchronize repository.');
+                }
+            } catch (err) {
+                alert('Sync error: ' + err.message);
+            } finally {
+                btnSyncRepo.disabled = false;
+                btnSyncRepo.innerHTML = originalHtml;
+            }
+        });
+    }
 
     // Ingestion tabs inside project page
     const ingestionTabBtns = document.querySelectorAll('.ingestion-tabs .tab-btn');
@@ -933,6 +976,10 @@ function initProjectsTab() {
         if (!activeProjectId) return;
 
         const repoUrl = document.getElementById('git-repo-url').value.trim();
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Cloning & Ingesting...';
 
         try {
             const res = await authorizedFetch(`/projects/${activeProjectId}/repository`, {
@@ -943,7 +990,7 @@ function initProjectsTab() {
 
             if (res.ok) {
                 document.getElementById('git-repo-url').value = '';
-                alert('GitHub repository metadata linked successfully (Architecture setup complete)!');
+                alert('GitHub repository linked and ingested successfully!');
                 selectProject(activeProjectId);
             } else {
                 const data = await res.json();
@@ -951,6 +998,9 @@ function initProjectsTab() {
             }
         } catch (err) {
             alert('Link error: ' + err.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         }
     });
 }
@@ -1008,6 +1058,22 @@ async function selectProject(id) {
         document.getElementById('detail-project-lang').textContent = details.languages.join(', ') || 'None Detected';
         document.getElementById('detail-project-files').textContent = details.total_files;
         
+        // Handle GitHub Integration card
+        const githubCard = document.getElementById('project-github-card');
+        if (details.repo_url) {
+            githubCard.style.display = 'block';
+            const urlLink = document.getElementById('github-info-url');
+            urlLink.href = details.repo_url;
+            urlLink.textContent = `${details.repo_owner}/${details.repo_name}`;
+            document.getElementById('github-info-branch').textContent = details.current_branch || '--';
+            document.getElementById('github-info-default-branch').textContent = details.default_branch || '--';
+            document.getElementById('github-info-sync-time').textContent = details.last_sync_time ? new Date(details.last_sync_time).toLocaleString() : '--';
+            document.getElementById('github-info-commit-sha').textContent = details.last_commit_sha ? details.last_commit_sha.slice(0, 7) : '--';
+            document.getElementById('github-info-commit-msg').textContent = details.last_commit_message || '--';
+        } else {
+            githubCard.style.display = 'none';
+        }
+
         if (details.last_analysis) {
             document.getElementById('detail-project-last-run').textContent = new Date(details.last_analysis.created_at).toLocaleString();
             

@@ -1,5 +1,6 @@
 import json
 import hashlib
+from datetime import datetime
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from fastapi import HTTPException, status
@@ -7,11 +8,76 @@ from fastapi import HTTPException, status
 from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report
 from app.projects.repositories.project_repository import ProjectRepository
 from app.projects.services.zip_processor import ZipProcessor
+from app.projects.services.git_service import GitService
 
 class ProjectService:
     @staticmethod
-    def create_project(db: Session, user_id: int, name: str) -> Project:
-        return ProjectRepository.create_project(db, user_id, name)
+    def create_project(db: Session, user_id: int, name: str, repo_url: Optional[str] = None) -> Project:
+        if repo_url:
+            # Validate, clone, and parse repository files
+            try:
+                metadata, files = GitService.clone_and_parse_repository(repo_url)
+            except ValueError as e:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+            if not files:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No supported files (.py, .java, .js, .ts) found in the repository."
+                )
+
+            # Create the project with GitHub repository metadata
+            project = ProjectRepository.create_project(
+                db=db,
+                user_id=user_id,
+                name=name,
+                repo_url=repo_url,
+                repo_name=metadata["repo_name"],
+                repo_owner=metadata["repo_owner"],
+                default_branch=metadata["default_branch"],
+                current_branch=metadata["current_branch"],
+                last_commit_sha=metadata["last_commit_sha"],
+                last_commit_message=metadata["last_commit_message"],
+                last_sync_time=datetime.utcnow()
+            )
+
+            # Ingest files under a starting "completed" ingestion Analysis run
+            analysis = ProjectRepository.create_analysis(db, project.id, source_type="repository", status="completed")
+
+            for f in files:
+                ProjectRepository.create_analysis_file(
+                    db,
+                    analysis_id=analysis.id,
+                    filename=f["filename"],
+                    extension=f["extension"],
+                    size=f["size"],
+                    language=f["language"],
+                    file_hash=f["hash"],
+                    content=f["content"]
+                )
+
+            # Create a parsed metadata mock report
+            summary = f"Successfully imported GitHub repository. Ingested {len(files)} files."
+            report_details = {
+                "repo_url": repo_url,
+                "total_files": len(files),
+                "files_by_language": {}
+            }
+            for f in files:
+                lang = f["language"]
+                report_details["files_by_language"][lang] = report_details["files_by_language"].get(lang, 0) + 1
+
+            ProjectRepository.create_report(
+                db,
+                analysis_id=analysis.id,
+                score=100,
+                summary=summary,
+                details_json=json.dumps(report_details)
+            )
+
+            return project
+        else:
+            return ProjectRepository.create_project(db, user_id, name)
 
     @staticmethod
     def get_projects(db: Session, user_id: int) -> List[Project]:
@@ -41,7 +107,15 @@ class ProjectService:
             "updated_at": project.updated_at,
             "total_files": total_files,
             "last_analysis": latest_analysis,
-            "languages": list(languages)
+            "languages": list(languages),
+            "repo_url": project.repo_url,
+            "repo_name": project.repo_name,
+            "repo_owner": project.repo_owner,
+            "default_branch": project.default_branch,
+            "current_branch": project.current_branch,
+            "last_commit_sha": project.last_commit_sha,
+            "last_commit_message": project.last_commit_message,
+            "last_sync_time": project.last_sync_time,
         }
 
     @staticmethod
@@ -170,18 +244,53 @@ class ProjectService:
         if not project:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
-        # Check repository URL format basically
-        if not repo_url.startswith("http://") and not repo_url.startswith("https://"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid repository URL format.")
+        try:
+            metadata, files = GitService.clone_and_parse_repository(repo_url)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+        if not files:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No supported files (.py, .java, .js, .ts) found in the repository."
+            )
+
+        # Update the project's repository metadata fields
+        project.repo_url = repo_url
+        project.repo_name = metadata["repo_name"]
+        project.repo_owner = metadata["repo_owner"]
+        project.default_branch = metadata["default_branch"]
+        project.current_branch = metadata["current_branch"]
+        project.last_commit_sha = metadata["last_commit_sha"]
+        project.last_commit_message = metadata["last_commit_message"]
+        project.last_sync_time = datetime.utcnow()
+        db.commit()
+        db.refresh(project)
 
         # Create new Analysis run
         analysis = ProjectRepository.create_analysis(db, project_id, source_type="repository", status="completed")
 
-        summary = f"GitHub repository linked: {repo_url}. Remote source metadata enqueued successfully."
+        for f in files:
+            ProjectRepository.create_analysis_file(
+                db,
+                analysis_id=analysis.id,
+                filename=f["filename"],
+                extension=f["extension"],
+                size=f["size"],
+                language=f["language"],
+                file_hash=f["hash"],
+                content=f["content"]
+            )
+
+        summary = f"GitHub repository linked: {repo_url}. Remote source metadata synced successfully."
         report_details = {
             "repo_url": repo_url,
-            "status": "Linked (Ready for Clone)"
+            "total_files": len(files),
+            "files_by_language": {}
         }
+        for f in files:
+            lang = f["language"]
+            report_details["files_by_language"][lang] = report_details["files_by_language"].get(lang, 0) + 1
 
         ProjectRepository.create_report(
             db, 
@@ -192,3 +301,88 @@ class ProjectService:
         )
 
         return analysis
+
+    @staticmethod
+    def sync_project_repository(db: Session, project_id: int, user_id: int) -> Dict[str, Any]:
+        project = ProjectRepository.get_project(db, project_id, user_id)
+        if not project:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+        if not project.repo_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail="Project is not linked to a GitHub repository."
+            )
+
+        try:
+            metadata, files = GitService.clone_and_parse_repository(project.repo_url)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+        # Check if commit SHA matches the last synced SHA
+        if project.last_commit_sha == metadata["last_commit_sha"]:
+            project.last_sync_time = datetime.utcnow()
+            db.commit()
+            db.refresh(project)
+            return {
+                "status": "up_to_date",
+                "message": "Repository is already up to date.",
+                "last_commit_sha": project.last_commit_sha,
+                "last_sync_time": project.last_sync_time.isoformat() if project.last_sync_time else None
+            }
+
+        # If a different commit SHA is detected, we process files
+        if not files:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No supported files (.py, .java, .js, .ts) found in the repository."
+            )
+
+        # Update the project's repository metadata fields
+        project.default_branch = metadata["default_branch"]
+        project.current_branch = metadata["current_branch"]
+        project.last_commit_sha = metadata["last_commit_sha"]
+        project.last_commit_message = metadata["last_commit_message"]
+        project.last_sync_time = datetime.utcnow()
+        db.commit()
+        db.refresh(project)
+
+        # Create new Analysis run
+        analysis = ProjectRepository.create_analysis(db, project_id, source_type="repository", status="completed")
+
+        for f in files:
+            ProjectRepository.create_analysis_file(
+                db,
+                analysis_id=analysis.id,
+                filename=f["filename"],
+                extension=f["extension"],
+                size=f["size"],
+                language=f["language"],
+                file_hash=f["hash"],
+                content=f["content"]
+            )
+
+        summary = f"Repository synchronized successfully. Ingested {len(files)} files at commit {metadata['last_commit_sha'][:7]}."
+        report_details = {
+            "repo_url": project.repo_url,
+            "total_files": len(files),
+            "files_by_language": {}
+        }
+        for f in files:
+            lang = f["language"]
+            report_details["files_by_language"][lang] = report_details["files_by_language"].get(lang, 0) + 1
+
+        ProjectRepository.create_report(
+            db, 
+            analysis_id=analysis.id, 
+            score=100, 
+            summary=summary, 
+            details_json=json.dumps(report_details)
+        )
+
+        return {
+            "status": "synced",
+            "message": f"Synchronized successfully to commit {metadata['last_commit_sha'][:7]}.",
+            "last_commit_sha": project.last_commit_sha,
+            "last_sync_time": project.last_sync_time.isoformat() if project.last_sync_time else None
+        }

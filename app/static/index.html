@@ -348,6 +348,39 @@
                                 </div>
                             </div>
 
+                            <!-- GitHub Info Card -->
+                            <div class="card glass" id="project-github-card" style="display: none;">
+                                <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                                    <h2>GitHub Integration</h2>
+                                    <button class="btn btn-secondary btn-sm" id="btn-sync-repository" style="margin: 0; padding: 6px 12px; display: flex; align-items: center; gap: 6px;">
+                                        <span id="sync-icon">🔄</span> Sync Repository
+                                    </button>
+                                </div>
+                                <div class="card-body" style="display: flex; flex-direction: column; gap: 12px; font-size: 14px;">
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 8px;">
+                                        <span style="color: var(--text-muted);">Repository URL</span>
+                                        <a id="github-info-url" href="#" target="_blank" style="color: var(--accent-teal); text-decoration: none; font-weight: 500;">--</a>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 8px;">
+                                        <span style="color: var(--text-muted);">Current / Default Branch</span>
+                                        <span><span id="github-info-branch" style="font-weight: 600; color: var(--accent-purple);">--</span> / <span id="github-info-default-branch" style="color: var(--text-muted);">--</span></span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 8px;">
+                                        <span style="color: var(--text-muted);">Last Sync Time</span>
+                                        <span id="github-info-sync-time" style="color: var(--text-main);">--</span>
+                                    </div>
+                                    <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 4px;">
+                                        <span style="color: var(--text-muted);">Last Commit Info:</span>
+                                        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 10px; font-family: var(--font-mono); font-size: 12px; margin-top: 4px;">
+                                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                                <span style="color: var(--accent-teal);" id="github-info-commit-sha">--</span>
+                                            </div>
+                                            <div style="color: var(--text-main); white-space: pre-wrap;" id="github-info-commit-msg">--</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Ingestion Card -->
                             <div class="card glass">
                                 <div class="tabs-header ingestion-tabs">
@@ -631,6 +664,10 @@
                     <div class="form-group">
                         <label for="project-modal-name">Project Name</label>
                         <input type="text" id="project-modal-name" required placeholder="Enter project name...">
+                    </div>
+                    <div class="form-group">
+                        <label for="project-modal-repo-url">GitHub Repository URL (Optional)</label>
+                        <input type="url" id="project-modal-repo-url" placeholder="https://github.com/username/repository.git">
                     </div>
                     <div style="display: flex; gap: 12px; margin-top: 10px;">
                         <button type="button" class="btn btn-secondary" id="btn-project-modal-cancel" style="flex: 1;">Cancel</button>

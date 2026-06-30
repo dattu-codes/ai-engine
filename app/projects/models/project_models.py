@@ -16,6 +16,16 @@ class Project(Base):
     analyses = relationship("Analysis", back_populates="project", cascade="all, delete-orphan")
     user = relationship("User")
 
+    # GitHub Repository Metadata
+    repo_url = Column(String(512), nullable=True)
+    repo_name = Column(String(255), nullable=True)
+    repo_owner = Column(String(255), nullable=True)
+    default_branch = Column(String(100), nullable=True)
+    current_branch = Column(String(100), nullable=True)
+    last_commit_sha = Column(String(100), nullable=True)
+    last_commit_message = Column(Text, nullable=True)
+    last_sync_time = Column(DateTime, nullable=True)
+
 
 class Analysis(Base):
     __tablename__ = "analyses"

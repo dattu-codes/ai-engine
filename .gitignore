@@ -22,3 +22,6 @@ Thumbs.db
 
 # Bytecode
 **/__pycache__/
+
+# Temp git clones
+app/temp_clones/
