@@ -1017,6 +1017,9 @@ async function selectProject(id) {
             statusEl.className = 'stat-value';
 
             if (isAnalyzed) {
+                // Reset subtab state
+                switchReportTab('ai');
+                
                 document.getElementById('detail-project-status').textContent = details.last_analysis.status.toUpperCase();
                 if (details.last_analysis.status === 'completed') {
                     statusEl.style.color = 'var(--accent-green)';
@@ -1325,7 +1328,134 @@ function renderProjectReport(report, modelUsed = "--", durationStr = "--") {
         });
     }
 
+    // Render static code analyzer metrics if available
+    if (data.analyzers) {
+        const analyzers = data.analyzers;
+        const summary = analyzers.summary || {};
+
+        // 1. Complexity Gauge
+        const complexityVal = summary.avg_complexity || 1.0;
+        document.getElementById('gauge-val-complexity').textContent = complexityVal;
+        // Circumference of r=38 circle is 2*pi*38 ~ 238
+        // Cap complexity mapping value at 15 for gauge visual reference
+        const complexityDash = Math.min(238, Math.max(0, (complexityVal / 15) * 238));
+        document.getElementById('gauge-fill-complexity').setAttribute('stroke-dasharray', `${complexityDash} 238`);
+        
+        const complRating = (summary.complexity_rating || 'LOW').toUpperCase();
+        const complEl = document.getElementById('rating-complexity');
+        complEl.textContent = complRating;
+        complEl.className = 'rating-pill ' + (complRating === 'LOW' ? 'green' : complRating === 'MODERATE' ? 'orange' : 'red');
+
+        // 2. Maintainability Gauge
+        const miVal = summary.avg_maintainability || 100;
+        document.getElementById('gauge-val-maintainability').textContent = `${Math.round(miVal)}%`;
+        const miDash = Math.min(238, Math.max(0, (miVal / 100) * 238));
+        document.getElementById('gauge-fill-maintainability').setAttribute('stroke-dasharray', `${miDash} 238`);
+
+        const miRating = (summary.maintainability_rating || 'EXCELLENT').toUpperCase();
+        const miEl = document.getElementById('rating-maintainability');
+        miEl.textContent = miRating === 'NEEDS REFACTORING' ? 'REFACTOR' : miRating;
+        miEl.className = 'rating-pill ' + (miRating === 'EXCELLENT' ? 'green' : miRating === 'MODERATE' ? 'orange' : 'red');
+
+        // 3. Security Gauge
+        const securityVal = summary.vulnerabilities_count || 0;
+        document.getElementById('gauge-val-security').textContent = securityVal;
+        const secDash = securityVal === 0 ? 0 : Math.min(238, (securityVal / 10) * 238);
+        document.getElementById('gauge-fill-security').setAttribute('stroke-dasharray', `${secDash} 238`);
+
+        const secRating = (summary.security_rating || 'SECURE').toUpperCase();
+        const secEl = document.getElementById('rating-security');
+        secEl.textContent = secRating;
+        secEl.className = 'rating-pill ' + (secRating === 'SECURE' ? 'green' : secRating === 'LOW RISK' ? 'orange' : 'red');
+
+        // 4. Populate Files Metrics Table
+        const filesBody = document.getElementById('analyzer-files-tbody');
+        filesBody.innerHTML = '';
+        const files = analyzers.files || [];
+        if (files.length === 0) {
+            filesBody.innerHTML = '<tr class="empty-row"><td colspan="6">No files evaluated.</td></tr>';
+        } else {
+            files.forEach(f => {
+                const tr = document.createElement('tr');
+                const alertBadgeClass = f.vulnerabilities_count > 0 ? 'badge red-glow' : 'badge';
+                tr.innerHTML = `
+                    <td style="font-family: var(--font-mono); color: var(--text-bright);">${escapeHtml(f.file)}</td>
+                    <td><span class="pill outline" style="font-size: 11px;">${escapeHtml(f.language)}</span></td>
+                    <td style="font-family: var(--font-mono);">${f.loc}</td>
+                    <td style="font-family: var(--font-mono);">${f.complexity}</td>
+                    <td style="font-family: var(--font-mono); font-weight: 600; color: ${f.maintainability >= 80 ? 'var(--accent-green)' : f.maintainability >= 55 ? 'var(--accent-orange)' : 'var(--accent-red)'};">${f.maintainability}%</td>
+                    <td><span class="${alertBadgeClass}">${f.vulnerabilities_count}</span></td>
+                `;
+                filesBody.appendChild(tr);
+            });
+        }
+
+        // 5. Populate Static Vulnerability Alerts Table
+        const vulnsBody = document.getElementById('analyzer-vulns-tbody');
+        vulnsBody.innerHTML = '';
+        const vulns = analyzers.vulnerabilities || [];
+        if (vulns.length === 0) {
+            vulnsBody.innerHTML = '<tr class="empty-row"><td colspan="5">No security warnings flagged. Good job!</td></tr>';
+        } else {
+            vulns.forEach(v => {
+                const tr = document.createElement('tr');
+                const sevClass = `badge-severity-${(v.severity || 'low').toLowerCase()}`;
+                tr.innerHTML = `
+                    <td><span class="pill outline" style="font-size: 11px;">${escapeHtml(v.category)}</span></td>
+                    <td><span class="${sevClass}">${escapeHtml(v.severity)}</span></td>
+                    <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-bright);">${escapeHtml(v.file)}:${v.line}</td>
+                    <td>
+                        <div style="font-weight: 600; color: var(--text-bright); margin-bottom: 4px;">${escapeHtml(v.title)}</div>
+                        <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">${escapeHtml(v.description)}</div>
+                    </td>
+                    <td style="font-size: 12px; color: var(--accent-teal); line-height: 1.4;">${escapeHtml(v.recommendation)}</td>
+                `;
+                vulnsBody.appendChild(tr);
+            });
+        }
+    } else {
+        // Reset/Empty Analyzer tabs
+        document.getElementById('gauge-val-complexity').textContent = '--';
+        document.getElementById('gauge-fill-complexity').setAttribute('stroke-dasharray', '0 238');
+        document.getElementById('rating-complexity').textContent = '--';
+        document.getElementById('rating-complexity').className = 'rating-pill';
+
+        document.getElementById('gauge-val-maintainability').textContent = '--';
+        document.getElementById('gauge-fill-maintainability').setAttribute('stroke-dasharray', '0 238');
+        document.getElementById('rating-maintainability').textContent = '--';
+        document.getElementById('rating-maintainability').className = 'rating-pill';
+
+        document.getElementById('gauge-val-security').textContent = '--';
+        document.getElementById('gauge-fill-security').setAttribute('stroke-dasharray', '0 238');
+        document.getElementById('rating-security').textContent = '--';
+        document.getElementById('rating-security').className = 'rating-pill';
+
+        document.getElementById('analyzer-files-tbody').innerHTML = '<tr class="empty-row"><td colspan="6">No records.</td></tr>';
+        document.getElementById('analyzer-vulns-tbody').innerHTML = '<tr class="empty-row"><td colspan="5">No security warnings flagged.</td></tr>';
+    }
+
     document.getElementById('project-report-card').style.display = 'block';
+}
+
+function switchReportTab(tab) {
+    const aiBtn = document.getElementById('btn-subtab-ai');
+    const staticBtn = document.getElementById('btn-subtab-static');
+    const aiPane = document.getElementById('report-subtab-ai');
+    const staticPane = document.getElementById('report-subtab-static');
+
+    if (!aiBtn || !staticBtn || !aiPane || !staticPane) return;
+
+    if (tab === 'ai') {
+        aiBtn.classList.add('active');
+        staticBtn.classList.remove('active');
+        aiPane.classList.add('active');
+        staticPane.classList.remove('active');
+    } else {
+        staticBtn.classList.add('active');
+        aiBtn.classList.remove('active');
+        staticPane.classList.add('active');
+        aiPane.classList.remove('active');
+    }
 }
 
 function jsonParseSafe(str) {

@@ -10,6 +10,7 @@ from app.projects.models.project_models import Project, Analysis, Report, Analys
 from app.projects.repositories.project_repository import ProjectRepository
 from app.projects.services.prompt_builder import PromptBuilder
 from app.projects.services.analysis_simulator import MockAnalysisSimulator
+from app.projects.services.code_analyzer import CodeAnalyzerService
 from app.services.ai import GeminiClient
 
 class AnalysisService:
@@ -134,7 +135,10 @@ class AnalysisService:
             score = int(response_json.get("score", 80))
             summary = response_json.get("summary", "Analysis completed successfully.")
             
-            # Serialize report details with duration and status metrics
+            # Run Advanced Static Code Analyzers
+            analyzer_results = CodeAnalyzerService.analyze_codebase(files)
+
+            # Serialize report details with duration, status and analyzer metrics
             report_data = {
                 "summary": summary,
                 "score": score,
@@ -143,7 +147,8 @@ class AnalysisService:
                 "recommendations": response_json.get("recommendations", []),
                 "issues": response_json.get("issues", []),
                 "execution_time": duration,
-                "status": "completed"
+                "status": "completed",
+                "analyzers": analyzer_results
             }
 
             # 4. Save Report record in database
