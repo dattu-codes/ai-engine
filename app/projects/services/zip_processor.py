@@ -43,10 +43,24 @@ class ZipProcessor:
                         continue
                     
                     extension = filename[dot_idx:].lower()
-                    if extension not in cls.SUPPORTED_EXTENSIONS:
+                    is_code = extension in cls.SUPPORTED_EXTENSIONS
+                    is_config = filename.lower().endswith(("requirements.txt", "package.json", "pyproject.toml", "pom.xml", "build.gradle"))
+                    
+                    if not is_code and not is_config:
                         continue
 
-                    language = cls.SUPPORTED_EXTENSIONS[extension]
+                    if filename.lower().endswith("requirements.txt"):
+                        language = "Requirements"
+                    elif filename.lower().endswith("package.json"):
+                        language = "JSON"
+                    elif filename.lower().endswith("pyproject.toml"):
+                        language = "TOML"
+                    elif filename.lower().endswith("pom.xml"):
+                        language = "XML"
+                    elif filename.lower().endswith("build.gradle"):
+                        language = "Gradle"
+                    else:
+                        language = cls.SUPPORTED_EXTENSIONS[extension]
                     
                     # Read file contents and generate hash
                     content_bytes = z.read(member.filename)

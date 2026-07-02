@@ -174,12 +174,27 @@ class GitService:
                     continue
                 
                 extension = file[dot_idx:].lower()
-                if extension not in supported_exts:
-                    continue
-
-                language = supported_exts[extension]
                 full_path = os.path.join(root, file)
                 rel_filename = os.path.relpath(full_path, dest_dir).replace("\\", "/")
+                
+                is_code = extension in supported_exts
+                is_config = rel_filename.lower().endswith(("requirements.txt", "package.json", "pyproject.toml", "pom.xml", "build.gradle"))
+                
+                if not is_code and not is_config:
+                    continue
+
+                if rel_filename.lower().endswith("requirements.txt"):
+                    language = "Requirements"
+                elif rel_filename.lower().endswith("package.json"):
+                    language = "JSON"
+                elif rel_filename.lower().endswith("pyproject.toml"):
+                    language = "TOML"
+                elif rel_filename.lower().endswith("pom.xml"):
+                    language = "XML"
+                elif rel_filename.lower().endswith("build.gradle"):
+                    language = "Gradle"
+                else:
+                    language = supported_exts[extension]
 
                 try:
                     with open(full_path, "rb") as f:

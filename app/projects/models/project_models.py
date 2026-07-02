@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
 from sqlalchemy.orm import relationship
 from app.auth.database.connection import Base
 
@@ -25,6 +25,17 @@ class Project(Base):
     last_commit_sha = Column(String(100), nullable=True)
     last_commit_message = Column(Text, nullable=True)
     last_sync_time = Column(DateTime, nullable=True)
+
+    # Code Intelligence Metadata Cache
+    project_type = Column(String(100), nullable=True)
+    framework = Column(String(100), nullable=True)
+    architecture = Column(String(100), nullable=True)
+    languages_distribution = Column(Text, nullable=True)  # JSON-serialized dict
+    dependencies_json = Column(Text, nullable=True)  # JSON-serialized list
+    entry_point = Column(String(255), nullable=True)
+    file_priorities = Column(Text, nullable=True)  # JSON-serialized dict filename -> priority
+    total_lines = Column(Integer, default=0, nullable=True)
+    has_intelligence = Column(Boolean, default=False, nullable=False)
 
 
 class Analysis(Base):

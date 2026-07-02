@@ -100,6 +100,23 @@ class ProjectService:
             for f in files:
                 languages.add(f.language)
 
+            if not project.has_intelligence and files:
+                from app.projects.services.code_intelligence import CodeIntelligenceEngine
+                intel = CodeIntelligenceEngine.analyze_project(files)
+                ProjectRepository.update_project_intelligence(
+                    db=db,
+                    project=project,
+                    project_type=intel["project_type"],
+                    framework=intel["framework"],
+                    architecture=intel["architecture"],
+                    languages_distribution=json.dumps(intel["languages_distribution"]),
+                    dependencies_json=json.dumps(intel["dependencies"]),
+                    entry_point=intel["entry_point"],
+                    file_priorities=json.dumps(intel["file_priorities"]),
+                    total_lines=intel["total_lines"],
+                    has_intelligence=True
+                )
+
         return {
             "id": project.id,
             "name": project.name,
@@ -116,6 +133,15 @@ class ProjectService:
             "last_commit_sha": project.last_commit_sha,
             "last_commit_message": project.last_commit_message,
             "last_sync_time": project.last_sync_time,
+            "project_type": project.project_type,
+            "framework": project.framework,
+            "architecture": project.architecture,
+            "languages_distribution": project.languages_distribution,
+            "dependencies_json": project.dependencies_json,
+            "entry_point": project.entry_point,
+            "file_priorities": project.file_priorities,
+            "total_lines": project.total_lines,
+            "has_intelligence": project.has_intelligence,
         }
 
     @staticmethod
@@ -151,6 +177,8 @@ class ProjectService:
 
         # Create new Analysis run
         analysis = ProjectRepository.create_analysis(db, project_id, source_type="zip", status="completed")
+        project.has_intelligence = False
+        db.commit()
 
         # Save files to database
         for f in files:
@@ -207,6 +235,8 @@ class ProjectService:
 
         # Create new Analysis run
         analysis = ProjectRepository.create_analysis(db, project_id, source_type="paste", status="completed")
+        project.has_intelligence = False
+        db.commit()
 
         # Save single file to DB
         ProjectRepository.create_analysis_file(
@@ -264,6 +294,7 @@ class ProjectService:
         project.last_commit_sha = metadata["last_commit_sha"]
         project.last_commit_message = metadata["last_commit_message"]
         project.last_sync_time = datetime.utcnow()
+        project.has_intelligence = False
         db.commit()
         db.refresh(project)
 
@@ -344,6 +375,7 @@ class ProjectService:
         project.last_commit_sha = metadata["last_commit_sha"]
         project.last_commit_message = metadata["last_commit_message"]
         project.last_sync_time = datetime.utcnow()
+        project.has_intelligence = False
         db.commit()
         db.refresh(project)
 

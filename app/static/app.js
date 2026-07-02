@@ -1074,6 +1074,100 @@ async function selectProject(id) {
             githubCard.style.display = 'none';
         }
 
+        // Handle Code Intelligence Card
+        const intelCard = document.getElementById('project-intelligence-card');
+        if (details.total_files > 0 && details.has_intelligence) {
+            intelCard.style.display = 'block';
+            document.getElementById('intel-project-type').textContent = details.project_type || 'None';
+            document.getElementById('intel-framework').textContent = details.framework || 'None';
+            document.getElementById('intel-architecture').textContent = details.architecture || 'None';
+            document.getElementById('intel-entry-point').textContent = details.entry_point || 'None';
+            document.getElementById('intel-total-lines').textContent = details.total_lines || '0';
+
+            // Languages Distribution
+            const langBar = document.getElementById('intel-languages-bar');
+            const langLegend = document.getElementById('intel-languages-legend');
+            langBar.innerHTML = '';
+            langLegend.innerHTML = '';
+            
+            if (details.languages_distribution) {
+                try {
+                    const dist = JSON.parse(details.languages_distribution);
+                    const colors = {
+                        'Python': '#3572A5',
+                        'Java': '#b07219',
+                        'JavaScript': '#f1e05a',
+                        'TypeScript': '#3178c6',
+                        'HTML': '#e34c26',
+                        'CSS': '#563d7c',
+                        'Unknown': '#64748b'
+                    };
+                    
+                    Object.entries(dist).forEach(([lang, pct]) => {
+                        const color = colors[lang] || '#' + Math.floor(Math.random()*16777215).toString(16);
+                        
+                        // Segment in bar
+                        const segment = document.createElement('div');
+                        segment.style.width = `${pct}%`;
+                        segment.style.backgroundColor = color;
+                        segment.style.height = '100%';
+                        segment.title = `${lang}: ${pct}%`;
+                        langBar.appendChild(segment);
+                        
+                        // Item in legend
+                        const legendItem = document.createElement('div');
+                        legendItem.style.display = 'flex';
+                        legendItem.style.alignItems = 'center';
+                        legendItem.style.gap = '6px';
+                        legendItem.innerHTML = `
+                            <span style="width: 8px; height: 8px; border-radius: 50%; background-color: ${color}; display: inline-block;"></span>
+                            <strong>${lang}</strong> <span>${pct}%</span>
+                        `;
+                        langLegend.appendChild(legendItem);
+                    });
+                } catch (e) {
+                    console.error('Failed to parse languages_distribution:', e);
+                }
+            }
+
+            // Dependencies
+            const depCount = document.getElementById('intel-dep-count');
+            const depList = document.getElementById('intel-dependencies-list');
+            depList.innerHTML = '';
+            
+            if (details.dependencies_json) {
+                try {
+                    const deps = JSON.parse(details.dependencies_json);
+                    depCount.textContent = `${deps.length} package${deps.length === 1 ? '' : 's'}`;
+                    
+                    if (deps.length === 0) {
+                        depList.innerHTML = '<span class="placeholder-text" style="font-size: 12px; color: var(--text-muted);">No dependencies detected.</span>';
+                    } else {
+                        deps.forEach(dep => {
+                            const badge = document.createElement('span');
+                            badge.className = 'pill';
+                            badge.style.background = 'rgba(255,255,255,0.04)';
+                            badge.style.border = '1px solid rgba(255,255,255,0.08)';
+                            badge.style.fontSize = '12px';
+                            badge.style.padding = '2px 8px';
+                            badge.style.borderRadius = '10px';
+                            badge.style.color = 'var(--text-main)';
+                            badge.innerHTML = `<strong style="color: var(--accent-teal);">${escapeHtml(dep.name)}</strong> <span style="color: var(--text-muted); font-size: 11px;">${escapeHtml(dep.version)}</span>`;
+                            depList.appendChild(badge);
+                        });
+                    }
+                } catch (e) {
+                    console.error('Failed to parse dependencies_json:', e);
+                    depList.innerHTML = '<span class="placeholder-text" style="font-size: 12px; color: var(--text-muted);">No dependencies detected.</span>';
+                }
+            } else {
+                depCount.textContent = '0 packages';
+                depList.innerHTML = '<span class="placeholder-text" style="font-size: 12px; color: var(--text-muted);">No dependencies detected.</span>';
+            }
+        } else {
+            intelCard.style.display = 'none';
+        }
+
         if (details.last_analysis) {
             document.getElementById('detail-project-last-run').textContent = new Date(details.last_analysis.created_at).toLocaleString();
             

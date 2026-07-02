@@ -84,5 +84,16 @@ class ProjectDetailsResponse(BaseModel):
     last_commit_message: Optional[str] = None
     last_sync_time: Optional[datetime] = None
 
+    # Code Intelligence Metadata Cache
+    project_type: Optional[str] = None
+    framework: Optional[str] = None
+    architecture: Optional[str] = None
+    languages_distribution: Optional[str] = None  # JSON string
+    dependencies_json: Optional[str] = None  # JSON string
+    entry_point: Optional[str] = None
+    file_priorities: Optional[str] = None  # JSON string
+    total_lines: Optional[int] = None
+    has_intelligence: Optional[bool] = None
+
     class Config:
         from_attributes = True

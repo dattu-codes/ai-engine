@@ -51,6 +51,33 @@ class ProjectRepository:
         return project
 
     @staticmethod
+    def update_project_intelligence(
+        db: Session,
+        project: Project,
+        project_type: Optional[str],
+        framework: Optional[str],
+        architecture: Optional[str],
+        languages_distribution: Optional[str],
+        dependencies_json: Optional[str],
+        entry_point: Optional[str],
+        file_priorities: Optional[str],
+        total_lines: int,
+        has_intelligence: bool
+    ) -> Project:
+        project.project_type = project_type
+        project.framework = framework
+        project.architecture = architecture
+        project.languages_distribution = languages_distribution
+        project.dependencies_json = dependencies_json
+        project.entry_point = entry_point
+        project.file_priorities = file_priorities
+        project.total_lines = total_lines
+        project.has_intelligence = has_intelligence
+        db.commit()
+        db.refresh(project)
+        return project
+
+    @staticmethod
     def delete_project(db: Session, project: Project) -> None:
         db.delete(project)
         db.commit()
