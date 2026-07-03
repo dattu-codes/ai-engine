@@ -12,6 +12,7 @@ from app.projects.services.prompt_builder import PromptBuilder
 from app.projects.services.analysis_simulator import MockAnalysisSimulator
 from app.projects.services.code_analyzer import CodeAnalyzerService
 from app.services.ai import GeminiClient
+from app.projects.services.review_pipeline_services import ReviewOrchestrator
 
 class AnalysisService:
     @staticmethod
@@ -75,115 +76,55 @@ class AnalysisService:
         return analysis
 
     @staticmethod
-    async def _execute_analysis_task(analysis_id: int, project_name: str, files: list, api_key: str = None):
+    async def _execute_analysis_task(analysis_id: int, project_name: str, files_list: list, api_key: str = None):
         """
-        Background task to build prompt, execute Gemini API call, parse structured JSON, and persist reports.
+        Background task delegating to ReviewOrchestrator.
         """
         db = SessionLocal()
-        start_time = time.time()
-        
-        # Load the analysis record in this thread's session context
-        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
-        if not analysis:
-            db.close()
-            return
-
         try:
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if not analysis:
+                return
+
             analysis.status = "running"
             db.commit()
 
-            # 1. Build prompt using prompt builder
-            prompt = PromptBuilder.build_review_prompt(project_name, files)
+            # Retrieve database analysis files from latest completed ingestion run
+            latest_ingest = db.query(Analysis)\
+                .filter(Analysis.project_id == analysis.project_id)\
+                .filter(Analysis.status == "completed")\
+                .filter(Analysis.id != analysis_id)\
+                .order_by(Analysis.id.desc())\
+                .first()
 
-            # 2. Call Gemini if API Key is present, else fall back to local mock
-            response_json = None
-            model_used = "mock-simulator"
-            
-            if api_key and api_key.strip():
-                try:
-                    raw_response = await GeminiClient.call_gemini(
-                        prompt, 
-                        api_key.strip(), 
-                        model="gemini-2.5-flash", 
-                        json_mode=True
-                    )
-                    
-                    # Clean markdown code block wraps if present
-                    cleaned_res = raw_response.strip()
-                    if cleaned_res.startswith("```"):
-                        lines = cleaned_res.splitlines()
-                        if lines[0].startswith("```"):
-                            lines = lines[1:]
-                        if lines and lines[-1].startswith("```"):
-                            lines = lines[:-1]
-                        cleaned_res = "\n".join(lines).strip()
-                        
-                    response_json = json.loads(cleaned_res)
-                    model_used = "gemini-2.5-flash"
-                except Exception as e:
-                    # Log error internally and fallback
-                    print(f"Gemini API execution failed: {str(e)}. Falling back to offline simulator...")
-                    response_json = MockAnalysisSimulator.simulate_review(project_name, files)
-                    model_used = f"mock-simulator (Gemini Error: {str(e)})"
+            if latest_ingest:
+                db_files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == latest_ingest.id).all()
             else:
-                # Direct offline simulation
-                response_json = MockAnalysisSimulator.simulate_review(project_name, files)
-
-            # 3. Validate structured response format and calculate metrics
-            end_time = time.time()
-            duration = float(end_time - start_time)
-            score = int(response_json.get("score", 80))
-            summary = response_json.get("summary", "Analysis completed successfully.")
+                db_files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == analysis_id).all()
             
-            # Run Advanced Static Code Analyzers
-            analyzer_results = CodeAnalyzerService.analyze_codebase(files)
-
-            # Serialize report details with duration, status and analyzer metrics
-            report_data = {
-                "summary": summary,
-                "score": score,
-                "strengths": response_json.get("strengths", []),
-                "weaknesses": response_json.get("weaknesses", []),
-                "recommendations": response_json.get("recommendations", []),
-                "issues": response_json.get("issues", []),
-                "execution_time": duration,
-                "status": "completed",
-                "analyzers": analyzer_results
-            }
-
-            # 4. Save Report record in database
-            report = Report(
+            # Execute pipeline
+            await ReviewOrchestrator.execute_pipeline(
+                db=db,
                 analysis_id=analysis_id,
-                score=score,
-                summary=summary,
-                details_json=json.dumps(report_data)
+                files=db_files,
+                api_key=api_key
             )
-            db.add(report)
-
-            # 5. Finalize Analysis run logs
-            analysis.status = "completed"
-            analysis.completed_at = datetime.utcnow()
-            analysis.duration = duration
-            analysis.model_used = model_used
-            db.commit()
-
         except Exception as e:
             # Handle unexpected failures
-            end_time = time.time()
-            analysis.status = "failed"
-            analysis.completed_at = datetime.utcnow()
-            analysis.duration = float(end_time - start_time)
-            analysis.model_used = "error-handler"
-            
-            # Save error stack trace inside report
-            err_report = Report(
-                analysis_id=analysis_id,
-                score=0,
-                summary=f"Analysis pipeline crashed: {str(e)}",
-                details_json=json.dumps({"error": str(e)})
-            )
-            db.add(err_report)
-            db.commit()
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                analysis.status = "failed"
+                analysis.completed_at = datetime.utcnow()
+                
+                # Save error report
+                err_report = Report(
+                    analysis_id=analysis_id,
+                    score=0,
+                    summary=f"Analysis pipeline crashed: {str(e)}",
+                    details_json=json.dumps({"error": str(e), "pipeline_stages": getattr(analysis, "pipeline_stages", None)})
+                )
+                db.add(err_report)
+                db.commit()
             print(f"Analysis task exception: {str(e)}")
         finally:
             db.close()

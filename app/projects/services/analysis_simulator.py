@@ -6,7 +6,7 @@ class MockAnalysisSimulator:
     def simulate_review(project_name: str, files: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Simulates an AI code review by running basic rule checks on the files list.
-        Returns a dictionary that conforms to the expected Gemini JSON schema.
+        Returns a dictionary that conforms to the expected Stage 3 JSON schema.
         """
         issues = []
         strengths = [
@@ -20,8 +20,8 @@ class MockAnalysisSimulator:
         total_files = len(files)
 
         for f in files:
-            filename = f["filename"]
-            content = f["content"]
+            filename = f.get("filename", "")
+            content = f.get("content", "")
             lines = content.splitlines()
             total_lines += len(lines)
 
@@ -33,10 +33,11 @@ class MockAnalysisSimulator:
                 if "eval(" in line and not stripped.startswith("//") and not stripped.startswith("#"):
                     issues.append({
                         "category": "Security",
-                        "severity": "high",
+                        "severity": "critical",
                         "file": filename,
-                        "title": "Hazardous Eval Statement",
-                        "description": "The code uses 'eval()', which allows arbitrary code execution and poses a major security vulnerability.",
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "The code uses 'eval()', which allows arbitrary code execution and poses a major security vulnerability.",
                         "recommendation": "Avoid using eval(). Parse inputs using structured libraries (such as json.loads) or execute functions dynamically via map tables.",
                         "confidence": 0.95
                     })
@@ -47,8 +48,9 @@ class MockAnalysisSimulator:
                         "category": "Style",
                         "severity": "low",
                         "file": filename,
-                        "title": "Direct Print Statement",
-                        "description": "Standard print() statements write directly to standard output, making log configuration difficult.",
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "Standard print() statements write directly to standard output, making log configuration difficult.",
                         "recommendation": "Replace standard prints with a configured logging library (e.g. logging.info).",
                         "confidence": 0.85
                     })
@@ -57,8 +59,9 @@ class MockAnalysisSimulator:
                         "category": "Style",
                         "severity": "low",
                         "file": filename,
-                        "title": "Direct console.log Usage",
-                        "description": "Direct console.log statements should be avoided in production environments.",
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "Direct console.log statements should be avoided in production environments.",
                         "recommendation": "Use a structured logging package or strip console logs from production builds.",
                         "confidence": 0.80
                     })
@@ -67,8 +70,9 @@ class MockAnalysisSimulator:
                         "category": "Style",
                         "severity": "low",
                         "file": filename,
-                        "title": "Direct System.out Print",
-                        "description": "System.out.println statement is used for debugging console output.",
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "System.out.println statement is used for debugging console output.",
                         "recommendation": "Use a configured SLF4J or log4j logger instance instead.",
                         "confidence": 0.85
                     })
@@ -81,8 +85,9 @@ class MockAnalysisSimulator:
                             "category": "Security",
                             "severity": "medium",
                             "file": filename,
-                            "title": "Silent Broad Exception Handler",
-                            "description": "An empty except-pass block handles all exceptions implicitly, which can suppress runtime errors and mask hidden bugs.",
+                            "line": i,
+                            "evidence": line.strip(),
+                            "explanation": "An empty except-pass block handles all exceptions implicitly, which can suppress runtime errors and mask hidden bugs.",
                             "recommendation": "At least log the warning traceback (e.g. logging.exception) or handle specific exception types.",
                             "confidence": 0.90
                         })
@@ -93,22 +98,24 @@ class MockAnalysisSimulator:
                         "category": "Style",
                         "severity": "low",
                         "file": filename,
-                        "title": "Pending Development TODO",
-                        "description": f"Found pending implementation item: '{line.strip()}'",
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": f"Found pending implementation item: '{line.strip()}'",
                         "recommendation": "Track and resolve the TODO or move it to a project management board.",
                         "confidence": 0.95
                     })
 
         # Calculate a simulated quality score
+        crit_issues = sum(1 for iss in issues if iss["severity"] == "critical")
         high_issues = sum(1 for iss in issues if iss["severity"] == "high")
         med_issues = sum(1 for iss in issues if iss["severity"] == "medium")
         low_issues = sum(1 for iss in issues if iss["severity"] == "low")
 
-        penalty = (high_issues * 20) + (med_issues * 10) + (low_issues * 5)
+        penalty = (crit_issues * 25) + (high_issues * 15) + (med_issues * 5) + (low_issues * 2)
         score = max(0, min(100, 100 - penalty))
 
         # Build list of weaknesses and recommendations based on issues
-        if high_issues > 0:
+        if crit_issues > 0:
             weaknesses.append("Critically hazardous eval functions detected in code execution path.")
             recommendations.append("Prioritize removing all arbitrary code execution paths (eval) to secure system parameters.")
         if med_issues > 0:

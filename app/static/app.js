@@ -1327,7 +1327,7 @@ async function startProjectAnalysis() {
     
     progressLabel.textContent = 'Enqueuing run...';
     progressPct.textContent = '10%';
-    progressBar.style.width = '10%';
+    if (progressBar) progressBar.style.width = '10%';
 
     try {
         const res = await authorizedFetch(`/analysis/${activeProjectId}/run`, {
@@ -1349,8 +1349,13 @@ async function startProjectAnalysis() {
 
         // Poll analysis run status
         progressLabel.textContent = 'Reviewing codebase...';
-        progressPct.textContent = '30%';
-        progressBar.style.width = '30%';
+        progressPct.textContent = '10%';
+
+        // Initialize timeline indicators as pending
+        document.querySelectorAll('.pipeline-step').forEach(step => {
+            step.className = 'pipeline-step pending';
+            step.querySelector('.step-duration').textContent = '--';
+        });
 
         if (analysisPollInterval) clearInterval(analysisPollInterval);
         
@@ -1360,15 +1365,57 @@ async function startProjectAnalysis() {
                 if (!statusRes.ok) return;
 
                 const run = await statusRes.json();
+                
+                // Update Timeline UI
+                if (run.pipeline_stages) {
+                    try {
+                        const stages = typeof run.pipeline_stages === 'string' 
+                            ? JSON.parse(run.pipeline_stages) 
+                            : run.pipeline_stages;
+                        
+                        const stageIds = {
+                            "Load Intelligence": "step-load-intel",
+                            "Prioritize Files": "step-prioritize-files",
+                            "Module Reviews": "step-module-reviews",
+                            "Merge Results": "step-merge-results",
+                            "Validate Findings": "step-validate-findings",
+                            "Generate Report": "step-generate-report"
+                        };
+                        
+                        let completedCount = 0;
+                        stages.forEach(s => {
+                            const stepId = stageIds[s.stage];
+                            if (!stepId) return;
+                            
+                            const stepEl = document.getElementById(stepId);
+                            if (stepEl) {
+                                stepEl.className = `pipeline-step ${s.status}`;
+                                const durEl = stepEl.querySelector('.step-duration');
+                                if (durEl) {
+                                    durEl.textContent = s.status === 'completed'
+                                        ? `${s.duration.toFixed(3)}s`
+                                        : (s.status === 'running' ? 'running...' : '--');
+                                }
+                            }
+                            if (s.status === 'completed') {
+                                completedCount++;
+                            }
+                        });
+                        
+                        // Approximate progress percent from completed pipeline steps
+                        const progressPercent = Math.round((completedCount / stages.length) * 100);
+                        progressPct.textContent = `${progressPercent}%`;
+                    } catch (e) {
+                        console.error("Error parsing stages:", e);
+                    }
+                }
+
                 if (run.status === 'running') {
-                    progressLabel.textContent = 'AI is writing the report...';
-                    progressPct.textContent = '65%';
-                    progressBar.style.width = '65%';
+                    progressLabel.textContent = 'Executing modular reviews...';
                 } else if (run.status === 'completed') {
                     clearInterval(analysisPollInterval);
                     progressLabel.textContent = 'Analysis Completed!';
                     progressPct.textContent = '100%';
-                    progressBar.style.width = '100%';
 
                     // Load the report details
                     await loadProjectReport(analysisId);
@@ -1409,19 +1456,20 @@ async function loadProjectReport(analysisId) {
         const runRes = await authorizedFetch(`/analysis/${analysisId}`);
         let modelUsed = "mock-simulator";
         let durationStr = "0.00s";
+        let runData = null;
         if (runRes.ok) {
-            const run = await runRes.json();
-            modelUsed = run.model_used || "mock-simulator";
-            durationStr = run.duration !== null ? `${run.duration.toFixed(3)}s` : "0.000s";
+            runData = await runRes.json();
+            modelUsed = runData.model_used || "mock-simulator";
+            durationStr = runData.duration !== null ? `${runData.duration.toFixed(3)}s` : "0.000s";
         }
 
-        renderProjectReport(report, modelUsed, durationStr);
+        renderProjectReport(report, modelUsed, durationStr, runData);
     } catch (err) {
         console.error('Failed to load project report:', err);
     }
 }
 
-function renderProjectReport(report, modelUsed = "--", durationStr = "--") {
+function renderProjectReport(report, modelUsed = "--", durationStr = "--", run = null) {
     let data;
     try {
         data = typeof report.details_json === 'string' 
@@ -1436,6 +1484,82 @@ function renderProjectReport(report, modelUsed = "--", durationStr = "--") {
     // Render metadata labels
     document.getElementById('report-meta-engine').textContent = modelUsed;
     document.getElementById('report-meta-duration').textContent = durationStr;
+
+    // Render Pipeline Telemetry details (v1.5)
+    if (run) {
+        document.getElementById('telemetry-coverage').textContent = run.coverage_percentage !== null ? `${run.coverage_percentage}%` : '--';
+        document.getElementById('telemetry-files-reviewed').textContent = `${run.files_reviewed || 0} / ${run.total_files || 0}`;
+        document.getElementById('telemetry-ai-calls').textContent = run.ai_calls !== null ? run.ai_calls : '0';
+        document.getElementById('telemetry-confidence').textContent = run.overall_confidence !== null ? `${Math.round(run.overall_confidence * 100)}%` : '--';
+        
+        // Modules Reviewed
+        const modulesListEl = document.getElementById('telemetry-modules-list');
+        modulesListEl.innerHTML = '';
+        if (run.modules_reviewed) {
+            try {
+                const modules = typeof run.modules_reviewed === 'string' ? JSON.parse(run.modules_reviewed) : run.modules_reviewed;
+                if (modules && modules.length > 0) {
+                    modules.forEach(m => {
+                        const badge = document.createElement('span');
+                        badge.className = 'pill outline';
+                        badge.style.fontSize = '11px';
+                        badge.style.borderColor = 'rgba(139,92,246,0.3)';
+                        badge.style.color = 'var(--accent-purple)';
+                        badge.textContent = m;
+                        modulesListEl.appendChild(badge);
+                    });
+                } else {
+                    modulesListEl.innerHTML = '<span style="color: var(--text-muted);">None</span>';
+                }
+            } catch (e) {
+                console.error("Error rendering modules reviewed:", e);
+            }
+        } else {
+            modulesListEl.innerHTML = '<span style="color: var(--text-muted);">None</span>';
+        }
+        
+        // Skipped Files List
+        const skippedCountEl = document.getElementById('telemetry-skipped-count');
+        const skippedSection = document.getElementById('telemetry-skipped-section');
+        const skippedListEl = document.getElementById('telemetry-skipped-list');
+        
+        skippedListEl.innerHTML = '';
+        if (run.skipped_reasons_json) {
+            try {
+                const skipped = typeof run.skipped_reasons_json === 'string' ? JSON.parse(run.skipped_reasons_json) : run.skipped_reasons_json;
+                const fileNames = Object.keys(skipped || {});
+                skippedCountEl.textContent = fileNames.length;
+                if (fileNames.length > 0) {
+                    skippedSection.style.display = 'flex';
+                    fileNames.forEach(fn => {
+                        const div = document.createElement('div');
+                        div.style.display = 'flex';
+                        div.style.justifyContent = 'space-between';
+                        div.style.marginBottom = '4px';
+                        div.style.borderBottom = '1px solid rgba(255,255,255,0.02)';
+                        div.style.paddingBottom = '2px';
+                        div.innerHTML = `<span style="color: var(--text-muted); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">${escapeHtml(fn)}</span> <span class="pill outline" style="font-size: 10px; color: #fca5a5; border-color: rgba(239, 68, 68, 0.2);">${escapeHtml(skipped[fn])}</span>`;
+                        skippedListEl.appendChild(div);
+                    });
+                } else {
+                    skippedSection.style.display = 'none';
+                }
+            } catch (e) {
+                console.error("Error rendering skipped list:", e);
+                skippedSection.style.display = 'none';
+            }
+        } else {
+            skippedSection.style.display = 'none';
+        }
+    } else {
+        // Fallback if run object is not supplied (e.g. from static config loading)
+        document.getElementById('telemetry-coverage').textContent = '--';
+        document.getElementById('telemetry-files-reviewed').textContent = '--';
+        document.getElementById('telemetry-ai-calls').textContent = '--';
+        document.getElementById('telemetry-confidence').textContent = '--';
+        document.getElementById('telemetry-modules-list').innerHTML = '--';
+        document.getElementById('telemetry-skipped-section').style.display = 'none';
+    }
 
     // Set score and badge color
     const scoreBadge = document.getElementById('report-score-badge');
@@ -1474,13 +1598,18 @@ function renderProjectReport(report, modelUsed = "--", durationStr = "--") {
         issues.forEach(issue => {
             const tr = document.createElement('tr');
             const severityClass = `badge-severity-${(issue.severity || 'low').toLowerCase()}`;
+            const fileWithLine = issue.line ? `${issue.file}#L${issue.line}` : issue.file;
+            const issueTitle = issue.title || `${issue.category} finding in ${issue.file}`;
+            const issueExplanation = issue.explanation || issue.description || '';
+            
             tr.innerHTML = `
                 <td><span class="pill outline" style="font-size: 11px;">${escapeHtml(issue.category)}</span></td>
                 <td><span class="${severityClass}">${escapeHtml(issue.severity)}</span></td>
-                <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-bright);">${escapeHtml(issue.file)}</td>
+                <td style="font-family: var(--font-mono); font-size: 12px; color: var(--text-bright); word-break: break-all;">${escapeHtml(fileWithLine)}</td>
                 <td>
-                    <div style="font-weight: 600; color: var(--text-bright); margin-bottom: 4px;">${escapeHtml(issue.title)}</div>
-                    <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4;">${escapeHtml(issue.description)}</div>
+                    <div style="font-weight: 600; color: var(--text-bright); margin-bottom: 4px;">${escapeHtml(issueTitle)}</div>
+                    <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 6px;">${escapeHtml(issueExplanation)}</div>
+                    ${issue.evidence ? `<div style="font-family: var(--font-mono); font-size: 11px; padding: 6px 10px; background: rgba(0,0,0,0.2); border-left: 3px solid var(--accent-purple); border-radius: 4px; color: #e9d5ff; overflow-x: auto; white-space: pre-wrap; word-break: break-all;">${escapeHtml(issue.evidence)}</div>` : ''}
                 </td>
                 <td style="font-size: 12px; color: var(--accent-teal); line-height: 1.4;">${escapeHtml(issue.recommendation)}</td>
             `;

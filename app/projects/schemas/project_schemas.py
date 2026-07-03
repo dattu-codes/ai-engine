@@ -31,6 +31,17 @@ class AnalysisResponse(BaseModel):
     completed_at: Optional[datetime] = None
     duration: Optional[float] = None
     model_used: Optional[str] = None
+    
+    # Trackers for pipeline (v1.5)
+    modules_reviewed: Optional[str] = None
+    files_reviewed: Optional[int] = None
+    total_files: Optional[int] = None
+    skipped_files: Optional[int] = None
+    coverage_percentage: Optional[float] = None
+    skipped_reasons_json: Optional[str] = None
+    ai_calls: Optional[int] = None
+    overall_confidence: Optional[float] = None
+    pipeline_stages: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -53,6 +53,17 @@ class Analysis(Base):
     duration = Column(Float, nullable=True)  # duration in seconds
     model_used = Column(String(100), nullable=True)
 
+    # Intelligent review pipeline fields (v1.5)
+    modules_reviewed = Column(Text, nullable=True)  # JSON-serialized list of module names
+    files_reviewed = Column(Integer, default=0, nullable=True)
+    total_files = Column(Integer, default=0, nullable=True)
+    skipped_files = Column(Integer, default=0, nullable=True)
+    coverage_percentage = Column(Float, default=0.0, nullable=True)
+    skipped_reasons_json = Column(Text, nullable=True)  # JSON-serialized dict (filename -> reason)
+    ai_calls = Column(Integer, default=0, nullable=True)
+    overall_confidence = Column(Float, default=0.0, nullable=True)
+    pipeline_stages = Column(Text, nullable=True)  # JSON-serialized list of stages
+
     # Relationships
     project = relationship("Project", back_populates="analyses")
     files = relationship("AnalysisFile", back_populates="analysis", cascade="all, delete-orphan")
