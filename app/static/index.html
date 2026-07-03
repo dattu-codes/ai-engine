@@ -88,6 +88,10 @@
                         <span class="nav-icon">📜</span>
                         <span class="nav-text">Versions</span>
                     </button>
+                    <button class="nav-item" data-view="view-chat" id="nav-item-chat" style="display: none;">
+                        <span class="nav-icon">💬</span>
+                        <span class="nav-text">Project Chat</span>
+                    </button>
                 </nav>
             </aside>
 
@@ -916,6 +920,95 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- View: Chat -->
+                <div class="view-pane" id="view-chat">
+                    <div style="display: flex; gap: 20px; height: calc(100vh - 185px); align-items: stretch;">
+                        
+                        <!-- Left Panel: Chat Interface -->
+                        <div style="flex: 2; display: flex; flex-direction: column; height: 100%; min-width: 0;" class="card glass">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 10px;">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span style="font-size: 20px;">🤖</span>
+                                    <div>
+                                        <h2 style="margin: 0; font-size: 16px; color: var(--text-bright);">AI Project Assistant</h2>
+                                        <p style="margin: 0; font-size: 12px; color: var(--text-muted);">Grounded in local project source files and reports</p>
+                                    </div>
+                                </div>
+                                <button class="btn btn-secondary" id="btn-clear-chat" style="padding: 6px 12px; font-size: 12px; margin: 0;">Clear Conversation</button>
+                            </div>
+                            
+                            <!-- Messages Area -->
+                            <div class="card-body" id="chat-messages-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 16px; min-height: 250px; background: rgba(0,0,0,0.15); border-radius: 8px;">
+                                <!-- Messages will render here dynamically -->
+                            </div>
+                            
+                            <!-- Typing indicator -->
+                            <div id="chat-typing-indicator" style="display: none; padding: 10px 20px; font-size: 13px; color: var(--text-muted); font-style: italic; display: flex; align-items: center; gap: 8px;">
+                                <span class="status-indicator online" style="animation: pulse-timeline 1s infinite alternate;"></span>
+                                Assistant is typing...
+                            </div>
+                            
+                            <!-- Footer Input Area -->
+                            <div class="card-footer" style="border-top: 1px solid rgba(255,255,255,0.06); padding: 12px 0 0 0; display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                                <!-- Suggestions Row -->
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="chat-suggestions-container">
+                                    <span class="pill outline chat-suggest-tag" style="cursor: pointer; font-size: 11px;" id="suggest-tag-explain">Explain project</span>
+                                    <span class="pill outline chat-suggest-tag" style="cursor: pointer; font-size: 11px;" id="suggest-tag-auth">Auth Flow</span>
+                                    <span class="pill outline chat-suggest-tag" style="cursor: pointer; font-size: 11px;" id="suggest-tag-refactor">Refactoring</span>
+                                    <span class="pill outline chat-suggest-tag" style="cursor: pointer; font-size: 11px;" id="suggest-tag-readme">Generate README</span>
+                                </div>
+                                
+                                <form id="chat-input-form" style="display: flex; gap: 10px; margin: 0; width: 100%;">
+                                    <input type="text" id="chat-input-text" placeholder="Ask anything about the project code, files, APIs, security..." style="flex: 1; margin: 0; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; color: #fff; padding: 10px 14px;" required autocomplete="off">
+                                    <button type="submit" class="btn btn-primary" id="btn-chat-send" style="margin: 0; display: flex; align-items: center; gap: 6px; padding: 0 20px;">
+                                        <span>Send</span>
+                                        <span>➔</span>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Context Inspector & Citations -->
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; height: 100%; max-width: 33%; min-width: 250px;" class="card glass">
+                            <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 10px;">
+                                <h2 style="font-size: 16px; margin: 0; color: var(--text-bright);">Context Inspector</h2>
+                                <p style="margin: 0; font-size: 12px; color: var(--text-muted);">Active response reference citations</p>
+                            </div>
+                            <div class="card-body" style="overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding: 10px; font-size: 13px;">
+                                <div style="background: rgba(255,255,255,0.02); border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <h3 style="font-size: 13px; color: var(--text-bright); margin: 0 0 6px 0;">Referenced Version</h3>
+                                    <span class="pill outline" id="inspector-version" style="color: var(--accent-purple); border-color: rgba(139,92,246,0.3); font-size: 11px;">No version cited</span>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <h3 style="font-size: 13px; color: var(--text-bright); margin: 0 0 6px 0;">Referenced Files</h3>
+                                    <div style="display: flex; flex-direction: column; gap: 6px;" id="inspector-files">
+                                        <span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No files cited</span>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <h3 style="font-size: 13px; color: var(--text-bright); margin: 0 0 6px 0;">Referenced Classes</h3>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="inspector-classes">
+                                        <span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No classes cited</span>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <h3 style="font-size: 13px; color: var(--text-bright); margin: 0 0 6px 0;">Referenced Functions</h3>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="inspector-functions">
+                                        <span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No functions cited</span>
+                                    </div>
+                                </div>
+                                <div style="background: rgba(255,255,255,0.02); border-radius: 6px; padding: 10px; border: 1px solid rgba(255,255,255,0.04);">
+                                    <h3 style="font-size: 13px; color: var(--text-bright); margin: 0 0 6px 0;">Referenced Reports</h3>
+                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;" id="inspector-reports">
+                                        <span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No reports cited</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                     </div>
                 </div>
             </main>

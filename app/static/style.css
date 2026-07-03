@@ -1716,5 +1716,110 @@ textarea#code-input {
     background: rgba(255, 255, 255, 0.01);
 }
 
+/* AI Project Chat View styles */
+.chat-msg {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    position: relative;
+    animation: fadeIn 0.25s ease;
+    word-break: break-word;
+}
+
+.chat-msg.user {
+    align-self: flex-end;
+    background: rgba(139, 92, 246, 0.18);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    color: var(--text-bright);
+    border-bottom-right-radius: 2px;
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.05);
+}
+
+.chat-msg.assistant {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-main);
+    border-bottom-left-radius: 2px;
+}
+
+.chat-msg-role {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+}
+
+.chat-msg.user .chat-msg-role {
+    color: var(--accent-purple);
+}
+
+.chat-msg.assistant .chat-msg-role {
+    color: var(--accent-emerald);
+}
+
+.chat-msg p {
+    margin: 0 0 10px 0;
+}
+
+.chat-msg p:last-child {
+    margin-bottom: 0;
+}
+
+.chat-msg pre {
+    background: rgba(0, 0, 0, 0.5) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    padding: 10px;
+    margin: 8px 0;
+    overflow-x: auto;
+}
+
+.chat-msg code {
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.chat-msg .inline-code {
+    background: rgba(255, 255, 255, 0.08);
+    color: #f472b6;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.chat-msg-inspect {
+    font-size: 11px;
+    color: var(--text-bright);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    align-self: flex-start;
+    margin-top: 8px;
+    transition: all 0.2s ease;
+}
+
+.chat-msg-inspect:hover {
+    background: rgba(139, 92, 246, 0.15);
+    border-color: rgba(139, 92, 246, 0.3);
+}
+
+.chat-msg.active-inspect {
+    border-color: var(--accent-emerald);
+    box-shadow: 0 0 12px rgba(52, 211, 153, 0.1);
+}
+
+.chat-msg li {
+    margin-left: 16px;
+    margin-bottom: 4px;
+}
+
 
 

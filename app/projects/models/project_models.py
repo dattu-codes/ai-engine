@@ -15,6 +15,7 @@ class Project(Base):
     # Relationships
     analyses = relationship("Analysis", back_populates="project", cascade="all, delete-orphan")
     versions = relationship("ProjectVersion", back_populates="project", cascade="all, delete-orphan")
+    chat_messages = relationship("ChatMessage", back_populates="project", cascade="all, delete-orphan")
     user = relationship("User")
 
     # GitHub Repository Metadata
@@ -134,3 +135,23 @@ class ProjectVersionFile(Base):
 
     # Relationships
     version = relationship("ProjectVersion", back_populates="files")
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(50), nullable=False)  # "user" or "assistant"
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Citations metadata
+    referenced_files = Column(Text, nullable=True)  # JSON list
+    referenced_classes = Column(Text, nullable=True)  # JSON list
+    referenced_functions = Column(Text, nullable=True)  # JSON list
+    referenced_reports = Column(Text, nullable=True)  # JSON list
+    referenced_version = Column(Integer, nullable=True)
+
+    # Relationships
+    project = relationship("Project", back_populates="chat_messages")

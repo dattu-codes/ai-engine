@@ -138,3 +138,24 @@ class VersionComparisonResponse(BaseModel):
 class ApplyFixRequest(BaseModel):
     issue: Dict[str, Any]
     api_key: Optional[str] = None
+
+
+class ChatRequest(BaseModel):
+    message: str
+    api_key: Optional[str] = None
+
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    project_id: int
+    role: str
+    content: str
+    created_at: datetime
+    referenced_files: Optional[List[str]] = None
+    referenced_classes: Optional[List[str]] = None
+    referenced_functions: Optional[List[str]] = None
+    referenced_reports: Optional[List[int]] = None
+    referenced_version: Optional[int] = None
+
+    class Config:
+        from_attributes = True

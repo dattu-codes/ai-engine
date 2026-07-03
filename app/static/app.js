@@ -603,6 +603,10 @@ async function handleLogout() {
     // Reset UI
     document.getElementById('auth-overlay').classList.remove('hidden');
     document.getElementById('header-auth').style.display = 'none';
+    const versionsBtn = document.getElementById('nav-item-versions');
+    if (versionsBtn) versionsBtn.style.display = 'none';
+    const chatBtn = document.getElementById('nav-item-chat');
+    if (chatBtn) chatBtn.style.display = 'none';
 
     if (refreshToken) {
         try {
@@ -747,6 +751,8 @@ function initSidebar() {
                 loadProjects();
             } else if (targetView === 'view-versions') {
                 loadProjectVersions(activeProjectId);
+            } else if (targetView === 'view-chat') {
+                loadProjectChat(activeProjectId);
             }
         });
     });
@@ -1210,6 +1216,8 @@ async function selectProject(id) {
         
         const versionsBtn = document.getElementById('nav-item-versions');
         if (versionsBtn) versionsBtn.style.display = 'block';
+        const chatBtn = document.getElementById('nav-item-chat');
+        if (chatBtn) chatBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -2121,4 +2129,341 @@ document.addEventListener('DOMContentLoaded', () => {
     if (runCompareBtn) {
         runCompareBtn.addEventListener('click', runVersionsComparison);
     }
+
+    // Chat view bindings
+    const chatForm = document.getElementById('chat-input-form');
+    if (chatForm) {
+        chatForm.addEventListener('submit', handleChatSubmit);
+    }
+
+    const clearChatBtn = document.getElementById('btn-clear-chat');
+    if (clearChatBtn) {
+        clearChatBtn.addEventListener('click', clearProjectChat);
+    }
+
+    // Suggested tags click events
+    const tagExplain = document.getElementById('suggest-tag-explain');
+    if (tagExplain) tagExplain.addEventListener('click', () => selectSuggestedChat('Explain this project'));
+    const tagAuth = document.getElementById('suggest-tag-auth');
+    if (tagAuth) tagAuth.addEventListener('click', () => selectSuggestedChat('Explain authentication flow'));
+    const tagRefactor = document.getElementById('suggest-tag-refactor');
+    if (tagRefactor) tagRefactor.addEventListener('click', () => selectSuggestedChat('Suggest refactoring'));
+    const tagReadme = document.getElementById('suggest-tag-readme');
+    if (tagReadme) tagReadme.addEventListener('click', () => selectSuggestedChat('Generate README'));
 });
+
+// AI Project Chat Logic
+let activeChatMessages = [];
+
+async function loadProjectChat(projectId) {
+    const messagesContainer = document.getElementById('chat-messages-container');
+    if (!messagesContainer) return;
+    
+    messagesContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 20px; text-align: center;">Loading chat history...</div>';
+    
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/chat/history`);
+        if (!res.ok) {
+            messagesContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 20px; text-align: center;">Failed to load chat history.</div>';
+            return;
+        }
+        
+        const history = await res.json();
+        activeChatMessages = history;
+        messagesContainer.innerHTML = '';
+        
+        if (history.length === 0) {
+            messagesContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 20px; text-align: center;" id="chat-empty-notice">Ask a question to start the conversation!</div>';
+            resetCitationsInspector();
+            return;
+        }
+        
+        history.forEach(msg => {
+            renderChatMessage(msg);
+        });
+        
+        // Highlight active citations for the last message
+        const lastMsg = history[history.length - 1];
+        if (lastMsg) {
+            updateCitationsInspector(lastMsg);
+        }
+        
+        scrollChatToBottom();
+    } catch (err) {
+        console.error('Failed to load chat:', err);
+        messagesContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 20px; text-align: center;">Connection error.</div>';
+    }
+}
+
+function scrollChatToBottom() {
+    const messagesContainer = document.getElementById('chat-messages-container');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
+function renderChatMessage(msg) {
+    const messagesContainer = document.getElementById('chat-messages-container');
+    if (!messagesContainer) return;
+    
+    // Remove empty notice if exists
+    const notice = document.getElementById('chat-empty-notice');
+    if (notice) notice.remove();
+    
+    const bubble = document.createElement('div');
+    bubble.className = `chat-msg ${msg.role}`;
+    bubble.id = `chat-msg-${msg.id}`;
+    
+    const roleSpan = document.createElement('span');
+    roleSpan.className = 'chat-msg-role';
+    roleSpan.textContent = msg.role === 'user' ? 'User' : 'Assistant';
+    bubble.appendChild(roleSpan);
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = formatMarkdown(msg.content);
+    bubble.appendChild(contentDiv);
+    
+    if (msg.role === 'assistant') {
+        const inspectBtn = document.createElement('div');
+        inspectBtn.className = 'chat-msg-inspect';
+        inspectBtn.innerHTML = '🔍 Inspect References';
+        inspectBtn.addEventListener('click', () => {
+            // Remove active inspection class from other messages
+            document.querySelectorAll('.chat-msg.assistant').forEach(el => el.classList.remove('active-inspect'));
+            bubble.classList.add('active-inspect');
+            updateCitationsInspector(msg);
+        });
+        bubble.appendChild(inspectBtn);
+    }
+    
+    messagesContainer.appendChild(bubble);
+    scrollChatToBottom();
+}
+
+function resetCitationsInspector() {
+    document.getElementById('inspector-version').textContent = 'No version cited';
+    document.getElementById('inspector-files').innerHTML = '<span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No files cited</span>';
+    document.getElementById('inspector-classes').innerHTML = '<span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No classes cited</span>';
+    document.getElementById('inspector-functions').innerHTML = '<span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No functions cited</span>';
+    document.getElementById('inspector-reports').innerHTML = '<span style="color: var(--text-muted); font-style: italic; font-size: 11px;">No reports cited</span>';
+}
+
+function updateCitationsInspector(msg) {
+    resetCitationsInspector();
+    
+    if (msg.referenced_version) {
+        document.getElementById('inspector-version').textContent = `v${msg.referenced_version}`;
+    }
+    
+    if (msg.referenced_files && msg.referenced_files.length > 0) {
+        const container = document.getElementById('inspector-files');
+        container.innerHTML = '';
+        msg.referenced_files.forEach(f => {
+            container.innerHTML += `<div style="margin-bottom: 4px;"><span class="pill outline" style="color: var(--accent-emerald); border-color: rgba(16,185,129,0.3); font-size: 11px; padding: 2px 6px; font-family: var(--font-mono); font-weight: 500; display: inline-block;">📄 ${f}</span></div>`;
+        });
+    }
+    
+    if (msg.referenced_classes && msg.referenced_classes.length > 0) {
+        const container = document.getElementById('inspector-classes');
+        container.innerHTML = '';
+        msg.referenced_classes.forEach(c => {
+            container.innerHTML += `<span class="pill outline" style="color: var(--accent-purple); border-color: rgba(139,92,246,0.3); font-size: 11px; padding: 2px 6px; font-weight: 500;">🏷️ ${c}</span>`;
+        });
+    }
+    
+    if (msg.referenced_functions && msg.referenced_functions.length > 0) {
+        const container = document.getElementById('inspector-functions');
+        container.innerHTML = '';
+        msg.referenced_functions.forEach(fn => {
+            container.innerHTML += `<span class="pill outline" style="color: var(--text-bright); border-color: rgba(255,255,255,0.08); font-size: 11px; padding: 2px 6px; font-family: var(--font-mono); font-weight: 500;">⚙️ ${fn}</span>`;
+        });
+    }
+    
+    if (msg.referenced_reports && msg.referenced_reports.length > 0) {
+        const container = document.getElementById('inspector-reports');
+        container.innerHTML = '';
+        msg.referenced_reports.forEach(r => {
+            container.innerHTML += `<span class="pill outline" style="color: #f59e0b; border-color: rgba(245,158,11,0.3); font-size: 11px; padding: 2px 6px; font-weight: 500;">📊 Report #${r}</span>`;
+        });
+    }
+}
+
+async function clearProjectChat() {
+    if (!confirm('Are you sure you want to clear this project chat history?')) return;
+    
+    try {
+        const res = await authorizedFetch(`/projects/${activeProjectId}/chat/history`, {
+            method: 'DELETE'
+        });
+        if (res.ok) {
+            loadProjectChat(activeProjectId);
+        } else {
+            alert('Failed to clear history.');
+        }
+    } catch (err) {
+        alert('Connection error: ' + err.message);
+    }
+}
+
+async function handleChatSubmit(e) {
+    if (e) e.preventDefault();
+    
+    const input = document.getElementById('chat-input-text');
+    if (!input || !input.value.trim()) return;
+    
+    const text = input.value.trim();
+    input.value = '';
+    
+    // Render user message immediately
+    const tempUserMsg = { id: Date.now(), role: 'user', content: text };
+    renderChatMessage(tempUserMsg);
+    
+    // Add assistant placeholder message
+    const messagesContainer = document.getElementById('chat-messages-container');
+    const tempBubbleId = 'assistant-stream-temp';
+    let tempBubble = document.getElementById(tempBubbleId);
+    if (!tempBubble) {
+        tempBubble = document.createElement('div');
+        tempBubble.className = 'chat-msg assistant';
+        tempBubble.id = tempBubbleId;
+        
+        const roleSpan = document.createElement('span');
+        roleSpan.className = 'chat-msg-role';
+        roleSpan.textContent = 'Assistant';
+        tempBubble.appendChild(roleSpan);
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.id = 'assistant-stream-temp-content';
+        contentDiv.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Connecting...</span>';
+        tempBubble.appendChild(contentDiv);
+        
+        messagesContainer.appendChild(tempBubble);
+    }
+    
+    scrollChatToBottom();
+    
+    // Show typing indicator
+    const typing = document.getElementById('chat-typing-indicator');
+    if (typing) typing.style.display = 'flex';
+    
+    try {
+        const apiKey = localStorage.getItem('gemini_api_key') || '';
+        const res = await fetch(`/projects/${activeProjectId}/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+            },
+            body: JSON.stringify({ message: text, api_key: apiKey })
+        });
+        
+        if (!res.ok) {
+            const errBody = await res.json();
+            document.getElementById('assistant-stream-temp-content').innerHTML = `<span style="color: var(--text-error);">Error: ${errBody.detail || 'Failed to generate response'}</span>`;
+            if (typing) typing.style.display = 'none';
+            return;
+        }
+        
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantText = '';
+        const contentDiv = document.getElementById('assistant-stream-temp-content');
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const dataText = line.substring(6).trim();
+                    if (dataText === '[DONE]') {
+                        break;
+                    }
+                    try {
+                        const parsedObj = JSON.parse(dataText);
+                        if (parsedObj.text) {
+                            assistantText += parsedObj.text;
+                            contentDiv.innerHTML = formatMarkdown(assistantText);
+                            // Highlight Prism code blocks if any
+                            Prism.highlightAllUnder(contentDiv);
+                            scrollChatToBottom();
+                        }
+                    } catch (err) {
+                        // ignore parsing partial chunk
+                    }
+                }
+            }
+        }
+        
+        // Hide typing indicator
+        if (typing) typing.style.display = 'none';
+        
+        // Remove temporary stream bubble and load history to display citations/inspect buttons properly
+        tempBubble.remove();
+        await loadProjectChat(activeProjectId);
+        
+    } catch (err) {
+        console.error('Chat stream exception:', err);
+        tempBubble.innerHTML = `<span style="color: var(--text-error);">Stream error: ${err.message}</span>`;
+        if (typing) typing.style.display = 'none';
+    }
+}
+
+function selectSuggestedChat(text) {
+    const input = document.getElementById('chat-input-text');
+    if (input) {
+        input.value = text;
+        // Trigger chat submission
+        const chatForm = document.getElementById('chat-input-form');
+        if (chatForm) {
+            // Dispatch submit event
+            const event = new Event('submit', { cancelable: true });
+            chatForm.dispatchEvent(event);
+        }
+    }
+}
+
+function formatMarkdown(text) {
+    // Escape HTML to prevent XSS
+    let escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+        
+    // Replace code blocks: ```python ... ```
+    escaped = escaped.replace(/```(python|bash|javascript|json|html|css)?\n([\s\S]*?)```/g, (match, lang, code) => {
+        const language = lang || 'python';
+        return `<pre class="language-${language}"><code class="language-${language}">${code.trim()}</code></pre>`;
+    });
+    
+    // Replace inline code blocks: `code`
+    escaped = escaped.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+    
+    // Replace headings: #, ##, ###
+    escaped = escaped.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+    escaped = escaped.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+    escaped = escaped.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+    
+    // Replace bullet lists
+    escaped = escaped.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
+    // Wrap consecutive <li> in <ul>
+    escaped = escaped.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+    // Clean up duplicate overlapping tags
+    escaped = escaped.replace(/<\/ul>\s*<ul>/g, '');
+    
+    // Replace bold text: **text**
+    escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    
+    // Replace lines with paragraph
+    const lines = escaped.split('\n');
+    const processedLines = lines.map(line => {
+        if (line.trim().startsWith('<h') || line.trim().startsWith('<pre') || line.trim().startsWith('</pre') || line.trim().startsWith('<code') || line.trim().startsWith('</code') || line.trim().startsWith('<ul>') || line.trim().startsWith('</ul>') || line.trim().startsWith('<li>') || line.trim().startsWith('</li>')) {
+            return line;
+        }
+        return line.trim() ? `<p>${line}</p>` : '';
+    });
+    
+    return processedLines.join('\n');
+}

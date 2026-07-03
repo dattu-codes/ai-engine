@@ -18,6 +18,7 @@ from app.auth.dependencies import get_current_user
 from app.projects.routes.project_routes import project_router
 from app.projects.routes.analysis_routes import analysis_router
 from app.projects.routes.version_routes import version_router
+from app.projects.routes.chat_routes import chat_router
 from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report
 
 # Create database tables automatically on startup
@@ -40,6 +41,7 @@ app.include_router(auth_router)
 app.include_router(project_router)
 app.include_router(analysis_router)
 app.include_router(version_router)
+app.include_router(chat_router)
 
 # In-memory stores
 graph_store = GraphStore()
