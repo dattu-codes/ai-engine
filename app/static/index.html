@@ -84,6 +84,10 @@
                         <span class="nav-icon">📁</span>
                         <span class="nav-text">Projects</span>
                     </button>
+                    <button class="nav-item" data-view="view-versions" id="nav-item-versions" style="display: none;">
+                        <span class="nav-icon">📜</span>
+                        <span class="nav-text">Versions</span>
+                    </button>
                 </nav>
             </aside>
 
@@ -648,11 +652,12 @@
                                                             <th>File</th>
                                                             <th>Description</th>
                                                             <th>Recommendation</th>
+                                                            <th>Action</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody id="report-issues-tbody">
                                                         <tr class="empty-row">
-                                                            <td colspan="5">No issues detected.</td>
+                                                            <td colspan="6">No issues detected.</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -767,6 +772,146 @@
                                                 </tr>
                                             </tbody>
                                         </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View: Versions -->
+                <div class="view-pane" id="view-versions">
+                    <div style="display: flex; gap: 20px; align-items: start;">
+                        <!-- Left Column: Current Status & History Timeline -->
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 20px; max-width: 48%;">
+                            <!-- Active version state -->
+                            <div class="card glass">
+                                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px;">
+                                    <h2>Workspace Head State</h2>
+                                    <span class="pill outline" id="head-version-badge" style="font-size: 13px; color: var(--accent-purple); border-color: rgba(139,92,246,0.3); padding: 4px 10px; font-weight: 600;">v1</span>
+                                </div>
+                                <div class="card-body">
+                                    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 14px;">
+                                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 8px;">
+                                            <span style="color: var(--text-muted)">Current Active Version</span>
+                                            <span id="current-ver-name" style="font-weight: 600; color: var(--text-bright)">Version 1</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 8px;">
+                                            <span style="color: var(--text-muted)">Created On</span>
+                                            <span id="current-ver-date">--</span>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 8px;">
+                                            <span style="color: var(--text-muted)">Latest Action</span>
+                                            <span id="current-ver-summary" style="font-style: italic; color: var(--accent-teal)">--</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Timeline -->
+                            <div class="card glass">
+                                <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px;">
+                                    <h2>Workspace Evolution Timeline</h2>
+                                </div>
+                                <div class="card-body" style="padding: 16px;">
+                                    <div class="evolution-timeline" id="evolution-timeline-container" style="display: flex; flex-direction: column; gap: 16px; position: relative; padding-left: 20px; border-left: 2px solid rgba(255,255,255,0.06);">
+                                        <!-- Dynamically generated timeline nodes -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- History Table -->
+                            <div class="card glass">
+                                <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px;">
+                                    <h2>Versioning Snapshots History</h2>
+                                </div>
+                                <div class="card-body" style="padding: 12px 0;">
+                                    <div class="table-container" style="max-height: 250px; overflow-y: auto;">
+                                        <table class="bugs-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Ver</th>
+                                                    <th>Summary</th>
+                                                    <th>Applied Fixes</th>
+                                                    <th>Created At</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="versions-history-tbody">
+                                                <tr class="empty-row">
+                                                    <td colspan="5">No version snapshots recorded.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Comparison & Diff Viewer -->
+                        <div style="flex: 1.2; display: flex; flex-direction: column; gap: 20px; align-self: stretch; max-width: 50%;">
+                            <div class="card glass" style="flex: 1; display: flex; flex-direction: column;">
+                                <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                                    <h2>Compare Snapshots</h2>
+                                    <button class="btn btn-primary btn-sm" id="btn-run-compare" style="margin: 0; padding: 6px 16px;">Compare</button>
+                                </div>
+                                <div class="card-body" style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+                                    <div style="display: flex; gap: 12px;">
+                                        <div class="form-group" style="flex: 1; margin: 0;">
+                                            <label for="compare-ver-1" style="font-size: 12px;">Base Version (Older)</label>
+                                            <select id="compare-ver-1" style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);"></select>
+                                        </div>
+                                        <div class="form-group" style="flex: 1; margin: 0;">
+                                            <label for="compare-ver-2" style="font-size: 12px;">Target Version (Newer)</label>
+                                            <select id="compare-ver-2" style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);"></select>
+                                        </div>
+                                    </div>
+
+                                    <!-- Comparison Stats -->
+                                    <div id="compare-stats-card" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; padding: 16px;">
+                                        <div style="display: flex; gap: 20px; margin-bottom: 12px; flex-wrap: wrap;">
+                                            <div style="flex: 1; min-width: 80px;">
+                                                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Files Changed</div>
+                                                <div style="font-size: 20px; font-weight: 700; color: var(--accent-teal);" id="compare-stat-files">0</div>
+                                            </div>
+                                            <div style="flex: 1; min-width: 80px;">
+                                                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Lines Added</div>
+                                                <div style="font-size: 20px; font-weight: 700; color: var(--accent-green);" id="compare-stat-added">+0</div>
+                                            </div>
+                                            <div style="flex: 1; min-width: 80px;">
+                                                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Lines Removed</div>
+                                                <div style="font-size: 20px; font-weight: 700; color: var(--accent-red);" id="compare-stat-removed">-0</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Issues Summary -->
+                                        <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 10px;">
+                                            <div>
+                                                <h4 style="font-size: 12px; color: var(--accent-green); text-transform: uppercase; margin-bottom: 4px;">Resolved Issues:</h4>
+                                                <ul id="compare-fixed-issues" style="font-size: 12px; list-style-type: square; padding-left: 16px; color: var(--text-main); max-height: 100px; overflow-y: auto;">
+                                                    <li style="color: var(--text-muted);">No issues resolved.</li>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <h4 style="font-size: 12px; color: var(--accent-purple); text-transform: uppercase; margin-bottom: 4px;">Remaining Issues:</h4>
+                                                <ul id="compare-remaining-issues" style="font-size: 12px; list-style-type: square; padding-left: 16px; color: var(--text-main); max-height: 100px; overflow-y: auto;">
+                                                    <li style="color: var(--text-muted);">No remaining issues.</li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Code Diff Viewer -->
+                                    <div id="compare-diff-viewer" style="display: none; flex: 1; display: flex; flex-direction: column; gap: 12px;">
+                                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                                            <h3 style="font-size: 14px;">Unified Code Diff</h3>
+                                            <select id="compare-diff-file-selector" style="padding: 4px 8px; border-radius: 4px; font-size: 12px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); color: var(--text-bright);"></select>
+                                        </div>
+                                        <div style="flex: 1; max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 12px; font-family: var(--font-mono); font-size: 12px; white-space: pre; overflow-x: auto;" id="compare-diff-content"></div>
+                                    </div>
+                                    
+                                    <div id="compare-placeholder" style="flex: 1; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 14px; min-height: 250px;">
+                                        Select base and target versions, then click Compare.
                                     </div>
                                 </div>
                             </div>

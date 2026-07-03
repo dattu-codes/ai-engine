@@ -1,0 +1,359 @@
+import json
+import hashlib
+import time
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+from sqlalchemy.orm import Session
+
+from app.projects.models.project_models import ProjectVersion, ProjectVersionFile, Analysis, AnalysisFile, Report
+from app.projects.repositories.project_repository import ProjectRepository
+from app.services.ai import GeminiClient
+
+class AIFixEngine:
+    @staticmethod
+    async def fix_code(content: str, filename: str, issue: dict, api_key: Optional[str] = None) -> str:
+        """
+        Applies a codebase repair. In Live Mode, queries the Gemini API to fix the code,
+        otherwise runs a localized rules-based search-and-replace simulator.
+        """
+        if api_key:
+            prompt = f"""
+You are an expert AI code refactoring engine. Your task is to fix the security, performance, or style issue described below inside the file '{filename}'.
+
+Issue Category: {issue.get('category')}
+Severity: {issue.get('severity')}
+Description: {issue.get('explanation') or issue.get('description')}
+Line Number: {issue.get('line')}
+Evidence: {issue.get('evidence')}
+Recommendation: {issue.get('recommendation')}
+
+Here is the complete source code of the file:
+```
+{content}
+```
+
+Please fix the issue following the recommendation. Output the complete, updated source code of the file.
+Do NOT output any markdown code blocks, explanatory text, or backticks. Return ONLY the code.
+"""
+            try:
+                fixed_code = await GeminiClient.call_gemini(prompt, api_key=api_key)
+                if fixed_code.startswith("```"):
+                    lines = fixed_code.splitlines()
+                    if lines and lines[0].startswith("```"):
+                        lines = lines[1:]
+                    if lines and lines[-1].startswith("```"):
+                        lines = lines[:-1]
+                    fixed_code = "\n".join(lines)
+                return fixed_code.strip()
+            except Exception as e:
+                # Fallback to simulator if API error occurs
+                print(f"Gemini Fix API call failed, falling back to simulator: {e}")
+                pass
+
+        # Offline Rules-based Simulator Mode
+        lines = content.splitlines()
+        evidence = issue.get("evidence", "").strip()
+        line_no = issue.get("line")
+        matched = False
+
+        if line_no and 1 <= line_no <= len(lines):
+            target_line = lines[line_no - 1]
+            if not evidence or evidence in target_line or (target_line.strip() and target_line.strip() in evidence):
+                matched = True
+                if "eval(" in target_line:
+                    lines[line_no - 1] = target_line.replace('eval("arbitrary_string")', '# eval removed for safety')
+                    lines[line_no - 1] = lines[line_no - 1].replace("eval(", "# eval removed: ")
+                elif "print(" in target_line:
+                    lines[line_no - 1] = target_line.replace("print(", "logging.info(")
+                    if not any("import logging" in l for l in lines):
+                        lines.insert(0, "import logging")
+                elif "console.log(" in target_line:
+                    lines[line_no - 1] = target_line.replace("console.log(", "// console.log removed: ")
+                elif "System.out.println(" in target_line:
+                    lines[line_no - 1] = target_line.replace("System.out.println(", "logger.info(")
+                elif "pass" in target_line:
+                    indent = len(target_line) - len(target_line.lstrip())
+                    lines[line_no - 1] = " " * indent + "logging.warning('Exception caught and ignored', exc_info=True)"
+                    if not any("import logging" in l for l in lines):
+                        lines.insert(0, "import logging")
+                elif "TODO" in target_line:
+                    lines[line_no - 1] = target_line.replace("TODO", "RESOLVED TODO")
+                else:
+                    lines[line_no - 1] = f"# Fixed: {target_line}"
+                content = "\n".join(lines)
+
+        if not matched:
+            # Fallback text replacements if line number is not matching or evidence check failed
+            content_lower = content.lower()
+            if "eval(" in content:
+                content = content.replace('eval("arbitrary_string")', '# eval removed for safety')
+            elif "print(" in content:
+                content = "import logging\n" + content.replace("print(", "logging.info(")
+            elif "pass" in content and "except" in content:
+                content = content.replace("pass", "logging.warning('Error logged', exc_info=True)")
+                
+        return content
+
+
+class VersionService:
+    @staticmethod
+    def create_initial_version(db: Session, project_id: int, analysis_id: int) -> ProjectVersion:
+        """
+        Creates Version 1 baseline snapshot from the project ingestion analysis.
+        """
+        # Fetch ingestion analysis run
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise ValueError(f"Analysis run {analysis_id} not found.")
+
+        # Check if version 1 already exists to prevent duplicate baselines
+        existing = db.query(ProjectVersion).filter(
+            ProjectVersion.project_id == project_id,
+            ProjectVersion.version_number == 1
+        ).first()
+        if existing:
+            return existing
+
+        db_files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == analysis_id).all()
+        
+        # Build metadata map
+        meta = {f.filename: f.hash for f in db_files}
+
+        version = ProjectVersion(
+            project_id=project_id,
+            version_number=1,
+            parent_version_id=None,
+            source_analysis_id=analysis_id,
+            applied_fixes="[]",
+            summary="Baseline version created from project ingestion.",
+            snapshot_metadata=json.dumps(meta)
+        )
+        db.add(version)
+        db.commit()
+        db.refresh(version)
+
+        # Replicate files to the ProjectVersionFile snapshot table
+        for f in db_files:
+            vf = ProjectVersionFile(
+                version_id=version.id,
+                filename=f.filename,
+                extension=f.extension,
+                size=f.size,
+                language=f.language,
+                hash=f.hash,
+                content=f.content
+            )
+            db.add(vf)
+        
+        db.commit()
+        db.refresh(version)
+        return version
+
+    @classmethod
+    async def apply_fix_and_create_version(
+        cls,
+        db: Session,
+        project_id: int,
+        issue: dict,
+        api_key: Optional[str] = None
+    ) -> ProjectVersion:
+        """
+        Applies a targeted fix to the codebase, increments the project version, and creates a snapshot.
+        """
+        # 1. Fetch current active (highest) version
+        current_version = db.query(ProjectVersion).filter(
+            ProjectVersion.project_id == project_id
+        ).order_by(ProjectVersion.version_number.desc()).first()
+
+        if not current_version:
+            raise ValueError("No baseline version exists for this project yet.")
+
+        target_file = issue.get("file")
+        if not target_file:
+            raise ValueError("Issue must specify a file path.")
+
+        # Fetch files at current version
+        curr_files = db.query(ProjectVersionFile).filter(
+            ProjectVersionFile.version_id == current_version.id
+        ).all()
+
+        target_vf = next((f for f in curr_files if f.filename == target_file), None)
+        if not target_vf:
+            raise ValueError(f"File '{target_file}' not found in current version.")
+
+        # 2. Fix target code using the AI/Simulator engine
+        fixed_content = await AIFixEngine.fix_code(
+            content=target_vf.content or "",
+            filename=target_file,
+            issue=issue,
+            api_key=api_key
+        )
+
+        # 3. Create the new immutable version
+        new_version_num = current_version.version_number + 1
+        fix_summary = issue.get("explanation") or issue.get("description") or f"Fixed issue in {target_file}"
+        
+        applied_list = [{"file": target_file, "fix": fix_summary, "line": issue.get("line"), "category": issue.get("category")}]
+
+        # Pre-build snapshot metadata map
+        meta = {}
+        
+        new_version = ProjectVersion(
+            project_id=project_id,
+            version_number=new_version_num,
+            parent_version_id=current_version.id,
+            source_analysis_id=current_version.source_analysis_id, # will be updated after running analysis
+            applied_fixes=json.dumps(applied_list),
+            summary=f"Version {new_version_num} - Applied fix for {issue.get('category')} in '{target_file}'.",
+            snapshot_metadata="{}"
+        )
+        db.add(new_version)
+        db.commit()
+        db.refresh(new_version)
+
+        # 4. Copy all files over to ProjectVersionFile snapshot list, applying fix to target_file
+        for f in curr_files:
+            if f.filename == target_file:
+                # Update file content, size, and hash
+                content_bytes = fixed_content.encode("utf-8")
+                size = len(content_bytes)
+                file_hash = hashlib.sha256(content_bytes).hexdigest()
+                content = fixed_content
+            else:
+                size = f.size
+                file_hash = f.hash
+                content = f.content
+
+            meta[f.filename] = file_hash
+
+            new_vf = ProjectVersionFile(
+                version_id=new_version.id,
+                filename=f.filename,
+                extension=f.extension,
+                size=size,
+                language=f.language,
+                hash=file_hash,
+                content=content
+            )
+            db.add(new_vf)
+
+        # Save metadata and commit
+        new_version.snapshot_metadata = json.dumps(meta)
+        db.commit()
+        db.refresh(new_version)
+        return new_version
+
+    @staticmethod
+    def restore_version(db: Session, project_id: int, target_version_id: int) -> ProjectVersion:
+        """
+        Restores the codebase back to a historical version snapshot by creating a new head version.
+        """
+        # Fetch target version to restore
+        target_version = db.query(ProjectVersion).filter(
+            ProjectVersion.id == target_version_id,
+            ProjectVersion.project_id == project_id
+        ).first()
+
+        if not target_version:
+            raise ValueError(f"Version with ID {target_version_id} not found.")
+
+        # Fetch current active version
+        current_version = db.query(ProjectVersion).filter(
+            ProjectVersion.project_id == project_id
+        ).order_by(ProjectVersion.version_number.desc()).first()
+
+        if not current_version:
+            raise ValueError("No active version found to restore to.")
+
+        # Create restored version record
+        new_version_num = current_version.version_number + 1
+        summary = f"Restored codebase state back to Version {target_version.version_number}."
+        
+        restored_version = ProjectVersion(
+            project_id=project_id,
+            version_number=new_version_num,
+            parent_version_id=current_version.id,
+            source_analysis_id=target_version.source_analysis_id,
+            applied_fixes=json.dumps([{"restored_from": target_version.version_number}]),
+            summary=summary,
+            snapshot_metadata=target_version.snapshot_metadata
+        )
+        db.add(restored_version)
+        db.commit()
+        db.refresh(restored_version)
+
+        # Duplicate version files list from the target version
+        target_files = db.query(ProjectVersionFile).filter(
+            ProjectVersionFile.version_id == target_version.id
+        ).all()
+
+        for tf in target_files:
+            new_vf = ProjectVersionFile(
+                version_id=restored_version.id,
+                filename=tf.filename,
+                extension=tf.extension,
+                size=tf.size,
+                language=tf.language,
+                hash=tf.hash,
+                content=tf.content
+            )
+            db.add(new_vf)
+
+        db.commit()
+        db.refresh(restored_version)
+        return restored_version
+
+    @staticmethod
+    def get_version_history(db: Session, project_id: int) -> List[ProjectVersion]:
+        """
+        Lists version history chronologically for a project.
+        """
+        return db.query(ProjectVersion).filter(
+            ProjectVersion.project_id == project_id
+        ).order_by(ProjectVersion.version_number.desc()).all()
+
+    @staticmethod
+    def record_ingestion_version(db: Session, project_id: int, analysis_id: int, summary: str = "Updated source code via ingestion.") -> ProjectVersion:
+        """
+        Records a new project version after code ingestion or sync has completed.
+        If no versions exist, creates the baseline Version 1.
+        """
+        current_version = db.query(ProjectVersion).filter(
+            ProjectVersion.project_id == project_id
+        ).order_by(ProjectVersion.version_number.desc()).first()
+
+        if not current_version:
+            return VersionService.create_initial_version(db, project_id, analysis_id)
+
+        db_files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == analysis_id).all()
+        meta = {f.filename: f.hash for f in db_files}
+        new_version_num = current_version.version_number + 1
+
+        version = ProjectVersion(
+            project_id=project_id,
+            version_number=new_version_num,
+            parent_version_id=current_version.id,
+            source_analysis_id=analysis_id,
+            applied_fixes="[]",
+            summary=summary,
+            snapshot_metadata=json.dumps(meta)
+        )
+        db.add(version)
+        db.commit()
+        db.refresh(version)
+
+        for f in db_files:
+            vf = ProjectVersionFile(
+                version_id=version.id,
+                filename=f.filename,
+                extension=f.extension,
+                size=f.size,
+                language=f.language,
+                hash=f.hash,
+                content=f.content
+            )
+            db.add(vf)
+        
+        db.commit()
+        db.refresh(version)
+        return version

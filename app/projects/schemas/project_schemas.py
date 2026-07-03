@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
@@ -108,3 +108,33 @@ class ProjectDetailsResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class ProjectVersionResponse(BaseModel):
+    id: int
+    project_id: int
+    version_number: int
+    parent_version_id: Optional[int] = None
+    created_at: datetime
+    source_analysis_id: Optional[int] = None
+    applied_fixes: Optional[str] = None
+    summary: Optional[str] = None
+    snapshot_metadata: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class VersionComparisonResponse(BaseModel):
+    files_changed_count: int
+    lines_added: int
+    lines_removed: int
+    files_changed: List[str]
+    issues_fixed: List[Dict[str, Any]]
+    remaining_issues: List[Dict[str, Any]]
+    diffs: Dict[str, str]
+
+
+class ApplyFixRequest(BaseModel):
+    issue: Dict[str, Any]
+    api_key: Optional[str] = None

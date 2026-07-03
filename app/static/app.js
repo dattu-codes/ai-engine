@@ -745,6 +745,8 @@ function initSidebar() {
 
             if (targetView === 'view-projects') {
                 loadProjects();
+            } else if (targetView === 'view-versions') {
+                loadProjectVersions(activeProjectId);
             }
         });
     });
@@ -1205,6 +1207,9 @@ async function selectProject(id) {
         }
 
         document.getElementById('active-project-details').style.display = 'flex';
+        
+        const versionsBtn = document.getElementById('nav-item-versions');
+        if (versionsBtn) versionsBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -1310,24 +1315,114 @@ function escapeHtml(text) {
 
 let analysisPollInterval = null;
 
+function startAnalysisPolling(analysisId) {
+    const progressContainer = document.getElementById('analysis-progress-container');
+    const progressLabel = document.getElementById('analysis-progress-label');
+    const progressPct = document.getElementById('analysis-progress-pct');
+    const btn = document.getElementById('btn-start-project-analysis');
+    const reportCard = document.getElementById('project-report-card');
+
+    if (btn) btn.disabled = true;
+    if (reportCard) reportCard.style.display = 'none';
+    if (progressContainer) progressContainer.style.display = 'block';
+
+    if (progressLabel) progressLabel.textContent = 'Reviewing codebase...';
+    if (progressPct) progressPct.textContent = '10%';
+
+    // Initialize timeline indicators as pending
+    document.querySelectorAll('.pipeline-step').forEach(step => {
+        step.className = 'pipeline-step pending';
+        const durEl = step.querySelector('.step-duration');
+        if (durEl) durEl.textContent = '--';
+    });
+
+    if (analysisPollInterval) clearInterval(analysisPollInterval);
+
+    analysisPollInterval = setInterval(async () => {
+        try {
+            const statusRes = await authorizedFetch(`/analysis/${analysisId}`);
+            if (!statusRes.ok) return;
+
+            const run = await statusRes.json();
+
+            // Update Timeline UI
+            if (run.pipeline_stages) {
+                try {
+                    const stages = typeof run.pipeline_stages === 'string'
+                        ? JSON.parse(run.pipeline_stages)
+                        : run.pipeline_stages;
+
+                    const stageIds = {
+                        "Load Intelligence": "step-load-intel",
+                        "Prioritize Files": "step-prioritize-files",
+                        "Module Reviews": "step-module-reviews",
+                        "Merge Results": "step-merge-results",
+                        "Validate Findings": "step-validate-findings",
+                        "Generate Report": "step-generate-report"
+                    };
+
+                    let completedCount = 0;
+                    stages.forEach(s => {
+                        const stepId = stageIds[s.stage];
+                        if (!stepId) return;
+
+                        const stepEl = document.getElementById(stepId);
+                        if (stepEl) {
+                            stepEl.className = `pipeline-step ${s.status}`;
+                            const durEl = stepEl.querySelector('.step-duration');
+                            if (durEl) {
+                                durEl.textContent = s.status === 'completed'
+                                    ? `${s.duration.toFixed(3)}s`
+                                    : (s.status === 'running' ? 'running...' : '--');
+                            }
+                        }
+                        if (s.status === 'completed') {
+                            completedCount++;
+                        }
+                    });
+
+                    const progressPercent = Math.round((completedCount / stages.length) * 100);
+                    if (progressPct) progressPct.textContent = `${progressPercent}%`;
+                } catch (e) {
+                    console.error("Error parsing stages:", e);
+                }
+            }
+
+            if (run.status === 'running') {
+                if (progressLabel) progressLabel.textContent = 'Executing modular reviews...';
+            } else if (run.status === 'completed') {
+                clearInterval(analysisPollInterval);
+                if (progressLabel) progressLabel.textContent = 'Analysis Completed!';
+                if (progressPct) progressPct.textContent = '100%';
+
+                await loadProjectReport(analysisId);
+                await selectProject(activeProjectId);
+
+                setTimeout(() => {
+                    if (progressContainer) progressContainer.style.display = 'none';
+                    if (btn) btn.disabled = false;
+                }, 2000);
+            } else if (run.status === 'failed') {
+                clearInterval(analysisPollInterval);
+                alert('AI Review run encountered an error or timed out.');
+                if (progressContainer) progressContainer.style.display = 'none';
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            console.error('Error polling status:', err);
+        }
+    }, 1500);
+}
+
 async function startProjectAnalysis() {
     if (!activeProjectId) return;
 
     const apiKey = document.getElementById('project-analysis-key').value;
     const btn = document.getElementById('btn-start-project-analysis');
     const progressContainer = document.getElementById('analysis-progress-container');
-    const progressLabel = document.getElementById('analysis-progress-label');
-    const progressPct = document.getElementById('analysis-progress-pct');
-    const progressBar = document.getElementById('analysis-progress-bar');
-    const reportCard = document.getElementById('project-report-card');
 
     btn.disabled = true;
-    reportCard.style.display = 'none';
     progressContainer.style.display = 'block';
-    
-    progressLabel.textContent = 'Enqueuing run...';
-    progressPct.textContent = '10%';
-    if (progressBar) progressBar.style.width = '10%';
 
     try {
         const res = await authorizedFetch(`/analysis/${activeProjectId}/run`, {
@@ -1345,98 +1440,7 @@ async function startProjectAnalysis() {
         }
 
         const analysis = await res.json();
-        const analysisId = analysis.id;
-
-        // Poll analysis run status
-        progressLabel.textContent = 'Reviewing codebase...';
-        progressPct.textContent = '10%';
-
-        // Initialize timeline indicators as pending
-        document.querySelectorAll('.pipeline-step').forEach(step => {
-            step.className = 'pipeline-step pending';
-            step.querySelector('.step-duration').textContent = '--';
-        });
-
-        if (analysisPollInterval) clearInterval(analysisPollInterval);
-        
-        analysisPollInterval = setInterval(async () => {
-            try {
-                const statusRes = await authorizedFetch(`/analysis/${analysisId}`);
-                if (!statusRes.ok) return;
-
-                const run = await statusRes.json();
-                
-                // Update Timeline UI
-                if (run.pipeline_stages) {
-                    try {
-                        const stages = typeof run.pipeline_stages === 'string' 
-                            ? JSON.parse(run.pipeline_stages) 
-                            : run.pipeline_stages;
-                        
-                        const stageIds = {
-                            "Load Intelligence": "step-load-intel",
-                            "Prioritize Files": "step-prioritize-files",
-                            "Module Reviews": "step-module-reviews",
-                            "Merge Results": "step-merge-results",
-                            "Validate Findings": "step-validate-findings",
-                            "Generate Report": "step-generate-report"
-                        };
-                        
-                        let completedCount = 0;
-                        stages.forEach(s => {
-                            const stepId = stageIds[s.stage];
-                            if (!stepId) return;
-                            
-                            const stepEl = document.getElementById(stepId);
-                            if (stepEl) {
-                                stepEl.className = `pipeline-step ${s.status}`;
-                                const durEl = stepEl.querySelector('.step-duration');
-                                if (durEl) {
-                                    durEl.textContent = s.status === 'completed'
-                                        ? `${s.duration.toFixed(3)}s`
-                                        : (s.status === 'running' ? 'running...' : '--');
-                                }
-                            }
-                            if (s.status === 'completed') {
-                                completedCount++;
-                            }
-                        });
-                        
-                        // Approximate progress percent from completed pipeline steps
-                        const progressPercent = Math.round((completedCount / stages.length) * 100);
-                        progressPct.textContent = `${progressPercent}%`;
-                    } catch (e) {
-                        console.error("Error parsing stages:", e);
-                    }
-                }
-
-                if (run.status === 'running') {
-                    progressLabel.textContent = 'Executing modular reviews...';
-                } else if (run.status === 'completed') {
-                    clearInterval(analysisPollInterval);
-                    progressLabel.textContent = 'Analysis Completed!';
-                    progressPct.textContent = '100%';
-
-                    // Load the report details
-                    await loadProjectReport(analysisId);
-                    
-                    // Refresh project stats (updates status badge & last run time)
-                    await selectProject(activeProjectId);
-
-                    setTimeout(() => {
-                        progressContainer.style.display = 'none';
-                        btn.disabled = false;
-                    }, 2000);
-                } else if (run.status === 'failed') {
-                    clearInterval(analysisPollInterval);
-                    alert('AI Review run encountered an error or timed out.');
-                    progressContainer.style.display = 'none';
-                    btn.disabled = false;
-                }
-            } catch (err) {
-                console.error('Error polling status:', err);
-            }
-        }, 1500);
+        startAnalysisPolling(analysis.id);
 
     } catch (err) {
         alert('Error starting review: ' + err.message);
@@ -1593,7 +1597,7 @@ function renderProjectReport(report, modelUsed = "--", durationStr = "--", run =
     const issues = data.issues || [];
 
     if (issues.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No issues detected by the AI Review Engine. Excellent!</td></tr>';
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No issues detected by the AI Review Engine. Excellent!</td></tr>';
     } else {
         issues.forEach(issue => {
             const tr = document.createElement('tr');
@@ -1613,6 +1617,58 @@ function renderProjectReport(report, modelUsed = "--", durationStr = "--", run =
                 </td>
                 <td style="font-size: 12px; color: var(--accent-teal); line-height: 1.4;">${escapeHtml(issue.recommendation)}</td>
             `;
+
+            // Action cell with Apply Fix button
+            const tdAction = document.createElement('td');
+            const fixBtn = document.createElement('button');
+            fixBtn.className = 'btn btn-primary btn-sm';
+            fixBtn.style.margin = '0';
+            fixBtn.style.padding = '4px 8px';
+            fixBtn.style.fontSize = '12px';
+            fixBtn.textContent = 'Apply Fix';
+            fixBtn.addEventListener('click', async () => {
+                const originalText = fixBtn.textContent;
+                fixBtn.disabled = true;
+                fixBtn.textContent = 'Fixing...';
+                
+                try {
+                    const apiKey = document.getElementById('project-analysis-key').value;
+                    const res = await authorizedFetch(`/projects/${activeProjectId}/versions/apply-fix`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            issue: issue,
+                            api_key: apiKey || null
+                        })
+                    });
+                    
+                    if (res.ok) {
+                        const newVer = await res.json();
+                        alert(`Successfully applied fix for ${issue.category} finding in '${issue.file}'. Version ${newVer.version_number} has been created and code is being analyzed.`);
+                        
+                        // Switch view to Projects page to show timeline progress
+                        const navProjectsBtn = document.querySelector('.nav-item[data-view="view-projects"]');
+                        if (navProjectsBtn) navProjectsBtn.click();
+                        
+                        // Start polling progress for the new analysis run!
+                        if (newVer.source_analysis_id) {
+                            startAnalysisPolling(newVer.source_analysis_id);
+                        }
+                    } else {
+                        const data = await res.json();
+                        alert(data.detail || 'Failed to apply fix.');
+                        fixBtn.disabled = false;
+                        fixBtn.textContent = originalText;
+                    }
+                } catch (err) {
+                    alert('Fix application error: ' + err.message);
+                    fixBtn.disabled = false;
+                    fixBtn.textContent = originalText;
+                }
+            });
+            tdAction.appendChild(fixBtn);
+            tr.appendChild(tdAction);
+
             tbody.appendChild(tr);
         });
     }
@@ -1754,3 +1810,315 @@ function jsonParseSafe(str) {
         return {};
     }
 }
+
+/* ==========================================================================
+   PROJECT VERSIONING & WORKSPACE MANAGEMENT
+   ========================================================================== */
+
+let versionList = [];
+
+async function loadProjectVersions(projectId) {
+    if (!projectId) return;
+
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/versions`);
+        if (!res.ok) return;
+
+        versionList = await res.json();
+        
+        // 1. Populate current head version labels
+        if (versionList.length > 0) {
+            const head = versionList[0]; // ordered desc
+            document.getElementById('head-version-badge').textContent = `v${head.version_number}`;
+            document.getElementById('current-ver-name').textContent = `Version ${head.version_number}`;
+            document.getElementById('current-ver-date').textContent = new Date(head.created_at).toLocaleString();
+            document.getElementById('current-ver-summary').textContent = head.summary || 'Initial baseline';
+        }
+
+        // 2. Populate comparison selector dropdowns
+        const compare1 = document.getElementById('compare-ver-1');
+        const compare2 = document.getElementById('compare-ver-2');
+        compare1.innerHTML = '';
+        compare2.innerHTML = '';
+
+        versionList.forEach((v, index) => {
+            const opt1 = document.createElement('option');
+            opt1.value = v.id;
+            opt1.textContent = `v${v.version_number} - ${v.summary ? v.summary.substring(0, 40) : 'Snapshot'}`;
+            if (index === versionList.length - 1) opt1.selected = true;
+            compare1.appendChild(opt1);
+
+            const opt2 = document.createElement('option');
+            opt2.value = v.id;
+            opt2.textContent = `v${v.version_number} - ${v.summary ? v.summary.substring(0, 40) : 'Snapshot'}`;
+            if (index === 0) opt2.selected = true;
+            compare2.appendChild(opt2);
+        });
+
+        // 3. Render Snapshots History Table
+        const tbody = document.getElementById('versions-history-tbody');
+        tbody.innerHTML = '';
+
+        versionList.forEach(v => {
+            const tr = document.createElement('tr');
+            
+            // Format applied fixes
+            let fixesStr = 'None';
+            if (v.applied_fixes) {
+                try {
+                    const fixes = JSON.parse(v.applied_fixes);
+                    if (fixes.length > 0) {
+                        fixesStr = fixes.map(f => {
+                            if (f.restored_from) return `Restored v${f.restored_from}`;
+                            return `${f.category || 'Fix'} in ${f.file || 'code'}`;
+                        }).join(', ');
+                    }
+                } catch (e) {}
+            }
+
+            tr.innerHTML = `
+                <td style="font-weight: 700; color: var(--accent-purple);">v${v.version_number}</td>
+                <td style="font-size: 13px;">${escapeHtml(v.summary || 'Baseline snapshot.')}</td>
+                <td style="font-size: 12px; color: var(--text-muted);">${escapeHtml(fixesStr)}</td>
+                <td style="font-size: 12px; color: var(--text-main); white-space: nowrap;">${new Date(v.created_at).toLocaleString()}</td>
+            `;
+
+            // Actions Cell
+            const tdActions = document.createElement('td');
+            tdActions.style.whiteSpace = 'nowrap';
+
+            // Download Button
+            const dlBtn = document.createElement('button');
+            dlBtn.className = 'btn btn-secondary btn-sm';
+            dlBtn.style.margin = '0 4px 0 0';
+            dlBtn.textContent = '📥 Download';
+            dlBtn.addEventListener('click', () => {
+                window.location.href = `/projects/${projectId}/versions/${v.id}/download`;
+            });
+            tdActions.appendChild(dlBtn);
+
+            // Restore Button
+            if (v.id !== versionList[0].id) {
+                const rstBtn = document.createElement('button');
+                rstBtn.className = 'btn btn-secondary btn-sm';
+                rstBtn.style.margin = '0';
+                rstBtn.textContent = '⏪ Restore';
+                rstBtn.addEventListener('click', async () => {
+                    const confirmRestore = confirm(`Are you sure you want to restore the codebase back to Version ${v.version_number}? This will create a new immutable version in the workspace history.`);
+                    if (!confirmRestore) return;
+
+                    rstBtn.disabled = true;
+                    rstBtn.textContent = 'Restoring...';
+
+                    try {
+                        const res = await authorizedFetch(`/projects/${projectId}/versions/${v.id}/restore`, {
+                            method: 'POST'
+                        });
+
+                        if (res.ok) {
+                            const newVer = await res.json();
+                            alert(`Project successfully restored to Version ${v.version_number}. Version ${newVer.version_number} is created.`);
+                            
+                            // Load project pane & start polling progress
+                            const navProjectsBtn = document.querySelector('.nav-item[data-view="view-projects"]');
+                            if (navProjectsBtn) navProjectsBtn.click();
+                            
+                            if (newVer.source_analysis_id) {
+                                startAnalysisPolling(newVer.source_analysis_id);
+                            }
+                        } else {
+                            const data = await res.json();
+                            alert(data.detail || 'Failed to restore version.');
+                            rstBtn.disabled = false;
+                            rstBtn.textContent = '⏪ Restore';
+                        }
+                    } catch (err) {
+                        alert('Restore error: ' + err.message);
+                        rstBtn.disabled = false;
+                        rstBtn.textContent = '⏪ Restore';
+                    }
+                });
+                tdActions.appendChild(rstBtn);
+            }
+
+            tr.appendChild(tdActions);
+            tbody.appendChild(tr);
+        });
+
+        // 4. Render Workspace Evolution Timeline
+        const timelineContainer = document.getElementById('evolution-timeline-container');
+        timelineContainer.innerHTML = '';
+
+        // Iterate in chronological order
+        const chronVersions = [...versionList].reverse();
+        chronVersions.forEach((v, index) => {
+            const isHead = index === chronVersions.length - 1;
+            const node = document.createElement('div');
+            node.className = 'timeline-node';
+            node.style.position = 'relative';
+            node.style.paddingBottom = '16px';
+
+            const dotStyle = isHead 
+                ? 'background: var(--accent-purple); box-shadow: 0 0 10px var(--accent-purple); width: 12px; height: 12px; left: -25px;'
+                : 'background: var(--accent-teal); box-shadow: 0 0 6px var(--accent-teal); width: 8px; height: 8px; left: -23px;';
+
+            let icon = '📁';
+            let label = 'Project Created';
+            
+            if (v.version_number > 1) {
+                if (v.applied_fixes.includes('restored_from')) {
+                    icon = '⏪';
+                    label = 'Restore';
+                } else if (v.applied_fixes && JSON.parse(v.applied_fixes).length > 0) {
+                    icon = '🛠️';
+                    label = 'Fix Applied';
+                } else {
+                    icon = '🔄';
+                    label = 'Analysis Sync';
+                }
+            }
+
+            node.innerHTML = `
+                <div style="position: absolute; top: 4px; border-radius: 50%; ${dotStyle} transition: all 0.3s;"></div>
+                <div style="font-weight: 700; font-size: 14px; color: var(--text-bright); display: flex; align-items: center; gap: 8px;">
+                    <span>${icon}</span>
+                    <span>${label} (v${v.version_number})</span>
+                    ${isHead ? '<span class="pill outline" style="font-size: 10px; color: var(--accent-purple); border-color: rgba(139,92,246,0.3); padding: 1px 6px;">Latest</span>' : ''}
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;">${new Date(v.created_at).toLocaleString()}</div>
+                <div style="font-size: 13px; color: var(--text-main); line-height: 1.4;">${escapeHtml(v.summary || 'Codebase snapshot enqueued.')}</div>
+            `;
+            timelineContainer.appendChild(node);
+        });
+
+    } catch (err) {
+        console.error('Failed to load project versions:', err);
+    }
+}
+
+async function runVersionsComparison() {
+    if (!activeProjectId) return;
+
+    const v1Id = document.getElementById('compare-ver-1').value;
+    const v2Id = document.getElementById('compare-ver-2').value;
+
+    if (!v1Id || !v2Id) {
+        alert('Please select both older (base) and newer (target) versions.');
+        return;
+    }
+
+    const btn = document.getElementById('btn-run-compare');
+    btn.disabled = true;
+    btn.textContent = 'Comparing...';
+
+    try {
+        const res = await authorizedFetch(`/projects/${activeProjectId}/versions/compare/details?v1_id=${v1Id}&v2_id=${v2Id}`);
+        if (!res.ok) {
+            const data = await res.json();
+            alert(data.detail || 'Comparison failed.');
+            return;
+        }
+
+        const comparison = await res.json();
+
+        // 1. Populate stats cards
+        document.getElementById('compare-stat-files').textContent = comparison.files_changed_count;
+        document.getElementById('compare-stat-added').textContent = `+${comparison.lines_added}`;
+        document.getElementById('compare-stat-removed').textContent = `-${comparison.lines_removed}`;
+
+        // 2. Populate fixed issues list
+        const fixedList = document.getElementById('compare-fixed-issues');
+        fixedList.innerHTML = '';
+        if (comparison.issues_fixed && comparison.issues_fixed.length > 0) {
+            comparison.issues_fixed.forEach(iss => {
+                const li = document.createElement('li');
+                li.style.marginBottom = '4px';
+                li.innerHTML = `<strong style="color: var(--accent-green);">Fixed:</strong> ${escapeHtml(iss.category)} issue in <code>${escapeHtml(iss.file)}#L${iss.line}</code>: ${escapeHtml(iss.explanation || iss.description)}`;
+                fixedList.appendChild(li);
+            });
+        } else {
+            fixedList.innerHTML = '<li style="color: var(--text-muted);">No issues resolved in this comparison delta.</li>';
+        }
+
+        // 3. Populate remaining issues list
+        const remainingList = document.getElementById('compare-remaining-issues');
+        remainingList.innerHTML = '';
+        if (comparison.remaining_issues && comparison.remaining_issues.length > 0) {
+            comparison.remaining_issues.forEach(iss => {
+                const li = document.createElement('li');
+                li.style.marginBottom = '4px';
+                li.innerHTML = `<strong style="color: var(--accent-orange);">Remaining:</strong> ${escapeHtml(iss.category)} finding in <code>${escapeHtml(iss.file)}#L${iss.line}</code>`;
+                remainingList.appendChild(li);
+            });
+        } else {
+            remainingList.innerHTML = '<li style="color: var(--accent-green); font-weight: 500;">🎉 Codebase has zero remaining warnings!</li>';
+        }
+
+        // 4. Handle Code Diff Dropdown
+        const fileSelector = document.getElementById('compare-diff-file-selector');
+        fileSelector.innerHTML = '';
+
+        const diffFiles = Object.keys(comparison.diffs || {});
+        if (diffFiles.length > 0) {
+            diffFiles.forEach(fn => {
+                const opt = document.createElement('option');
+                opt.value = fn;
+                opt.textContent = fn;
+                fileSelector.appendChild(opt);
+            });
+
+            fileSelector.onchange = () => {
+                renderGitDiff(comparison.diffs[fileSelector.value]);
+            };
+
+            renderGitDiff(comparison.diffs[diffFiles[0]]);
+            
+            document.getElementById('compare-diff-viewer').style.display = 'flex';
+        } else {
+            document.getElementById('compare-diff-viewer').style.display = 'none';
+        }
+
+        // Switch panel visibility
+        document.getElementById('compare-placeholder').style.display = 'none';
+        document.getElementById('compare-stats-card').style.display = 'block';
+
+    } catch (err) {
+        alert('Comparison error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Compare';
+    }
+}
+
+function renderGitDiff(diffText) {
+    const diffContainer = document.getElementById('compare-diff-content');
+    if (!diffText) {
+        diffContainer.innerHTML = '<span style="color: var(--text-muted);">No modifications in this file.</span>';
+        return;
+    }
+
+    const lines = diffText.split('\n');
+    let highlightedHTML = '';
+
+    lines.forEach(line => {
+        let lineClass = '';
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+            lineClass = 'style="background: rgba(16, 185, 129, 0.15); color: #34d399; display: block; width: 100%;"';
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+            lineClass = 'style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; display: block; width: 100%;"';
+        } else if (line.startsWith('@@')) {
+            lineClass = 'style="color: var(--accent-purple); font-weight: 600; display: block;"';
+        }
+        highlightedHTML += `<div ${lineClass}>${escapeHtml(line)}</div>`;
+    });
+
+    diffContainer.innerHTML = highlightedHTML;
+}
+
+// Bind comparison button click handler
+document.addEventListener('DOMContentLoaded', () => {
+    const runCompareBtn = document.getElementById('btn-run-compare');
+    if (runCompareBtn) {
+        runCompareBtn.addEventListener('click', runVersionsComparison);
+    }
+});

@@ -63,6 +63,15 @@ class AnalysisService:
         db.commit()
         db.refresh(analysis)
 
+        # Associate this analysis with the latest ProjectVersion
+        from app.projects.models.project_models import ProjectVersion
+        latest_version = db.query(ProjectVersion).filter(
+            ProjectVersion.project_id == project_id
+        ).order_by(ProjectVersion.version_number.desc()).first()
+        if latest_version:
+            latest_version.source_analysis_id = analysis.id
+            db.commit()
+
         # Launch the background async task
         asyncio.create_task(
             AnalysisService._execute_analysis_task(

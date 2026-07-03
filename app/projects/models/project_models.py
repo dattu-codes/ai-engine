@@ -14,6 +14,7 @@ class Project(Base):
 
     # Relationships
     analyses = relationship("Analysis", back_populates="project", cascade="all, delete-orphan")
+    versions = relationship("ProjectVersion", back_populates="project", cascade="all, delete-orphan")
     user = relationship("User")
 
     # GitHub Repository Metadata
@@ -98,3 +99,38 @@ class Report(Base):
 
     # Relationships
     analysis = relationship("Analysis", back_populates="reports")
+
+
+class ProjectVersion(Base):
+    __tablename__ = "project_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    parent_version_id = Column(Integer, ForeignKey("project_versions.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    source_analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True)
+    applied_fixes = Column(Text, nullable=True)  # JSON-serialized list of issues/fixes
+    summary = Column(Text, nullable=True)
+    snapshot_metadata = Column(Text, nullable=True)  # JSON-serialized metadata
+
+    # Relationships
+    project = relationship("Project", back_populates="versions")
+    parent = relationship("ProjectVersion", remote_side=[id])
+    files = relationship("ProjectVersionFile", back_populates="version", cascade="all, delete-orphan")
+
+
+class ProjectVersionFile(Base):
+    __tablename__ = "project_version_files"
+
+    id = Column(Integer, primary_key=True, index=True)
+    version_id = Column(Integer, ForeignKey("project_versions.id", ondelete="CASCADE"), nullable=False)
+    filename = Column(String(512), nullable=False)
+    extension = Column(String(50), nullable=False)
+    size = Column(Integer, nullable=False)
+    language = Column(String(100), nullable=False)
+    hash = Column(String(64), nullable=False)
+    content = Column(Text, nullable=True)
+
+    # Relationships
+    version = relationship("ProjectVersion", back_populates="files")

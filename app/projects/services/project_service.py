@@ -211,6 +211,9 @@ class ProjectService:
             details_json=json.dumps(report_details)
         )
 
+        from app.projects.services.version_service import VersionService
+        VersionService.record_ingestion_version(db, project_id, analysis.id, summary="Uploaded ZIP archive ingestion.")
+
         return analysis
 
     @staticmethod
@@ -265,6 +268,9 @@ class ProjectService:
             summary=summary, 
             details_json=json.dumps(report_details)
         )
+
+        from app.projects.services.version_service import VersionService
+        VersionService.record_ingestion_version(db, project_id, analysis.id, summary=f"Ingested pasted code file: '{filename}'.")
 
         return analysis
 
@@ -330,6 +336,9 @@ class ProjectService:
             summary=summary, 
             details_json=json.dumps(report_details)
         )
+
+        from app.projects.services.version_service import VersionService
+        VersionService.record_ingestion_version(db, project_id, analysis.id, summary="Linked public Git repository baseline.")
 
         return analysis
 
@@ -411,6 +420,9 @@ class ProjectService:
             summary=summary, 
             details_json=json.dumps(report_details)
         )
+
+        from app.projects.services.version_service import VersionService
+        VersionService.record_ingestion_version(db, project_id, analysis.id, summary=f"Synced GitHub repository to commit {metadata['last_commit_sha'][:7]}.")
 
         return {
             "status": "synced",
