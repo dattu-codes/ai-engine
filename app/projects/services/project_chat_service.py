@@ -42,19 +42,18 @@ class ProjectChatService:
                 for v in context["version_history"]
             ])
 
-        # Construct findings text
-        findings_text = "No static analysis or review issues available."
-        if context["report"] and context["report"].details_json:
-            try:
-                rep_data = json.loads(context["report"].details_json)
-                issues = rep_data.get("issues", [])
-                if issues:
-                    findings_text = "\n".join([
-                        f"- [{iss.get('category', 'Bug')}] File: {iss.get('file')}#L{iss.get('line')}: {iss.get('explanation')} (Rec: {iss.get('recommendation')})"
-                        for iss in issues
-                    ])
-            except Exception:
-                pass
+        # Construct findings text from persistent database ReviewFinding model
+        try:
+            from app.projects.models.project_models import ReviewFinding
+            findings = db.query(ReviewFinding).filter(ReviewFinding.project_id == project_id).all()
+            findings_text = "No persistent review findings available."
+            if findings:
+                findings_text = "\n".join([
+                    f"- [ID: {f.id}] Category: {f.category} | Severity: {f.severity} | File: {f.file_path}#L{f.line_number} | Title: {f.title} | Status: {f.status} | Description: {f.description} (Assigned to: {f.assigned_to or 'Unassigned'}, Created: {f.created_at.isoformat() if f.created_at else 'Unknown'}, Resolved: {f.resolved_at.isoformat() if f.resolved_at else 'N/A'}, Ignored Reason: {f.ignored_reason or 'N/A'})"
+                    for f in findings
+                ])
+        except Exception as fe:
+            findings_text = f"Error loading persistent findings context: {fe}"
 
         # Construct source files text context
         source_files_text = "No relevant source files retrieved for this query context."

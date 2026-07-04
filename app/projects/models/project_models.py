@@ -18,6 +18,7 @@ class Project(Base):
     versions = relationship("ProjectVersion", back_populates="project", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="project", cascade="all, delete-orphan")
     pull_requests = relationship("PullRequest", back_populates="project", cascade="all, delete-orphan")
+    findings = relationship("ReviewFinding", back_populates="project", cascade="all, delete-orphan")
     user = relationship("User")
 
     # GitHub Repository Metadata
@@ -191,3 +192,33 @@ class PullRequest(Base):
     project = relationship("Project", back_populates="pull_requests")
     analyses = relationship("Analysis", foreign_keys=[Analysis.pull_request_id], back_populates="pull_request", cascade="all, delete-orphan")
     latest_analysis = relationship("Analysis", foreign_keys=[latest_analysis_id])
+
+
+class ReviewFinding(Base):
+    __tablename__ = "review_findings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True)
+    resolved_in_version_id = Column(Integer, ForeignKey("project_versions.id", ondelete="SET NULL"), nullable=True)
+    
+    file_path = Column(String(512), nullable=False)
+    line_number = Column(Integer, nullable=False)
+    category = Column(String(100), nullable=False)
+    severity = Column(String(50), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    recommendation = Column(Text, nullable=False)
+    confidence = Column(Float, default=0.8, nullable=False)
+    status = Column(String(50), default="Open", nullable=False)  # Open, In Progress, Resolved, Ignored
+    assigned_to = Column(String(100), nullable=True)
+    ignored_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    project = relationship("Project", back_populates="findings")
+    analysis = relationship("Analysis")
+    resolved_in_version = relationship("ProjectVersion")
+

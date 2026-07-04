@@ -239,6 +239,32 @@ class VersionService:
 
         # Save metadata and commit
         new_version.snapshot_metadata = json.dumps(meta)
+        
+        # Resolve associated ReviewFinding
+        try:
+            from app.projects.models.project_models import ReviewFinding
+            finding = db.query(ReviewFinding).filter(
+                ReviewFinding.project_id == project_id,
+                ReviewFinding.file_path == target_file,
+                ReviewFinding.category == issue.get("category"),
+                ReviewFinding.line_number == issue.get("line"),
+                ReviewFinding.status.in_(["Open", "In Progress"])
+            ).first()
+            if not finding:
+                finding = db.query(ReviewFinding).filter(
+                    ReviewFinding.project_id == project_id,
+                    ReviewFinding.file_path == target_file,
+                    ReviewFinding.category == issue.get("category"),
+                    ReviewFinding.status.in_(["Open", "In Progress"])
+                ).first()
+            
+            if finding:
+                finding.status = "Resolved"
+                finding.resolved_at = datetime.utcnow()
+                finding.resolved_in_version_id = new_version.id
+        except Exception as fe:
+            print(f"Error marking finding resolved on fix: {fe}")
+
         db.commit()
         db.refresh(new_version)
         return new_version

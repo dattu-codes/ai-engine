@@ -607,6 +607,10 @@ async function handleLogout() {
     if (versionsBtn) versionsBtn.style.display = 'none';
     const chatBtn = document.getElementById('nav-item-chat');
     if (chatBtn) chatBtn.style.display = 'none';
+    const prBtn = document.getElementById('nav-item-pull-requests');
+    if (prBtn) prBtn.style.display = 'none';
+    const findingsBtn = document.getElementById('nav-item-findings');
+    if (findingsBtn) findingsBtn.style.display = 'none';
 
     if (refreshToken) {
         try {
@@ -755,6 +759,8 @@ function initSidebar() {
                 loadProjectChat(activeProjectId);
             } else if (targetView === 'view-pull-requests') {
                 loadProjectPullRequests(activeProjectId);
+            } else if (targetView === 'view-findings') {
+                loadProjectFindings(activeProjectId);
             }
         });
     });
@@ -1224,6 +1230,8 @@ async function selectProject(id) {
         if (chatBtn) chatBtn.style.display = 'block';
         const prBtn = document.getElementById('nav-item-pull-requests');
         if (prBtn) prBtn.style.display = 'block';
+        const findingsBtn = document.getElementById('nav-item-findings');
+        if (findingsBtn) findingsBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -3012,4 +3020,623 @@ function startPRAnalysisPolling(prId) {
         }
     }, 1500);
 }
+
+
+// --- Review Findings Subsystem ---
+let activeFindingsList = [];
+let activeFindingId = null;
+let activeFindingFilterStatus = 'Open';
+let activeFindingFilterSeverity = '';
+let activeFindingFilterCategory = '';
+let activeFindingSearchQuery = '';
+
+async function loadProjectFindings(projectId) {
+    if (!projectId) return;
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/findings`);
+        if (res.ok) {
+            activeFindingsList = await res.json();
+            renderFindings();
+            renderFindingsDashboard(projectId);
+        } else {
+            console.error('Failed to load findings');
+        }
+    } catch (err) {
+        console.error('Error loading findings:', err);
+    }
+}
+
+function renderFindings() {
+    const listContainer = document.getElementById('findings-list-container');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    // Apply filtering
+    const filtered = activeFindingsList.filter(f => {
+        // Status filter
+        if (f.status !== activeFindingFilterStatus) return false;
+        // Severity filter
+        if (activeFindingFilterSeverity && f.severity !== activeFindingFilterSeverity) return false;
+        // Category filter
+        if (activeFindingFilterCategory && f.category !== activeFindingFilterCategory) return false;
+        // Search query
+        if (activeFindingSearchQuery) {
+            const query = activeFindingSearchQuery.toLowerCase();
+            const desc = (f.description || '').toLowerCase();
+            const file = (f.file_path || '').toLowerCase();
+            if (!desc.includes(query) && !file.includes(query)) return false;
+        }
+        return true;
+    });
+
+    // Update count badge
+    const badge = document.getElementById('findings-total-badge');
+    if (badge) {
+        badge.textContent = `${filtered.length} ${activeFindingFilterStatus}`;
+    }
+
+    if (filtered.length === 0) {
+        listContainer.innerHTML = `<div style="color: var(--text-muted); font-style: italic; font-size: 13px; text-align: center; padding: 20px;">No ${activeFindingFilterStatus.toLowerCase()} findings match the criteria.</div>`;
+        return;
+    }
+
+    filtered.forEach(f => {
+        const card = document.createElement('div');
+        card.className = `card glass finding-card ${activeFindingId === f.id ? 'active' : ''}`;
+        card.style.margin = '0 0 10px 0';
+        card.style.padding = '12px';
+        card.style.cursor = 'pointer';
+        card.style.border = activeFindingId === f.id ? '1px solid var(--accent-purple)' : '1px solid rgba(255,255,255,0.06)';
+        card.style.transition = 'all 0.2s';
+        
+        const sevColors = {
+            critical: '#ef4444',
+            high: '#f97316',
+            medium: '#eab308',
+            low: '#3b82f6'
+        };
+
+        const badgeColor = sevColors[f.severity.toLowerCase()] || 'var(--text-muted)';
+        
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: ${badgeColor};">${f.severity}</span>
+                <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${f.category}</span>
+            </div>
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-bright); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${f.title || f.file_path}
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                ${f.file_path}#L${f.line_number}
+            </div>
+        `;
+
+        card.addEventListener('click', () => {
+            // Remove active class from previous
+            document.querySelectorAll('.finding-card').forEach(c => {
+                c.classList.remove('active');
+                c.style.borderColor = 'rgba(255,255,255,0.06)';
+            });
+            card.classList.add('active');
+            card.style.borderColor = 'var(--accent-purple)';
+            
+            selectFinding(f.id);
+        });
+
+        listContainer.appendChild(card);
+    });
+}
+
+async function selectFinding(findingId) {
+    activeFindingId = findingId;
+    try {
+        const res = await authorizedFetch(`/findings/${findingId}`);
+        if (res.ok) {
+            const finding = await res.json();
+            renderFindingDetail(finding);
+        }
+    } catch (err) {
+        console.error('Error fetching finding detail:', err);
+    }
+}
+
+function renderFindingDetail(finding) {
+    document.getElementById('finding-detail-placeholder').style.display = 'none';
+    document.getElementById('finding-detail-content').style.display = 'flex';
+
+    document.getElementById('finding-detail-title').textContent = finding.title || `${finding.category} Issue`;
+    document.getElementById('finding-detail-meta').textContent = `${finding.file_path} #L${finding.line_number}`;
+    document.getElementById('finding-detail-desc').textContent = finding.description;
+    document.getElementById('finding-detail-rec').textContent = finding.recommendation;
+
+    // Set Assignee dropdown
+    const select = document.getElementById('finding-assignee-select');
+    if (select) {
+        select.value = finding.assigned_to || '';
+    }
+
+    // Set meta tags
+    document.getElementById('finding-meta-analysis').textContent = finding.analysis_id || '--';
+    
+    const versionContainer = document.getElementById('finding-meta-resolved-version-container');
+    if (finding.resolved_in_version_id) {
+        versionContainer.style.display = 'block';
+        document.getElementById('finding-meta-resolved-version').textContent = finding.resolved_in_version_id;
+    } else {
+        versionContainer.style.display = 'none';
+    }
+
+    // Badges
+    const badgeContainer = document.getElementById('finding-detail-badges');
+    badgeContainer.innerHTML = '';
+    
+    const sevColors = {
+        critical: 'rgba(239, 68, 68, 0.15)',
+        high: 'rgba(249, 115, 22, 0.15)',
+        medium: 'rgba(234, 179, 8, 0.15)',
+        low: 'rgba(59, 130, 246, 0.15)'
+    };
+    const sevTextColors = {
+        critical: '#fca5a5',
+        high: '#ffedd5',
+        medium: '#fef9c3',
+        low: '#dbeafe'
+    };
+
+    const sevBadge = document.createElement('span');
+    sevBadge.className = 'badge';
+    sevBadge.style.background = sevColors[finding.severity.toLowerCase()] || 'rgba(255,255,255,0.06)';
+    sevBadge.style.color = sevTextColors[finding.severity.toLowerCase()] || 'var(--text-muted)';
+    sevBadge.textContent = finding.severity.toUpperCase();
+    badgeContainer.appendChild(sevBadge);
+
+    const confBadge = document.createElement('span');
+    confBadge.className = 'badge';
+    confBadge.style.background = 'rgba(139, 92, 246, 0.15)';
+    confBadge.style.color = '#c084fc';
+    confBadge.textContent = `${Math.round(finding.confidence * 100)}% Conf`;
+    badgeContainer.appendChild(confBadge);
+
+    // Set action buttons display based on status
+    const reopenBtn = document.getElementById('btn-finding-reopen');
+    const ignoreBtn = document.getElementById('btn-finding-ignore');
+    const resolveBtn = document.getElementById('btn-finding-resolve');
+    const fixBtn = document.getElementById('btn-finding-apply-fix');
+    const ignoreReasonContainer = document.getElementById('finding-ignored-reason-container');
+
+    if (finding.status === 'Resolved') {
+        reopenBtn.style.display = 'block';
+        ignoreBtn.style.display = 'none';
+        resolveBtn.style.display = 'none';
+        fixBtn.style.display = 'none';
+        ignoreReasonContainer.style.display = 'none';
+    } else if (finding.status === 'Ignored') {
+        reopenBtn.style.display = 'block';
+        ignoreBtn.style.display = 'none';
+        resolveBtn.style.display = 'none';
+        fixBtn.style.display = 'none';
+        
+        ignoreReasonContainer.style.display = 'block';
+        document.getElementById('finding-ignored-reason').textContent = finding.ignored_reason || 'No ignore reason provided.';
+    } else {
+        reopenBtn.style.display = 'none';
+        ignoreBtn.style.display = 'block';
+        resolveBtn.style.display = 'block';
+        fixBtn.style.display = 'block';
+        ignoreReasonContainer.style.display = 'none';
+    }
+}
+
+async function renderFindingsDashboard(projectId) {
+    if (!projectId) return;
+
+    // 1. Gather status metrics from activeFindingsList
+    let openCount = 0;
+    let progressCount = 0;
+    let resolvedCount = 0;
+    let ignoredCount = 0;
+    let criticalCount = 0;
+
+    activeFindingsList.forEach(f => {
+        if (f.status === 'Open') openCount++;
+        else if (f.status === 'In Progress') progressCount++;
+        else if (f.status === 'Resolved') resolvedCount++;
+        else if (f.status === 'Ignored') ignoredCount++;
+
+        if (f.severity.toLowerCase() === 'critical' && f.status !== 'Resolved' && f.status !== 'Ignored') {
+            criticalCount++;
+        }
+    });
+
+    document.getElementById('metric-open-findings').textContent = openCount + progressCount;
+    document.getElementById('metric-critical-findings').textContent = criticalCount;
+    document.getElementById('metric-resolved-today').textContent = resolvedCount;
+    document.getElementById('metric-ignored-findings').textContent = ignoredCount;
+
+    const total = openCount + progressCount + resolvedCount + ignoredCount;
+    const successRate = total > 0 ? Math.round((resolvedCount / total) * 100) : 0;
+    document.getElementById('metric-fix-success').textContent = `${successRate}%`;
+
+    // 2. Fetch history timeline for Resolution Trend
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/findings/history`);
+        if (res.ok) {
+            const history = await res.json();
+            drawResolutionTrendChart(history);
+            
+            // Calculate Average Resolution Time
+            if (history.length > 0) {
+                let totalDiff = 0;
+                history.forEach(item => {
+                    const created = new Date(item.created_at);
+                    const resolved = new Date(item.resolved_at);
+                    totalDiff += (resolved - created);
+                });
+                const avgHours = Math.round(totalDiff / (1000 * 60 * 60 * history.length));
+                if (avgHours < 24) {
+                    document.getElementById('metric-avg-time').textContent = `${avgHours} hrs`;
+                } else {
+                    document.getElementById('metric-avg-time').textContent = `${Math.round(avgHours / 24)} days`;
+                }
+            } else {
+                document.getElementById('metric-avg-time').textContent = '--';
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching history:', err);
+    }
+
+    // 3. Draw Severity & Category distributions
+    drawSeverityCategoryBars(activeFindingsList);
+}
+
+function drawSeverityCategoryBars(findings) {
+    const sevContainer = document.getElementById('chart-severity-bars');
+    const catContainer = document.getElementById('chart-category-bars');
+    if (!sevContainer || !catContainer) return;
+
+    // Severity counts
+    const sevCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+    // Category counts
+    const catCounts = {};
+
+    findings.forEach(f => {
+        if (f.status === 'Resolved') return;
+        const sev = f.severity.toLowerCase();
+        if (sevCounts[sev] !== undefined) sevCounts[sev]++;
+        
+        const cat = f.category || 'Other';
+        catCounts[cat] = (catCounts[cat] || 0) + 1;
+    });
+
+    const totalSev = Object.values(sevCounts).reduce((a, b) => a + b, 0);
+    const totalCat = Object.values(catCounts).reduce((a, b) => a + b, 0);
+
+    // Render Severity Bars
+    let sevHtml = '<div style="font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">SEVERITY</div>';
+    const sevColors = {
+        critical: '#ef4444',
+        high: '#f97316',
+        medium: '#eab308',
+        low: '#3b82f6'
+    };
+    
+    Object.keys(sevCounts).forEach(sev => {
+        const count = sevCounts[sev];
+        const pct = totalSev > 0 ? (count / totalSev) * 100 : 0;
+        sevHtml += `
+            <div style="display: flex; flex-direction: column; gap: 2px; font-size: 11px; margin-bottom: 5px;">
+                <div style="display: flex; justify-content: space-between; color: var(--text-main);">
+                    <span style="text-transform: capitalize;">${sev}</span>
+                    <span>${count}</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden;">
+                    <div style="width: ${pct}%; height: 100%; background: ${sevColors[sev] || 'var(--text-muted)'}; border-radius: 3px;"></div>
+                </div>
+            </div>
+        `;
+    });
+    sevContainer.innerHTML = sevHtml;
+
+    // Render Category Bars
+    let catHtml = '<div style="font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px;">CATEGORY</div>';
+    const categories = Object.keys(catCounts).sort((a,b) => catCounts[b] - catCounts[a]).slice(0, 4);
+    
+    if (categories.length === 0) {
+        catHtml += '<div style="color: var(--text-muted); font-style: italic; font-size: 12px;">No categories</div>';
+    } else {
+        categories.forEach(cat => {
+            const count = catCounts[cat];
+            const pct = totalCat > 0 ? (count / totalCat) * 100 : 0;
+            catHtml += `
+                <div style="display: flex; flex-direction: column; gap: 2px; font-size: 11px; margin-bottom: 5px;">
+                    <div style="display: flex; justify-content: space-between; color: var(--text-main);">
+                        <span>${cat}</span>
+                        <span>${count}</span>
+                    </div>
+                    <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.04); border-radius: 3px; overflow: hidden;">
+                        <div style="width: ${pct}%; height: 100%; background: var(--accent-teal); border-radius: 3px;"></div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+    catContainer.innerHTML = catHtml;
+}
+
+function drawResolutionTrendChart(history) {
+    const container = document.getElementById('chart-resolution-trend-container');
+    if (!container) return;
+
+    if (!history || history.length === 0) {
+        container.innerHTML = `<span style="color: var(--text-muted); font-style: italic; font-size: 12px;">No resolved findings trend data yet. Resolve issues to populate.</span>`;
+        return;
+    }
+
+    // Group history by date (YYYY-MM-DD)
+    const countsByDate = {};
+    history.forEach(item => {
+        if (!item.resolved_at) return;
+        const dateStr = item.resolved_at.split('T')[0];
+        countsByDate[dateStr] = (countsByDate[dateStr] || 0) + 1;
+    });
+
+    const dates = Object.keys(countsByDate).sort();
+    let cumulative = 0;
+    const dataPoints = dates.map(date => {
+        cumulative += countsByDate[date];
+        return { date, value: cumulative };
+    });
+
+    if (dataPoints.length === 0) {
+        container.innerHTML = `<span style="color: var(--text-muted); font-style: italic; font-size: 12px;">No resolved findings trend data yet.</span>`;
+        return;
+    }
+
+    const points = dataPoints.slice(-10);
+    
+    const width = container.clientWidth || 350;
+    const height = 100;
+    const padding = 15;
+    
+    const maxVal = Math.max(...points.map(p => p.value)) || 1;
+    
+    const xStep = points.length > 1 ? (width - padding * 2) / (points.length - 1) : 0;
+    const yScale = (height - padding * 2) / maxVal;
+    
+    let pathD = "";
+    let areaD = "";
+    let circlesHtml = "";
+    
+    points.forEach((p, idx) => {
+        const x = padding + idx * xStep;
+        const y = height - padding - (p.value * yScale);
+        
+        if (idx === 0) {
+            pathD = `M ${x} ${y}`;
+            areaD = `M ${x} ${height - padding} L ${x} ${y}`;
+        } else {
+            pathD += ` L ${x} ${y}`;
+            areaD += ` L ${x} ${y}`;
+        }
+        
+        if (idx === points.length - 1) {
+            areaD += ` L ${x} ${height - padding} Z`;
+        }
+
+        circlesHtml += `<circle cx="${x}" cy="${y}" r="4" fill="var(--accent-purple)" stroke="white" stroke-width="1.5">
+            <title>${p.date}: ${p.value} resolved</title>
+        </circle>`;
+    });
+
+    if (points.length === 1) {
+        const x = width / 2;
+        const y = height / 2;
+        pathD = `M ${padding} ${y} L ${width - padding} ${y}`;
+        circlesHtml = `<circle cx="${x}" cy="${y}" r="5" fill="var(--accent-purple)" stroke="white" stroke-width="1.5">
+            <title>${points[0].date}: ${points[0].value} resolved</title>
+        </circle>`;
+    }
+
+    container.innerHTML = `
+        <svg width="100%" height="100%" viewBox="0 0 ${width} ${height}" style="overflow: visible;">
+            <defs>
+                <linearGradient id="trendAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--accent-purple)" stop-opacity="0.2"/>
+                    <stop offset="100%" stop-color="var(--accent-purple)" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+            ${areaD ? `<path d="${areaD}" fill="url(#trendAreaGrad)"/>` : ''}
+            ${pathD ? `<path d="${pathD}" fill="none" stroke="var(--accent-purple)" stroke-width="2"/>` : ''}
+            ${circlesHtml}
+        </svg>
+    `;
+}
+
+// Bind search and filter events in custom init
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('findings-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            activeFindingSearchQuery = e.target.value;
+            renderFindings();
+        });
+    }
+
+    const sevFilter = document.getElementById('findings-filter-severity');
+    if (sevFilter) {
+        sevFilter.addEventListener('change', (e) => {
+            activeFindingFilterSeverity = e.target.value;
+            renderFindings();
+        });
+    }
+
+    const catFilter = document.getElementById('findings-filter-category');
+    if (catFilter) {
+        catFilter.addEventListener('change', (e) => {
+            activeFindingFilterCategory = e.target.value;
+            renderFindings();
+        });
+    }
+
+    const tabs = document.querySelectorAll('#findings-status-tabs .finding-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => {
+                t.classList.remove('active');
+                t.style.color = 'var(--text-muted)';
+                t.style.borderBottom = 'none';
+                t.style.fontWeight = 'normal';
+            });
+            tab.classList.add('active');
+            tab.style.color = 'var(--accent-purple)';
+            tab.style.borderBottom = '2px solid var(--accent-purple)';
+            tab.style.fontWeight = '600';
+
+            activeFindingFilterStatus = tab.getAttribute('data-status');
+            renderFindings();
+        });
+    });
+
+    const resolveBtn = document.getElementById('btn-finding-resolve');
+    if (resolveBtn) {
+        resolveBtn.addEventListener('click', async () => {
+            if (!activeFindingId) return;
+            try {
+                const res = await authorizedFetch(`/findings/${activeFindingId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: 'Resolved' })
+                });
+                if (res.ok) {
+                    alert('Finding marked as Resolved successfully!');
+                    loadProjectFindings(activeProjectId);
+                } else {
+                    alert('Failed to resolve finding.');
+                }
+            } catch (err) {
+                alert('Resolve error: ' + err.message);
+            }
+        });
+    }
+
+    const ignoreBtn = document.getElementById('btn-finding-ignore');
+    if (ignoreBtn) {
+        ignoreBtn.addEventListener('click', async () => {
+            if (!activeFindingId) return;
+            const reason = prompt('Please enter a reason for ignoring/overriding this finding:');
+            if (reason === null) return;
+            
+            try {
+                const res = await authorizedFetch(`/findings/${activeFindingId}/ignore`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reason: reason })
+                });
+                if (res.ok) {
+                    alert('Finding ignored and overridden successfully!');
+                    loadProjectFindings(activeProjectId);
+                } else {
+                    alert('Failed to ignore finding.');
+                }
+            } catch (err) {
+                alert('Ignore error: ' + err.message);
+            }
+        });
+    }
+
+    const reopenBtn = document.getElementById('btn-finding-reopen');
+    if (reopenBtn) {
+        reopenBtn.addEventListener('click', async () => {
+            if (!activeFindingId) return;
+            try {
+                const res = await authorizedFetch(`/findings/${activeFindingId}/reopen`, {
+                    method: 'PATCH'
+                });
+                if (res.ok) {
+                    alert('Finding reopened successfully!');
+                    loadProjectFindings(activeProjectId);
+                } else {
+                    alert('Failed to reopen finding.');
+                }
+            } catch (err) {
+                alert('Reopen error: ' + err.message);
+            }
+        });
+    }
+
+    const assigneeSelect = document.getElementById('finding-assignee-select');
+    if (assigneeSelect) {
+        assigneeSelect.addEventListener('change', async (e) => {
+            if (!activeFindingId) return;
+            const user = e.target.value || null;
+            try {
+                const res = await authorizedFetch(`/findings/${activeFindingId}/assign`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assigned_to: user })
+                });
+                if (res.ok) {
+                    alert(`Finding successfully assigned to ${user || 'Unassigned'}.`);
+                    loadProjectFindings(activeProjectId);
+                }
+            } catch (err) {
+                console.error('Assign error:', err);
+            }
+        });
+    }
+
+    const applyFixBtn = document.getElementById('btn-finding-apply-fix');
+    if (applyFixBtn) {
+        applyFixBtn.addEventListener('click', async () => {
+            if (!activeFindingId || !activeProjectId) return;
+            
+            const findRes = await authorizedFetch(`/findings/${activeFindingId}`);
+            if (!findRes.ok) return;
+            const finding = await findRes.json();
+
+            const issue = {
+                file: finding.file_path,
+                line: finding.line_number,
+                category: finding.category,
+                severity: finding.severity,
+                explanation: finding.description,
+                recommendation: finding.recommendation,
+                evidence: finding.title
+            };
+
+            const originalText = applyFixBtn.textContent;
+            applyFixBtn.disabled = true;
+            applyFixBtn.textContent = 'Applying Fix...';
+
+            try {
+                const apiKey = localStorage.getItem('gemini_api_key') || '';
+                const res = await authorizedFetch(`/projects/${activeProjectId}/versions/apply-fix`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        issue: issue,
+                        api_key: apiKey || null
+                    })
+                });
+
+                if (res.ok) {
+                    const newVer = await res.json();
+                    alert(`Successfully applied patch for finding! New Version ${newVer.version_number} has been created, and this finding is now Resolved.`);
+                    loadProjectFindings(activeProjectId);
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to apply AI patch.');
+                }
+            } catch (err) {
+                alert('Apply fix error: ' + err.message);
+            } finally {
+                applyFixBtn.disabled = false;
+                applyFixBtn.textContent = originalText;
+            }
+        });
+    }
+});
 

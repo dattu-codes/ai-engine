@@ -549,6 +549,20 @@ class ReviewOrchestrator:
         )
         db.add(report)
         
+        # Sync findings
+        try:
+            from app.projects.services.review_finding_service import ReviewFindingService
+            reviewed_filenames = [f.filename for f in files] if files else None
+            ReviewFindingService.sync_findings(
+                db=db,
+                project_id=analysis.project_id,
+                analysis_id=analysis.id,
+                issues=valid_issues,
+                reviewed_files=reviewed_filenames
+            )
+        except Exception as fe:
+            print(f"Error syncing review findings: {fe}")
+
         # Finish tracking
         analysis.status = "completed"
         analysis.completed_at = datetime.utcnow()

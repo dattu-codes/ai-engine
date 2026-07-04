@@ -25,16 +25,18 @@ class AnalysisService:
         if not project:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
-        # Find the latest completed analysis run to extract files from
-        latest_completed = ProjectRepository.get_latest_analysis(db, project_id)
-        if not latest_completed:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail="Cannot analyze an empty project. Please ingest source files first."
-            )
+        # Find the latest completed analysis run that actually has files
+        latest_completed = None
+        all_analyses = ProjectRepository.get_project_analyses(db, project_id)
+        files = []
+        for anal in all_analyses:
+            if anal.status == "completed":
+                files = ProjectRepository.get_analysis_files(db, anal.id)
+                if files:
+                    latest_completed = anal
+                    break
 
-        files = ProjectRepository.get_analysis_files(db, latest_completed.id)
-        if not files:
+        if not latest_completed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail="Cannot analyze an empty project. Please ingest source code files first."
@@ -98,17 +100,20 @@ class AnalysisService:
             analysis.status = "running"
             db.commit()
 
-            # Retrieve database analysis files from latest completed ingestion run
-            latest_ingest = db.query(Analysis)\
+            # Retrieve database analysis files from latest completed run that has files
+            db_files = []
+            completed_analyses = db.query(Analysis)\
                 .filter(Analysis.project_id == analysis.project_id)\
                 .filter(Analysis.status == "completed")\
                 .filter(Analysis.id != analysis_id)\
                 .order_by(Analysis.id.desc())\
-                .first()
-
-            if latest_ingest:
-                db_files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == latest_ingest.id).all()
-            else:
+                .all()
+            for ca in completed_analyses:
+                db_files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == ca.id).all()
+                if db_files:
+                    break
+            
+            if not db_files:
                 db_files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == analysis_id).all()
             
             # Execute pipeline
