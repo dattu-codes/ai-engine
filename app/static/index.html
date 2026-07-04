@@ -92,6 +92,10 @@
                         <span class="nav-icon">💬</span>
                         <span class="nav-text">Project Chat</span>
                     </button>
+                    <button class="nav-item" data-view="view-pull-requests" id="nav-item-pull-requests" style="display: none;">
+                        <span class="nav-icon">💻</span>
+                        <span class="nav-text">Pull Requests</span>
+                    </button>
                 </nav>
             </aside>
 
@@ -1009,6 +1013,131 @@
                             </div>
                         </div>
                         
+                    </div>
+                </div>
+
+                <!-- View: Pull Requests -->
+                <div class="view-pane" id="view-pull-requests" style="display: none;">
+                    <div style="display: flex; gap: 20px; height: calc(100vh - 185px); align-items: stretch;">
+                        
+                        <!-- Left Panel: PR List & Trigger -->
+                        <div style="flex: 1; display: flex; flex-direction: column; height: 100%; min-width: 320px;" class="card glass">
+                            <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 10px;">
+                                <h2>Pull Requests</h2>
+                                <p>Manage repository pull request audits</p>
+                            </div>
+                            
+                            <!-- Manual PR Review trigger form -->
+                            <div style="padding: 10px; background: rgba(255,255,255,0.02); border-radius: 8px; margin-bottom: 15px; border: 1px solid rgba(255,255,255,0.04);">
+                                <h3 style="font-size: 13px; color: var(--text-bright); margin: 0 0 10px 0;">New Pull Request Review</h3>
+                                <form id="pr-review-trigger-form" style="display: flex; gap: 8px;">
+                                    <input type="number" id="pr-trigger-number" required placeholder="PR # (e.g. 15)" style="flex: 1; min-width: 0; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 12px; color: #fff; font-size: 13px;">
+                                    <button type="submit" class="btn btn-primary" style="margin: 0; padding: 8px 16px; font-size: 13px;">Review</button>
+                                </form>
+                            </div>
+
+                            <!-- List of PRs -->
+                            <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;" id="pr-list-container">
+                                <div class="empty-state" style="padding: 20px 10px;">
+                                    <span style="font-size: 24px;">💻</span>
+                                    <p style="margin-top: 10px; font-size: 13px;">No Pull Requests reviewed yet</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: PR Details View -->
+                        <div style="flex: 2.5; display: flex; flex-direction: column; height: 100%; min-width: 0;" class="card glass hidden" id="pr-details-panel">
+                            <!-- Details Header -->
+                            <div class="card-header" style="border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; gap: 15px;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="pill outline" id="pr-details-status" style="font-size: 11px;">open</span>
+                                        <h2 id="pr-details-title" style="margin: 0; font-size: 18px; word-break: break-word;">...</h2>
+                                    </div>
+                                    <p style="margin-top: 4px;" id="pr-details-meta">PR #-- by @-- | base <- head</p>
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="btn btn-secondary" id="btn-pr-refresh" style="margin: 0; padding: 6px 12px; font-size: 12px;">Refresh</button>
+                                    <button class="btn btn-primary" id="btn-pr-review-again" style="margin: 0; padding: 6px 12px; font-size: 12px;">Review Again</button>
+                                </div>
+                            </div>
+
+                            <!-- Detail Content with Tab Panes -->
+                            <div style="flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 20px;">
+                                
+                                <!-- Executive Overview -->
+                                <div class="card" style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); padding: 15px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                        <h3 style="font-size: 14px; color: var(--text-bright); margin: 0;">Overview</h3>
+                                        <span class="badge" id="pr-score-badge" style="font-size: 18px; font-weight: 700; background: rgba(139,92,246,0.15); color: var(--accent-purple); padding: 4px 10px; border-radius: 8px;">--%</span>
+                                    </div>
+                                    <p id="pr-executive-summary" style="font-size: 13px; line-height: 1.5; color: var(--text-muted); margin: 0 0 12px 0;">...</p>
+                                    <div style="display: flex; gap: 20px; align-items: center;">
+                                        <div>
+                                            <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Risk Assessment:</span>
+                                            <span class="pill" id="pr-risk-pill" style="font-size: 11px; margin-left: 6px;">low</span>
+                                        </div>
+                                        <div>
+                                            <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Files Changed:</span>
+                                            <strong id="pr-meta-files" style="font-size: 12px; margin-left: 4px; color: var(--text-bright);">0</strong>
+                                        </div>
+                                        <div>
+                                            <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase;">Commits:</span>
+                                            <strong id="pr-meta-commits" style="font-size: 12px; margin-left: 4px; color: var(--text-bright);">0</strong>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Changed Files & Diff Viewer -->
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <h3 style="font-size: 14px; color: var(--text-bright); margin: 0 0 4px 0;">Changed Files & Diff Patch</h3>
+                                    <div style="display: flex; gap: 10px; align-items: stretch; height: 260px;">
+                                        <!-- File list left sidebar -->
+                                        <div style="flex: 1; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; background: rgba(0,0,0,0.15); overflow-y: auto; display: flex; flex-direction: column;" id="pr-files-tab-container">
+                                            <!-- list of modified file items -->
+                                        </div>
+                                        <!-- Diff patch code container -->
+                                        <div style="flex: 2; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; background: #12131a; overflow: auto; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px;" id="pr-diff-code-panel">
+                                            <span style="color: var(--text-muted); font-style: italic;">Select a modified file to view diff patch</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Findings Filters & List -->
+                                <div style="display: flex; flex-direction: column; gap: 10px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <h3 style="font-size: 14px; color: var(--text-bright); margin: 0;">Review Findings</h3>
+                                        <div style="display: flex; gap: 6px;" class="findings-filter-bar" id="pr-findings-filters">
+                                            <span class="pill outline active" data-filter="all" style="cursor: pointer; font-size: 10px; padding: 2px 8px;">All</span>
+                                            <span class="pill outline" data-filter="critical" style="cursor: pointer; font-size: 10px; padding: 2px 8px; color: #ef4444; border-color: rgba(239,68,68,0.2);">Critical</span>
+                                            <span class="pill outline" data-filter="high" style="cursor: pointer; font-size: 10px; padding: 2px 8px; color: #f97316; border-color: rgba(249,115,22,0.2);">High</span>
+                                            <span class="pill outline" data-filter="medium" style="cursor: pointer; font-size: 10px; padding: 2px 8px; color: #eab308; border-color: rgba(234,179,8,0.2);">Medium</span>
+                                            <span class="pill outline" data-filter="low" style="cursor: pointer; font-size: 10px; padding: 2px 8px; color: #3b82f6; border-color: rgba(59,130,246,0.2);">Low</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="display: flex; flex-direction: column; gap: 10px;" id="pr-findings-container">
+                                        <!-- Scanned issues listed here -->
+                                    </div>
+                                </div>
+
+                                <!-- AI Fix Suggestions -->
+                                <div style="display: flex; flex-direction: column; gap: 8px;" id="pr-fixes-section">
+                                    <h3 style="font-size: 14px; color: var(--text-bright); margin: 0 0 4px 0;">Suggested AI Code Fixes</h3>
+                                    <div style="display: flex; flex-direction: column; gap: 10px;" id="pr-fixes-container">
+                                        <!-- suggested fix widgets -->
+                                    </div>
+                                </div>
+
+                                <!-- Review Run Timeline History -->
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <h3 style="font-size: 14px; color: var(--text-bright); margin: 0 0 4px 0;">Review Run Timeline</h3>
+                                    <div style="display: flex; flex-direction: column; gap: 8px; border-left: 2px solid rgba(255,255,255,0.06); padding-left: 15px; margin-left: 10px;" id="pr-timeline-container">
+                                        <!-- list of historical analysis runs -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>

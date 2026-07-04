@@ -753,6 +753,8 @@ function initSidebar() {
                 loadProjectVersions(activeProjectId);
             } else if (targetView === 'view-chat') {
                 loadProjectChat(activeProjectId);
+            } else if (targetView === 'view-pull-requests') {
+                loadProjectPullRequests(activeProjectId);
             }
         });
     });
@@ -1024,6 +1026,8 @@ async function loadProjects() {
         if (projects.length === 0) {
             container.innerHTML = '<p class="placeholder-text" style="padding: 0 16px;">No projects registered. Click "+ New" to begin.</p>';
             document.getElementById('active-project-details').style.display = 'none';
+            const prBtn = document.getElementById('nav-item-pull-requests');
+            if (prBtn) prBtn.style.display = 'none';
             activeProjectId = null;
             return;
         }
@@ -1218,6 +1222,8 @@ async function selectProject(id) {
         if (versionsBtn) versionsBtn.style.display = 'block';
         const chatBtn = document.getElementById('nav-item-chat');
         if (chatBtn) chatBtn.style.display = 'block';
+        const prBtn = document.getElementById('nav-item-pull-requests');
+        if (prBtn) prBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -2467,3 +2473,543 @@ function formatMarkdown(text) {
     
     return processedLines.join('\n');
 }
+
+/* ==========================================================================
+   PULL REQUEST REVIEW DASHBOARD LOGIC
+   ========================================================================== */
+
+let activePRId = null;
+let activePRFindings = [];
+let prPollInterval = null;
+
+async function loadProjectPullRequests(projectId) {
+    const listContainer = document.getElementById('pr-list-container');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 20px; text-align: center;">Loading Pull Requests...</div>';
+    document.getElementById('pr-details-panel').classList.add('hidden');
+    activePRId = null;
+
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/pull-requests`);
+        if (!res.ok) {
+            listContainer.innerHTML = '<div style="color: var(--text-error); font-style: italic; padding: 20px; text-align: center;">Failed to load Pull Requests.</div>';
+            return;
+        }
+
+        const prs = await res.json();
+        listContainer.innerHTML = '';
+
+        if (prs.length === 0) {
+            listContainer.innerHTML = `
+                <div class="empty-state" style="padding: 20px 10px;">
+                    <span style="font-size: 24px;">💻</span>
+                    <p style="margin-top: 10px; font-size: 13px;">No Pull Requests reviewed yet</p>
+                </div>`;
+            return;
+        }
+
+        prs.forEach(pr => {
+            const card = document.createElement('div');
+            card.className = `project-card pr-card ${activePRId === pr.id ? 'active' : ''}`;
+            card.id = `pr-card-${pr.id}`;
+            card.style.padding = '12px';
+            card.style.borderRadius = '8px';
+            card.style.border = '1px solid rgba(255,255,255,0.06)';
+            card.style.background = 'rgba(255,255,255,0.02)';
+            card.style.cursor = 'pointer';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.gap = '6px';
+
+            const statusClass = pr.status === 'open' ? 'badge-severity-low' : 'badge-severity-medium';
+            
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                    <h3 style="font-size: 13px; font-weight: 600; color: var(--text-bright); margin: 0; word-break: break-all;">#${pr.github_pr_number} ${escapeHtml(pr.title)}</h3>
+                    <span class="pill outline" style="font-size: 9px; padding: 1px 4px;">${pr.status}</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted);">By @${escapeHtml(pr.author)}</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-muted);">${escapeHtml(pr.base_branch)} &larr; ${escapeHtml(pr.head_branch)}</span>
+                    <span class="badge" style="font-size: 11px; font-weight: bold; background: rgba(139,92,246,0.1); color: var(--accent-purple); padding: 2px 6px; border-radius: 4px;">Score: ${pr.analyses && pr.analyses.length > 0 && pr.analyses[0].score !== null ? pr.analyses[0].score + '%' : '--'}</span>
+                </div>
+            `;
+
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.pr-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                selectPullRequest(pr);
+            });
+
+            listContainer.appendChild(card);
+        });
+
+        // Auto-select first PR if active
+        if (!activePRId && prs.length > 0) {
+            listContainer.firstElementChild.click();
+        }
+
+    } catch (err) {
+        console.error('Failed to load project PRs:', err);
+        listContainer.innerHTML = '<div style="color: var(--text-error); font-style: italic; padding: 20px; text-align: center;">Connection error.</div>';
+    }
+}
+
+async function selectPullRequest(pr) {
+    activePRId = pr.id;
+    const panel = document.getElementById('pr-details-panel');
+    panel.classList.remove('hidden');
+
+    // Headers
+    document.getElementById('pr-details-status').textContent = pr.status;
+    document.getElementById('pr-details-title').textContent = pr.title;
+    document.getElementById('pr-details-meta').textContent = `PR #${pr.github_pr_number} by @${pr.author} | base: ${pr.base_branch} &larr; head: ${pr.head_branch}`;
+
+    // Overview details loading
+    document.getElementById('pr-score-badge').textContent = '--%';
+    document.getElementById('pr-executive-summary').textContent = 'Loading review summary...';
+    document.getElementById('pr-risk-pill').textContent = 'loading...';
+    document.getElementById('pr-risk-pill').className = 'pill';
+    document.getElementById('pr-meta-files').textContent = pr.files_changed;
+    document.getElementById('pr-meta-commits').textContent = pr.commits;
+
+    // Reset components
+    document.getElementById('pr-files-tab-container').innerHTML = '';
+    document.getElementById('pr-diff-code-panel').innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Select a modified file to view diff patch</span>';
+    document.getElementById('pr-findings-container').innerHTML = '';
+    document.getElementById('pr-fixes-container').innerHTML = '';
+    document.getElementById('pr-timeline-container').innerHTML = '';
+
+    // File Tabs rendering from JSON metadata
+    if (pr.pr_files_json) {
+        try {
+            const files = JSON.parse(pr.pr_files_json);
+            const container = document.getElementById('pr-files-tab-container');
+            container.innerHTML = '';
+
+            files.forEach((f, idx) => {
+                const item = document.createElement('div');
+                item.className = 'file-tab-item';
+                item.style.padding = '8px 12px';
+                item.style.borderBottom = '1px solid rgba(255,255,255,0.04)';
+                item.style.cursor = 'pointer';
+                item.style.fontSize = '12px';
+                item.style.color = 'var(--text-main)';
+                item.style.fontFamily = 'var(--font-mono)';
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.alignItems = 'center';
+
+                item.innerHTML = `
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80%;" title="${escapeHtml(f.filename)}">📄 ${escapeHtml(f.filename.split('/').pop())}</span>
+                    <span style="font-size: 10px; color: var(--accent-emerald);">+${f.additions} -${f.deletions}</span>
+                `;
+
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('.file-tab-item').forEach(el => {
+                        el.style.background = '';
+                        el.style.color = '';
+                    });
+                    item.style.background = 'rgba(139,92,246,0.15)';
+                    item.style.color = '#fff';
+                    renderPRDiff(f.patch || 'No patch information available.');
+                });
+
+                container.appendChild(item);
+
+                // Auto click first tab
+                if (idx === 0) item.click();
+            });
+        } catch (e) {
+            console.error('Failed to render file tabs:', e);
+        }
+    }
+
+    // Load actual Review execution details
+    if (pr.latest_analysis_id) {
+        await loadPRAnalysisRunData(pr.latest_analysis_id);
+    } else {
+        document.getElementById('pr-executive-summary').textContent = 'No review runs executed yet for this Pull Request. Click "Review Again" to run.';
+    }
+
+    // Render historical Analysis Runs timeline
+    if (pr.analyses && pr.analyses.length > 0) {
+        const timeline = document.getElementById('pr-timeline-container');
+        timeline.innerHTML = '';
+
+        pr.analyses.forEach(run => {
+            const node = document.createElement('div');
+            node.className = 'timeline-run-item';
+            node.style.cursor = 'pointer';
+            node.style.padding = '6px 10px';
+            node.style.borderRadius = '6px';
+            node.style.border = '1px solid rgba(255,255,255,0.04)';
+            node.style.background = 'rgba(255,255,255,0.01)';
+            node.style.display = 'flex';
+            node.style.justifyContent = 'space-between';
+            node.style.alignItems = 'center';
+            node.style.fontSize = '12px';
+
+            const activeMark = run.id === pr.latest_analysis_id ? 'border-color: var(--accent-purple); background: rgba(139,92,246,0.05);' : '';
+            node.setAttribute('style', `cursor: pointer; padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01); display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-bottom: 4px; ${activeMark}`);
+
+            node.innerHTML = `
+                <div>
+                    <strong>Run #${run.id}</strong> <span style="color: var(--text-muted); font-size: 11px; margin-left: 6px;">${new Date(run.created_at).toLocaleString()}</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <span class="pill outline" style="font-size: 10px;">${run.status}</span>
+                    <strong style="color: var(--accent-purple);">${run.score !== null ? run.score + '%' : '--'}</strong>
+                </div>
+            `;
+
+            node.addEventListener('click', async () => {
+                document.querySelectorAll('.timeline-run-item').forEach(el => {
+                    el.style.borderColor = '';
+                    el.style.background = '';
+                });
+                node.style.borderColor = 'var(--accent-purple)';
+                node.style.background = 'rgba(139,92,246,0.05)';
+                await loadPRAnalysisRunData(run.id);
+            });
+
+            timeline.appendChild(node);
+        });
+    }
+}
+
+async function loadPRAnalysisRunData(analysisId) {
+    try {
+        // Fetch summary
+        const summaryRes = await authorizedFetch(`/pull-requests/${activePRId}/summary`);
+        if (summaryRes.ok) {
+            const summary = await summaryRes.json();
+            document.getElementById('pr-score-badge').textContent = `${summary.score}%`;
+            document.getElementById('pr-executive-summary').textContent = summary.summary;
+            
+            // Risk pill styling
+            const pill = document.getElementById('pr-risk-pill');
+            pill.textContent = summary.risk_assessment.toUpperCase();
+            
+            let pillClass = 'badge-severity-low';
+            if (summary.risk_assessment === 'critical') pillClass = 'badge-severity-critical';
+            else if (summary.risk_assessment === 'high') pillClass = 'badge-severity-high';
+            else if (summary.risk_assessment === 'medium') pillClass = 'badge-severity-medium';
+            pill.className = `pill ${pillClass}`;
+        }
+
+        // Fetch findings
+        const findingsRes = await authorizedFetch(`/pull-requests/${activePRId}/findings`);
+        if (findingsRes.ok) {
+            activePRFindings = await findingsRes.json();
+            renderPRFindings('all');
+        }
+    } catch (err) {
+        console.error('Failed to load analysis run data:', err);
+    }
+}
+
+function renderPRDiff(patchText) {
+    const panel = document.getElementById('pr-diff-code-panel');
+    if (!patchText || patchText === 'No patch information available.') {
+        panel.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">No patch information available for this file.</span>';
+        return;
+    }
+
+    const lines = patchText.split('\n');
+    let output = '';
+
+    lines.forEach(line => {
+        let style = '';
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+            style = 'background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 500; display: block;';
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+            style = 'background: rgba(239, 68, 68, 0.12); color: #fca5a5; display: block; text-decoration: line-through;';
+        } else if (line.startsWith('@@')) {
+            style = 'color: var(--accent-purple); font-weight: 600; display: block;';
+        }
+        output += `<div style="${style}">${escapeHtml(line)}</div>`;
+    });
+
+    panel.innerHTML = output;
+}
+
+function renderPRFindings(filter) {
+    const container = document.getElementById('pr-findings-container');
+    const fixesContainer = document.getElementById('pr-fixes-container');
+    
+    container.innerHTML = '';
+    fixesContainer.innerHTML = '';
+
+    const filtered = activePRFindings.filter(f => {
+        if (filter === 'all') return true;
+        return f.severity.toLowerCase() === filter;
+    });
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div style="color: var(--text-muted); font-style: italic; font-size: 13px; text-align: center; padding: 15px;">No ${filter} findings found in this Pull Request run.</div>`;
+        return;
+    }
+
+    filtered.forEach(issue => {
+        const div = document.createElement('div');
+        div.style.padding = '12px';
+        div.style.borderRadius = '8px';
+        div.style.border = '1px solid rgba(255,255,255,0.06)';
+        div.style.background = 'rgba(255,255,255,0.01)';
+        div.style.display = 'flex';
+        div.style.flexDirection = 'column';
+        div.style.gap = '6px';
+        
+        const severityClass = `badge-severity-${(issue.severity || 'low').toLowerCase()}`;
+        const fileLine = issue.line ? `${issue.file}#L${issue.line}` : issue.file;
+
+        div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span class="${severityClass}" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">${issue.severity}</span>
+                <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">${escapeHtml(fileLine)}</span>
+            </div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-bright);">${escapeHtml(issue.category)} finding</div>
+            <p style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: 0;">${escapeHtml(issue.explanation)}</p>
+            ${issue.evidence ? `<pre style="margin: 4px 0 0 0; padding: 6px 10px; background: rgba(0,0,0,0.25); border-radius: 4px; border-left: 2px solid var(--accent-purple); font-size: 11px; color: #d8b4fe; overflow-x: auto;"><code>${escapeHtml(issue.evidence)}</code></pre>` : ''}
+            <div style="font-size: 12px; color: var(--accent-teal); margin-top: 4px;"><strong>Recommendation:</strong> ${escapeHtml(issue.recommendation)}</div>
+        `;
+
+        container.appendChild(div);
+
+        // Add fix widget if it's a critical/high security issue with evidence
+        if (issue.severity === 'critical' || issue.severity === 'high') {
+            const fixWidget = document.createElement('div');
+            fixWidget.style.padding = '12px';
+            fixWidget.style.borderRadius = '8px';
+            fixWidget.style.border = '1px solid rgba(139,92,246,0.2)';
+            fixWidget.style.background = 'rgba(139,92,246,0.03)';
+            fixWidget.style.display = 'flex';
+            fixWidget.style.flexDirection = 'column';
+            fixWidget.style.gap = '8px';
+
+            fixWidget.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <strong style="font-size: 12px; color: var(--accent-purple);">Suggested Secure Fix for ${escapeHtml(issue.file)}</strong>
+                    <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Severity: ${issue.severity}</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-main); font-family: var(--font-mono); font-style: italic; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px;">
+                    ${escapeHtml(issue.recommendation)}
+                </div>
+            `;
+
+            const fixBtn = document.createElement('button');
+            fixBtn.className = 'btn btn-primary btn-sm';
+            fixBtn.style.margin = '4px 0 0 0';
+            fixBtn.style.alignSelf = 'flex-start';
+            fixBtn.textContent = 'Apply AI Fix Patch';
+            
+            fixBtn.addEventListener('click', async () => {
+                const originalText = fixBtn.textContent;
+                fixBtn.disabled = true;
+                fixBtn.textContent = 'Applying Patch...';
+                
+                try {
+                    const apiKey = localStorage.getItem('gemini_api_key') || '';
+                    const res = await authorizedFetch(`/projects/${activeProjectId}/versions/apply-fix`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            issue: issue,
+                            api_key: apiKey || null
+                        })
+                    });
+                    
+                    if (res.ok) {
+                        const newVer = await res.json();
+                        alert(`Successfully applied fix for ${issue.category} finding in '${issue.file}'. New Version ${newVer.version_number} has been created.`);
+                        
+                        // Reload timeline
+                        loadProjectPullRequests(activeProjectId);
+                    } else {
+                        const data = await res.json();
+                        alert(data.detail || 'Failed to apply patch.');
+                        fixBtn.disabled = false;
+                        fixBtn.textContent = originalText;
+                    }
+                } catch (err) {
+                    alert('Patch error: ' + err.message);
+                    fixBtn.disabled = false;
+                    fixBtn.textContent = originalText;
+                }
+            });
+
+            fixWidget.appendChild(fixBtn);
+            fixesContainer.appendChild(fixWidget);
+        }
+    });
+
+    // Handle placeholder for Suggested fixes
+    if (fixesContainer.innerHTML === '') {
+        fixesContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; font-size: 13px; text-align: center; padding: 10px;">No secure code patches recommended for this PR.</div>';
+    }
+}
+
+// Bind filters click handlers
+document.addEventListener('DOMContentLoaded', () => {
+    const filters = document.querySelectorAll('#pr-findings-filters span');
+    filters.forEach(span => {
+        span.addEventListener('click', () => {
+            filters.forEach(s => s.classList.remove('active'));
+            span.classList.add('active');
+            renderPRFindings(span.getAttribute('data-filter'));
+        });
+    });
+
+    // Form submit review trigger listener
+    const triggerForm = document.getElementById('pr-review-trigger-form');
+    if (triggerForm) {
+        triggerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!activeProjectId) return;
+
+            const inputNum = document.getElementById('pr-trigger-number');
+            const prNum = parseInt(inputNum.value);
+            if (!prNum) return;
+
+            const submitBtn = triggerForm.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Triggering...';
+
+            try {
+                const res = await authorizedFetch(`/projects/${activeProjectId}/pull-requests/review`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pull_request_number: prNum })
+                });
+
+                if (res.ok) {
+                    const pr = await res.json();
+                    inputNum.value = '';
+                    alert(`PR #${prNum} review successfully enqueued! Checking changed files...`);
+                    
+                    // Trigger polling progress bar simulation
+                    startPRAnalysisPolling(pr.id);
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to trigger review.');
+                }
+            } catch (err) {
+                alert('Review trigger error: ' + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            }
+        });
+    }
+
+    // Refresh action trigger
+    const refreshBtn = document.getElementById('btn-pr-refresh');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', async () => {
+            if (!activePRId) return;
+
+            const originalText = refreshBtn.textContent;
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = 'Syncing...';
+
+            try {
+                const res = await authorizedFetch(`/pull-requests/${activePRId}/refresh`, {
+                    method: 'POST'
+                });
+
+                if (res.ok) {
+                    const updated = await res.json();
+                    alert('Pull Request metadata refreshed successfully!');
+                    selectPullRequest(updated);
+                } else {
+                    alert('Failed to refresh metadata.');
+                }
+            } catch (err) {
+                alert('Refresh error: ' + err.message);
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = originalText;
+            }
+        });
+    }
+
+    // Review again trigger
+    const reviewAgainBtn = document.getElementById('btn-pr-review-again');
+    if (reviewAgainBtn) {
+        reviewAgainBtn.addEventListener('click', async () => {
+            if (!activePRId) return;
+
+            const originalText = reviewAgainBtn.textContent;
+            reviewAgainBtn.disabled = true;
+            reviewAgainBtn.textContent = 'Starting...';
+
+            try {
+                const res = await authorizedFetch(`/pull-requests/${activePRId}/review-again`, {
+                    method: 'POST'
+                });
+
+                if (res.ok) {
+                    const updated = await res.json();
+                    alert('Re-review analysis triggered successfully! Queueing modified files...');
+                    startPRAnalysisPolling(updated.id);
+                } else {
+                    alert('Failed to re-review.');
+                }
+            } catch (err) {
+                alert('Re-review error: ' + err.message);
+            } finally {
+                reviewAgainBtn.disabled = false;
+                reviewAgainBtn.textContent = originalText;
+            }
+        });
+    }
+});
+
+// Polls active Pull Request Analysis progress
+function startPRAnalysisPolling(prId) {
+    if (prPollInterval) clearInterval(prPollInterval);
+    
+    // Switch UI sidebar view automatically to show PR dashboard
+    const navPrBtn = document.getElementById('nav-item-pull-requests');
+    if (navPrBtn) navPrBtn.click();
+
+    prPollInterval = setInterval(async () => {
+        try {
+            const res = await authorizedFetch(`/pull-requests/${prId}`);
+            if (!res.ok) {
+                clearInterval(prPollInterval);
+                return;
+            }
+
+            const pr = await res.json();
+            
+            // Check status of latest analysis
+            if (pr.latest_analysis_id) {
+                const runRes = await authorizedFetch(`/analysis/${pr.latest_analysis_id}`);
+                if (runRes.ok) {
+                    const run = await runRes.json();
+                    if (run.status === 'completed' || run.status === 'failed') {
+                        clearInterval(prPollInterval);
+                        
+                        // Reload PR pane content
+                        loadProjectPullRequests(activeProjectId);
+                        selectPullRequest(pr);
+                        
+                        if (run.status === 'completed') {
+                            alert('PR review pipeline analysis completed successfully!');
+                        } else {
+                            alert('PR review pipeline analysis execution failed.');
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error('Polling PR error:', err);
+            clearInterval(prPollInterval);
+        }
+    }, 1500);
+}
+

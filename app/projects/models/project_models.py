@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
 from sqlalchemy.orm import relationship
 from app.auth.database.connection import Base
@@ -16,6 +17,7 @@ class Project(Base):
     analyses = relationship("Analysis", back_populates="project", cascade="all, delete-orphan")
     versions = relationship("ProjectVersion", back_populates="project", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="project", cascade="all, delete-orphan")
+    pull_requests = relationship("PullRequest", back_populates="project", cascade="all, delete-orphan")
     user = relationship("User")
 
     # GitHub Repository Metadata
@@ -70,6 +72,14 @@ class Analysis(Base):
     project = relationship("Project", back_populates="analyses")
     files = relationship("AnalysisFile", back_populates="analysis", cascade="all, delete-orphan")
     reports = relationship("Report", back_populates="analysis", cascade="all, delete-orphan")
+    pull_request_id = Column(Integer, ForeignKey("pull_requests.id", ondelete="SET NULL"), nullable=True)
+    pull_request = relationship("PullRequest", foreign_keys=[pull_request_id], back_populates="analyses")
+
+    @property
+    def score(self) -> Optional[int]:
+        if self.reports:
+            return self.reports[0].score
+        return None
 
 
 class AnalysisFile(Base):
@@ -155,3 +165,29 @@ class ChatMessage(Base):
 
     # Relationships
     project = relationship("Project", back_populates="chat_messages")
+
+
+class PullRequest(Base):
+    __tablename__ = "pull_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    github_pr_number = Column(Integer, nullable=False)
+    title = Column(String(255), nullable=False)
+    author = Column(String(100), nullable=False)
+    base_branch = Column(String(100), nullable=False)
+    head_branch = Column(String(100), nullable=False)
+    status = Column(String(50), default="open", nullable=False)  # open, closed, merged
+    files_changed = Column(Integer, default=0, nullable=False)
+    additions = Column(Integer, default=0, nullable=False)
+    deletions = Column(Integer, default=0, nullable=False)
+    commits = Column(Integer, default=0, nullable=False)
+    latest_analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True)
+    pr_files_json = Column(Text, nullable=True)  # JSON cache of file list and patches
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    project = relationship("Project", back_populates="pull_requests")
+    analyses = relationship("Analysis", foreign_keys=[Analysis.pull_request_id], back_populates="pull_request", cascade="all, delete-orphan")
+    latest_analysis = relationship("Analysis", foreign_keys=[latest_analysis_id])
