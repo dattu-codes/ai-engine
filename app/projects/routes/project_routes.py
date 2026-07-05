@@ -127,3 +127,143 @@ def get_project_latest_report(id: int, current_user: User = Depends(get_current_
         return None
 
     return ProjectRepository.get_latest_report(db, latest_analysis.id)
+
+
+@project_router.post("/{id}/semantic-graph/regenerate")
+def regenerate_project_semantic_graph(
+    id: int, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    
+    from app.projects.services.semantic_graph_service import SemanticGraphService
+    stats = SemanticGraphService.generate_graph(db, id)
+    return stats
+
+
+@project_router.get("/{id}/semantic-graph")
+def get_project_semantic_graph(
+    id: int, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    from app.projects.models.project_models import SemanticNode, SemanticEdge
+    nodes = db.query(SemanticNode).filter(SemanticNode.project_id == id).all()
+    edges = db.query(SemanticEdge).filter(SemanticEdge.project_id == id).all()
+    
+    import json
+    stats = json.loads(project.graph_statistics_json) if project.graph_statistics_json else {}
+
+    return {
+        "has_semantic_graph": project.has_semantic_graph,
+        "generated_at": project.graph_generated_at,
+        "statistics": stats,
+        "nodes": [
+            {
+                "id": n.id,
+                "node_type": n.node_type,
+                "name": n.name,
+                "file_path": n.file_path,
+                "start_line": n.start_line,
+                "end_line": n.end_line,
+                "metadata": json.loads(n.metadata_json) if n.metadata_json else {}
+            }
+            for n in nodes
+        ],
+        "edges": [
+            {
+                "id": e.id,
+                "source_node_id": e.source_node_id,
+                "target_node_id": e.target_node_id,
+                "relationship": e.relationship
+            }
+            for e in edges
+        ]
+    }
+
+
+@project_router.get("/{id}/semantic-graph/dependency-tree")
+def get_project_dependency_tree(
+    id: int, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    from app.projects.services.dependency_analyzer import DependencyAnalyzer
+    return DependencyAnalyzer.build_dependency_tree(db, id)
+
+
+@project_router.get("/{id}/semantic-graph/cycles")
+def get_project_dependency_cycles(
+    id: int, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    from app.projects.services.dependency_analyzer import DependencyAnalyzer
+    return DependencyAnalyzer.detect_circular_dependencies(db, id)
+
+
+@project_router.get("/{id}/semantic-graph/dead-code")
+def get_project_dead_code(
+    id: int, 
+    current_user: User = Depends(get_current_user), 
+    db: Session = Depends(get_db)
+):
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    from app.projects.services.dependency_analyzer import DependencyAnalyzer
+    return DependencyAnalyzer.find_dead_or_unused_modules(db, id)
+
+
+@project_router.get("/{id}/semantic-graph/impact-analysis")
+def get_project_impact_analysis(
+    id: int,
+    file_path: str,
+    symbol_name: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    from app.projects.services.impact_analysis_service import ImpactAnalysisService
+    return ImpactAnalysisService.analyze_impact(db, id, file_path, symbol_name)
+
+
+@project_router.get("/{id}/semantic-graph/compare")
+def compare_project_version_graphs(
+    id: int,
+    base_version_id: int,
+    target_version_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+
+    from app.projects.services.semantic_graph_service import SemanticGraphService
+    try:
+        comparison = SemanticGraphService.compare_version_graphs(db, base_version_id, target_version_id)
+        return comparison
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+

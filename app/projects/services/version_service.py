@@ -267,6 +267,14 @@ class VersionService:
 
         db.commit()
         db.refresh(new_version)
+
+        # Generate semantic graph cache (v2.2)
+        try:
+            from app.projects.services.semantic_graph_service import SemanticGraphService
+            SemanticGraphService.generate_graph(db, project_id)
+        except Exception as ge:
+            print(f"Error generating semantic graph on fix: {ge}")
+
         return new_version
 
     @staticmethod
@@ -327,6 +335,14 @@ class VersionService:
 
         db.commit()
         db.refresh(restored_version)
+
+        # Generate semantic graph cache (v2.2)
+        try:
+            from app.projects.services.semantic_graph_service import SemanticGraphService
+            SemanticGraphService.generate_graph(db, project_id)
+        except Exception as ge:
+            print(f"Error generating semantic graph on restore: {ge}")
+
         return restored_version
 
     @staticmethod

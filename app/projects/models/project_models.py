@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, relationship as orm_relationship
 from app.auth.database.connection import Base
 
 class Project(Base):
@@ -19,6 +19,8 @@ class Project(Base):
     chat_messages = relationship("ChatMessage", back_populates="project", cascade="all, delete-orphan")
     pull_requests = relationship("PullRequest", back_populates="project", cascade="all, delete-orphan")
     findings = relationship("ReviewFinding", back_populates="project", cascade="all, delete-orphan")
+    semantic_nodes = relationship("SemanticNode", back_populates="project", cascade="all, delete-orphan")
+    semantic_edges = relationship("SemanticEdge", back_populates="project", cascade="all, delete-orphan")
     user = relationship("User")
 
     # GitHub Repository Metadata
@@ -41,6 +43,11 @@ class Project(Base):
     file_priorities = Column(Text, nullable=True)  # JSON-serialized dict filename -> priority
     total_lines = Column(Integer, default=0, nullable=True)
     has_intelligence = Column(Boolean, default=False, nullable=False)
+    
+    # Semantic Code Graph Cache (v2.2)
+    has_semantic_graph = Column(Boolean, default=False, nullable=False)
+    graph_generated_at = Column(DateTime, nullable=True)
+    graph_statistics_json = Column(Text, nullable=True)
 
 
 class Analysis(Base):
@@ -213,6 +220,12 @@ class ReviewFinding(Base):
     status = Column(String(50), default="Open", nullable=False)  # Open, In Progress, Resolved, Ignored
     assigned_to = Column(String(100), nullable=True)
     ignored_reason = Column(Text, nullable=True)
+    
+    # Semantic Code Graph Dependency Metrics (v2.2)
+    impacted_modules = Column(Text, nullable=True)  # JSON-serialized list of modules
+    dependency_chain = Column(Text, nullable=True)  # JSON-serialized list of dependency file paths
+    downstream_risk = Column(String(100), nullable=True)  # High Risk, Medium Risk, Low Risk
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     resolved_at = Column(DateTime, nullable=True)
@@ -221,4 +234,34 @@ class ReviewFinding(Base):
     project = relationship("Project", back_populates="findings")
     analysis = relationship("Analysis")
     resolved_in_version = relationship("ProjectVersion")
+
+
+class SemanticNode(Base):
+    __tablename__ = "semantic_nodes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    node_type = Column(String(100), nullable=False)  # class, interface, method, function, api_route, db_model, file
+    name = Column(String(255), nullable=False)
+    file_path = Column(String(512), nullable=False)
+    start_line = Column(Integer, nullable=True)
+    end_line = Column(Integer, nullable=True)
+    metadata_json = Column(Text, nullable=True)  # JSON metadata (signatures, docstrings, parameters)
+
+    # Relationships
+    project = orm_relationship("Project", back_populates="semantic_nodes")
+
+
+class SemanticEdge(Base):
+    __tablename__ = "semantic_edges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    source_node_id = Column(Integer, ForeignKey("semantic_nodes.id", ondelete="CASCADE"), nullable=False)
+    target_node_id = Column(Integer, ForeignKey("semantic_nodes.id", ondelete="CASCADE"), nullable=False)
+    relationship = Column(String(100), nullable=False)  # IMPORTS, CALLS, EXTENDS, IMPLEMENTS, DEPENDS_ON, REFERENCES, USES, INHERITS
+
+    # Relationships
+    project = orm_relationship("Project", back_populates="semantic_edges")
+
 

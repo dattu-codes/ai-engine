@@ -611,6 +611,8 @@ async function handleLogout() {
     if (prBtn) prBtn.style.display = 'none';
     const findingsBtn = document.getElementById('nav-item-findings');
     if (findingsBtn) findingsBtn.style.display = 'none';
+    const semanticBtn = document.getElementById('nav-item-semantic');
+    if (semanticBtn) semanticBtn.style.display = 'none';
 
     if (refreshToken) {
         try {
@@ -1232,6 +1234,8 @@ async function selectProject(id) {
         if (prBtn) prBtn.style.display = 'block';
         const findingsBtn = document.getElementById('nav-item-findings');
         if (findingsBtn) findingsBtn.style.display = 'block';
+        const semanticBtn = document.getElementById('nav-item-semantic');
+        if (semanticBtn) semanticBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -3640,3 +3644,562 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// ==========================================
+// AI Engine v2.2: Semantic Code Graph Explorer
+// ==========================================
+
+let semGraphData = { nodes: [], edges: [] };
+let semNodePositions = {}; // id -> { x, y }
+let semSelectedNode = null;
+let semZoomScale = 1.0;
+let semPanOffset = { x: 0, y: 0 };
+let semIsDragging = false;
+let semDragStart = { x: 0, y: 0 };
+let semGraphCanvas = null;
+let semGraphCtx = null;
+let semNodeRadii = {
+    file: 20,
+    class: 16,
+    db_model: 18,
+    interface: 16,
+    method: 10,
+    function: 10,
+    api_route: 15
+};
+let semNodeColors = {
+    file: '#94a3b8',      // slate
+    class: '#3b82f6',     // custom blue
+    db_model: '#fbbf24',  // amber
+    interface: '#60a5fa', // sky blue
+    method: '#a78bfa',    // purple
+    function: '#c084fc',  // lavender
+    api_route: '#10b981'  // emerald
+};
+
+// Listen to view-pane change to load and render semantic explorer
+document.addEventListener('click', (e) => {
+    const navItem = e.target.closest('.nav-item');
+    if (navItem && navItem.getAttribute('data-view') === 'view-semantic') {
+        initSemanticExplorer();
+    }
+});
+
+async function initSemanticExplorer() {
+    semGraphCanvas = document.getElementById('sem-graph-canvas');
+    if (!semGraphCanvas) return;
+    semGraphCtx = semGraphCanvas.getContext('2d');
+    
+    // Resize canvas to fill parent
+    resizeSemCanvas();
+    window.addEventListener('resize', resizeSemCanvas);
+    
+    // Attach mouse listeners
+    semGraphCanvas.addEventListener('mousedown', onSemMouseDown);
+    semGraphCanvas.addEventListener('mousemove', onSemMouseMove);
+    semGraphCanvas.addEventListener('mouseup', onSemMouseUp);
+    semGraphCanvas.addEventListener('mouseleave', onSemMouseUp);
+    semGraphCanvas.addEventListener('wheel', onSemWheel, { passive: false });
+    
+    // Wire UI controls
+    document.getElementById('sem-graph-view').onchange = renderSemanticGraph;
+    document.getElementById('sem-graph-search').oninput = renderSemanticGraph;
+    document.getElementById('btn-sem-zoom-in').onclick = () => { semZoomScale *= 1.2; renderSemanticGraph(); };
+    document.getElementById('btn-sem-zoom-out').onclick = () => { semZoomScale /= 1.2; renderSemanticGraph(); };
+    document.getElementById('btn-sem-reset').onclick = () => {
+        semZoomScale = 1.0;
+        semPanOffset = { x: 0, y: 0 };
+        semSelectedNode = null;
+        renderSemanticGraph();
+    };
+    
+    document.getElementById('btn-regenerate-graph').onclick = regenerateSemanticGraph;
+    document.getElementById('btn-run-impact').onclick = runSemanticImpactAnalysis;
+    
+    // Load data
+    await loadSemanticGraphData();
+}
+
+function resizeSemCanvas() {
+    if (!semGraphCanvas) return;
+    const rect = semGraphCanvas.parentElement.getBoundingClientRect();
+    semGraphCanvas.width = rect.width;
+    semGraphCanvas.height = rect.height;
+    renderSemanticGraph();
+}
+
+async function loadSemanticGraphData() {
+    if (!activeProjectId) return;
+    try {
+        const res = await authorizedFetch(`/projects/${activeProjectId}/semantic-graph`);
+        if (!res.ok) return;
+        const data = await res.json();
+        semGraphData = data;
+        
+        // Populate stats dashboard
+        const stats = data.statistics || {};
+        document.getElementById('sem-stat-classes').textContent = stats.classes || 0;
+        document.getElementById('sem-stat-functions').textContent = stats.functions || 0;
+        document.getElementById('sem-stat-apis').textContent = stats.api_routes || 0;
+        
+        // Fetch circular dependencies
+        const cyclesRes = await authorizedFetch(`/projects/${activeProjectId}/semantic-graph/cycles`);
+        const cycles = cyclesRes.ok ? await cyclesRes.json() : [];
+        document.getElementById('sem-stat-cycles').textContent = cycles.length;
+        
+        // Fetch dead code
+        const deadRes = await authorizedFetch(`/projects/${activeProjectId}/semantic-graph/dead-code`);
+        const dead = deadRes.ok ? await deadRes.json() : { unused_files: [], dead_symbols: [] };
+        const totalDead = (dead.unused_files || []).length + (dead.dead_symbols || []).length;
+        document.getElementById('sem-stat-dead').textContent = totalDead;
+        
+        // Initialize node positions using force layout simulation
+        initNodePositions();
+    } catch (err) {
+        console.error('Failed to load semantic graph details:', err);
+    }
+}
+
+function initNodePositions() {
+    semNodePositions = {};
+    if (semGraphData.nodes.length === 0) return;
+    
+    const width = semGraphCanvas.width || 800;
+    const height = semGraphCanvas.height || 600;
+    
+    // Initial placement grouped by node type to build beautiful layouts
+    semGraphData.nodes.forEach((n, idx) => {
+        let x = width / 2;
+        let y = height / 2;
+        
+        if (n.node_type === 'file') {
+            x = width * 0.2 + Math.random() * 80;
+            y = height * 0.2 + (idx * 50) % (height * 0.6);
+        } else if (n.node_type === 'class' || n.node_type === 'db_model') {
+            x = width * 0.5 + Math.random() * 80;
+            y = height * 0.3 + (idx * 60) % (height * 0.5);
+        } else if (n.node_type === 'method' || n.node_type === 'function') {
+            x = width * 0.7 + Math.random() * 80;
+            y = height * 0.4 + (idx * 40) % (height * 0.5);
+        } else if (n.node_type === 'api_route') {
+            x = width * 0.85 - Math.random() * 40;
+            y = height * 0.5 + (idx * 70) % (height * 0.4);
+        }
+        
+        semNodePositions[n.id] = { x, y };
+    });
+    
+    // Run spring force-directed simulation (60 iterations) to settle layout
+    const k = 50; // spring rest length
+    const cRepulsive = 200000;
+    const cAttractive = 0.06;
+    
+    for (let iter = 0; iter < 60; iter++) {
+        let forces = {};
+        semGraphData.nodes.forEach(n => { forces[n.id] = { x: 0, y: 0 }; });
+        
+        // Repulsive forces between all nodes
+        for (let i = 0; i < semGraphData.nodes.length; i++) {
+            const n1 = semGraphData.nodes[i];
+            const p1 = semNodePositions[n1.id];
+            for (let j = i + 1; j < semGraphData.nodes.length; j++) {
+                const n2 = semGraphData.nodes[j];
+                const p2 = semNodePositions[n2.id];
+                if (!p1 || !p2) continue;
+                
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const distSq = dx * dx + dy * dy + 0.1;
+                const dist = Math.sqrt(distSq);
+                
+                if (dist < 300) {
+                    const fRep = cRepulsive / distSq;
+                    const fx = (dx / dist) * fRep;
+                    const fy = (dy / dist) * fRep;
+                    
+                    forces[n1.id].x += fx;
+                    forces[n1.id].y += fy;
+                    forces[n2.id].x -= fx;
+                    forces[n2.id].y -= fy;
+                }
+            }
+        }
+        
+        // Attractive forces along edges
+        semGraphData.edges.forEach(e => {
+            const p1 = semNodePositions[e.source_node_id];
+            const p2 = semNodePositions[e.target_node_id];
+            if (p1 && p2) {
+                const dx = p1.x - p2.x;
+                const dy = p1.y - p2.y;
+                const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
+                
+                const fAtt = cAttractive * (dist - k);
+                const fx = (dx / dist) * fAtt;
+                const fy = (dy / dist) * fAtt;
+                
+                forces[e.source_node_id].x -= fx;
+                forces[e.source_node_id].y -= fy;
+                forces[e.target_node_id].x += fx;
+                forces[e.target_node_id].y += fy;
+            }
+        });
+        
+        // Apply forces to update node coordinates
+        semGraphData.nodes.forEach(n => {
+            const p = semNodePositions[n.id];
+            const f = forces[n.id];
+            if (!p || !f) return;
+            
+            // limit displacement
+            const dispLimit = 15;
+            const fx = Math.max(-dispLimit, Math.min(dispLimit, f.x));
+            const fy = Math.max(-dispLimit, Math.min(dispLimit, f.y));
+            
+            p.x += fx;
+            p.y += fy;
+        });
+    }
+    
+    renderSemanticGraph();
+}
+
+function renderSemanticGraph() {
+    if (!semGraphCtx || !semGraphCanvas) return;
+    
+    const ctx = semGraphCtx;
+    const canvas = semGraphCanvas;
+    const viewMode = document.getElementById('sem-graph-view').value;
+    const searchQuery = document.getElementById('sem-graph-search').value.toLowerCase();
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Filter nodes and edges based on View Mode selection
+    let nodesToDraw = semGraphData.nodes || [];
+    let edgesToDraw = semGraphData.edges || [];
+    
+    if (viewMode === 'class') {
+        nodesToDraw = nodesToDraw.filter(n => ['file', 'class', 'db_model', 'interface'].includes(n.node_type));
+    } else if (viewMode === 'function') {
+        nodesToDraw = nodesToDraw.filter(n => ['file', 'function'].includes(n.node_type));
+    } else if (viewMode === 'api') {
+        nodesToDraw = nodesToDraw.filter(n => ['file', 'api_route', 'method', 'function'].includes(n.node_type));
+    } else if (viewMode === 'call') {
+        nodesToDraw = nodesToDraw.filter(n => ['method', 'function'].includes(n.node_type));
+    }
+    
+    const allowedNodeIds = new Set(nodesToDraw.map(n => n.id));
+    edgesToDraw = edgesToDraw.filter(e => allowedNodeIds.has(e.source_node_id) && allowedNodeIds.has(e.target_node_id));
+    
+    // Handle selections and highlighted states
+    let highlightedNodes = new Set();
+    let highlightedEdges = new Set();
+    
+    if (semSelectedNode) {
+        highlightedNodes.add(semSelectedNode.id);
+        edgesToDraw.forEach(e => {
+            if (e.source_node_id === semSelectedNode.id) {
+                highlightedNodes.add(e.target_node_id);
+                highlightedEdges.add(e.id);
+            }
+            if (e.target_node_id === semSelectedNode.id) {
+                highlightedNodes.add(e.source_node_id);
+                highlightedEdges.add(e.id);
+            }
+        });
+    }
+    
+    ctx.save();
+    // Translate and Scale canvas viewport
+    ctx.translate(semPanOffset.x, semPanOffset.y);
+    ctx.scale(semZoomScale, semZoomScale);
+    
+    // 1. Draw Edges
+    edgesToDraw.forEach(e => {
+        const p1 = semNodePositions[e.source_node_id];
+        const p2 = semNodePositions[e.target_node_id];
+        if (!p1 || !p2) return;
+        
+        const isHighlighted = semSelectedNode ? highlightedEdges.has(e.id) : true;
+        ctx.strokeStyle = isHighlighted ? 'rgba(96,165,250,0.8)' : 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = isHighlighted ? 2 : 1;
+        
+        ctx.beginPath();
+        if (e.relationship === 'IMPORTS' || e.relationship === 'DEPENDS_ON') {
+            ctx.setLineDash([4, 4]); // dashed lines for imports
+        } else {
+            ctx.setLineDash([]);
+        }
+        
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        
+        // Draw directional relationship arrow
+        const targetNodeObj = semGraphData.nodes.find(n => n.id === e.target_node_id);
+        if (targetNodeObj) {
+            drawEdgeArrow(ctx, p1.x, p1.y, p2.x, p2.y, semNodeRadii[targetNodeObj.node_type] || 15);
+        }
+    });
+    
+    ctx.setLineDash([]); // reset dash
+    
+    // 2. Draw Nodes
+    nodesToDraw.forEach(n => {
+        const pos = semNodePositions[n.id];
+        if (!pos) return;
+        
+        const radius = semNodeRadii[n.node_type] || 15;
+        const color = semNodeColors[n.node_type] || '#94a3b8';
+        
+        const isMatched = searchQuery ? n.name.toLowerCase().includes(searchQuery) || n.file_path.toLowerCase().includes(searchQuery) : true;
+        const isSelected = semSelectedNode && semSelectedNode.id === n.id;
+        const isHighlighted = semSelectedNode ? highlightedNodes.has(n.id) : true;
+        
+        // Opacity
+        ctx.globalAlpha = (isHighlighted && isMatched) ? 1.0 : 0.15;
+        
+        // Glow effect for selected
+        if (isSelected) {
+            ctx.shadowColor = color;
+            ctx.shadowBlur = 15;
+        } else {
+            ctx.shadowBlur = 0;
+        }
+        
+        // Circle body
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        
+        // Outline border
+        ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = isSelected ? 3 : 1.5;
+        ctx.stroke();
+        
+        // Text labels
+        ctx.shadowBlur = 0; // reset shadow
+        ctx.fillStyle = '#f8fafc'; // light text
+        ctx.font = isSelected ? 'bold 11px var(--font-mono)' : '9px var(--font-mono)';
+        ctx.textAlign = 'center';
+        ctx.fillText(n.name, pos.x, pos.y + radius + 11);
+        
+        // Node Type subtitle
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.font = '8px var(--font-sans)';
+        ctx.fillText(n.node_type.toUpperCase(), pos.x, pos.y - radius - 5);
+    });
+    
+    ctx.restore();
+}
+
+function drawEdgeArrow(ctx, fromx, fromy, tox, toy, targetRadius) {
+    const angle = Math.atan2(toy - fromy, tox - fromx);
+    // Find point on target circle boundary
+    const arrowX = tox - targetRadius * Math.cos(angle);
+    const arrowY = toy - targetRadius * Math.sin(angle);
+    
+    ctx.beginPath();
+    ctx.moveTo(arrowX, arrowY);
+    ctx.lineTo(arrowX - 8 * Math.cos(angle - Math.PI / 6), arrowY - 8 * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(arrowX - 8 * Math.cos(angle + Math.PI / 6), arrowY - 8 * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fill();
+}
+
+// Interactive zoom/pan/drag events implementation
+
+function onSemMouseDown(e) {
+    const rect = semGraphCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // Transform coordinates back to canvas world coordinates
+    const worldX = (mouseX - semPanOffset.x) / semZoomScale;
+    const worldY = (mouseY - semPanOffset.y) / semZoomScale;
+    
+    // Check if clicked on any node
+    let clickedNode = null;
+    for (let i = 0; i < semGraphData.nodes.length; i++) {
+        const n = semGraphData.nodes[i];
+        const p = semNodePositions[n.id];
+        if (p) {
+            const radius = semNodeRadii[n.node_type] || 15;
+            const dist = Math.sqrt((worldX - p.x) ** 2 + (worldY - p.y) ** 2);
+            if (dist <= radius) {
+                clickedNode = n;
+                break;
+            }
+        }
+    }
+    
+    if (clickedNode) {
+        semSelectedNode = clickedNode;
+        // Populate node details card
+        displayNodeDetails(clickedNode);
+        
+        // Seed impact analyzer inputs with selected node path
+        document.getElementById('impact-file-path').value = clickedNode.file_path;
+        if (clickedNode.node_type !== 'file') {
+            document.getElementById('impact-symbol').value = clickedNode.name.split('.').pop();
+        } else {
+            document.getElementById('impact-symbol').value = '';
+        }
+        
+        renderSemanticGraph();
+    } else {
+        semIsDragging = true;
+        semDragStart = { x: mouseX - semPanOffset.x, y: mouseY - semPanOffset.y };
+        semGraphCanvas.style.cursor = 'grabbing';
+    }
+}
+
+function onSemMouseMove(e) {
+    if (semIsDragging) {
+        const rect = semGraphCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        semPanOffset.x = mouseX - semDragStart.x;
+        semPanOffset.y = mouseY - semDragStart.y;
+        renderSemanticGraph();
+    }
+}
+
+function onSemMouseUp() {
+    semIsDragging = false;
+    if (semGraphCanvas) semGraphCanvas.style.cursor = 'grab';
+}
+
+function onSemWheel(e) {
+    e.preventDefault();
+    const rect = semGraphCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const zoomFactor = 1.1;
+    let newScale = semZoomScale;
+    if (e.deltaY < 0) {
+        newScale *= zoomFactor;
+    } else {
+        newScale /= zoomFactor;
+    }
+    
+    // Zoom around mouse position
+    semPanOffset.x = mouseX - (mouseX - semPanOffset.x) * (newScale / semZoomScale);
+    semPanOffset.y = mouseY - (mouseY - semPanOffset.y) * (newScale / semZoomScale);
+    semZoomScale = newScale;
+    renderSemanticGraph();
+}
+
+function displayNodeDetails(node) {
+    const detailsContainer = document.getElementById('sem-node-details');
+    if (!detailsContainer) return;
+    
+    const meta = node.metadata || {};
+    let metaHTML = '';
+    
+    if (node.node_type === 'file') {
+        metaHTML = `<div><strong>Size:</strong> ${meta.size || 0} bytes</div>
+                    <div><strong>Language:</strong> ${meta.language || 'Unknown'}</div>`;
+    } else if (node.node_type === 'class' || node.node_type === 'db_model') {
+        const bases = meta.bases || [];
+        metaHTML = `<div><strong>Inherited Bases:</strong> ${bases.join(', ') || 'None'}</div>`;
+    } else if (node.node_type === 'method' || node.node_type === 'function') {
+        const args = meta.args || [];
+        metaHTML = `<div><strong>Arguments:</strong> <code>(${args.join(', ')})</code></div>`;
+    }
+    
+    detailsContainer.innerHTML = `
+        <div style="font-size: 14px; font-weight: 700; color: var(--text-bright); word-break: break-all;">${escapeHtml(node.name)}</div>
+        <div style="margin-top: 6px;"><span class="pill outline" style="font-size: 10px;">${node.node_type.toUpperCase()}</span></div>
+        <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 6px;">
+            <div><strong>File Path:</strong> <code style="word-break: break-all;">${escapeHtml(node.file_path)}</code></div>
+            <div><strong>Lines:</strong> L${node.start_line} - L${node.end_line}</div>
+            ${metaHTML}
+        </div>
+    `;
+}
+
+async function regenerateSemanticGraph() {
+    if (!activeProjectId) return;
+    const btn = document.getElementById('btn-regenerate-graph');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Analyzing...';
+    
+    try {
+        const res = await authorizedFetch(`/projects/${activeProjectId}/semantic-graph/regenerate`, { method: 'POST' });
+        if (res.ok) {
+            alert('Semantic code graph successfully parsed and regenerated.');
+            await loadSemanticGraphData();
+        } else {
+            const data = await res.json();
+            alert(data.detail || 'Failed to regenerate semantic graph.');
+        }
+    } catch (err) {
+        alert('Regenerate semantic graph error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = originalText;
+    }
+}
+
+async function runSemanticImpactAnalysis() {
+    if (!activeProjectId) return;
+    const filePath = document.getElementById('impact-file-path').value.trim();
+    const symbol = document.getElementById('impact-symbol').value.trim();
+    
+    if (!filePath) {
+        alert('Please specify a file path to run impact analysis.');
+        return;
+    }
+    
+    const btn = document.getElementById('btn-run-impact');
+    btn.disabled = true;
+    btn.textContent = 'Calculating...';
+    
+    try {
+        let url = `/projects/${activeProjectId}/semantic-graph/impact-analysis?file_path=${encodeURIComponent(filePath)}`;
+        if (symbol) {
+            url += `&symbol_name=${encodeURIComponent(symbol)}`;
+        }
+        
+        const res = await authorizedFetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            
+            // Show impact block
+            document.getElementById('impact-results').style.display = 'block';
+            document.getElementById('impact-risk-score').textContent = data.risk_score;
+            
+            const badge = document.getElementById('impact-risk-badge');
+            badge.textContent = data.risk_rating;
+            badge.className = 'badge';
+            if (data.risk_rating === 'High Risk') {
+                badge.classList.add('badge-error');
+            } else if (data.risk_rating === 'Medium Risk') {
+                badge.classList.add('badge-warning');
+            } else {
+                badge.classList.add('badge-success');
+            }
+            
+            const depsDiv = document.getElementById('impact-deps');
+            const deps = data.dependent_files || [];
+            if (deps.length === 0) {
+                depsDiv.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">No downstream dependency impact.</span>';
+            } else {
+                depsDiv.innerHTML = deps.map(d => `<div style="word-break: break-all; margin-bottom: 4px;">• ${escapeHtml(d)}</div>`).join('');
+            }
+        } else {
+            const data = await res.json();
+            alert(data.detail || 'Impact analysis failed.');
+        }
+    } catch (err) {
+        alert('Impact analysis error: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Analyze Impact';
+    }
+}

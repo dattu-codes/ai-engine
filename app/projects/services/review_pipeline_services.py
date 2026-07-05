@@ -593,6 +593,43 @@ class ReviewOrchestrator:
         """
         dep_names = [d["name"] for d in dependencies if "name" in d]
         
+        # Query semantic graph relationships context (v2.2)
+        semantic_graph_context = ""
+        try:
+            from app.auth.database.connection import SessionLocal
+            from app.projects.models.project_models import Project, SemanticNode, SemanticEdge
+            db_conn = SessionLocal()
+            try:
+                project = db_conn.query(Project).filter(Project.name == project_name).first()
+                if project and project.has_semantic_graph:
+                    file_paths = [f.get("filename") for f in files if f.get("filename")]
+                    nodes = db_conn.query(SemanticNode).filter(
+                        SemanticNode.project_id == project.id,
+                        SemanticNode.file_path.in_(file_paths)
+                    ).all()
+                    
+                    node_ids = [n.id for n in nodes]
+                    edges = []
+                    if node_ids:
+                        edges = db_conn.query(SemanticEdge).filter(
+                            SemanticEdge.project_id == project.id,
+                            (SemanticEdge.source_node_id.in_(node_ids)) | (SemanticEdge.target_node_id.in_(node_ids))
+                        ).all()
+                    
+                    lines = ["\n=== Semantic Code Graph & Dependency Context ==="]
+                    for n in nodes:
+                        lines.append(f"- {n.node_type.upper()}: {n.name} ({n.file_path}:{n.start_line}-{n.end_line})")
+                    for e in edges:
+                        src = db_conn.query(SemanticNode).filter(SemanticNode.id == e.source_node_id).first()
+                        tgt = db_conn.query(SemanticNode).filter(SemanticNode.id == e.target_node_id).first()
+                        if src and tgt:
+                            lines.append(f"  Relationship: {src.name} ({src.node_type}) --[{e.relationship}]--> {tgt.name} ({tgt.node_type})")
+                    semantic_graph_context = "\n".join(lines)
+            finally:
+                db_conn.close()
+        except Exception as se:
+            print(f"Error fetching semantic graph context for review: {se}")
+
         # In Live Mode:
         if api_key:
             # 1. Compile prompt using PromptBuilder
@@ -607,6 +644,8 @@ class ReviewOrchestrator:
                 files=files,
                 static_analysis=[] # Pass empty or pull matching files alerts
             )
+            # Inject semantic graph context to prompt
+            prompt += f"\n\n{semantic_graph_context}"
             # 2. Call Gemini
             try:
                 response = GeminiService.call_gemini(prompt, api_key)

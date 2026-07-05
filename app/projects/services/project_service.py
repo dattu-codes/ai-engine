@@ -214,6 +214,13 @@ class ProjectService:
         from app.projects.services.version_service import VersionService
         VersionService.record_ingestion_version(db, project_id, analysis.id, summary="Uploaded ZIP archive ingestion.")
 
+        # Generate semantic graph cache (v2.2)
+        try:
+            from app.projects.services.semantic_graph_service import SemanticGraphService
+            SemanticGraphService.generate_graph(db, project_id)
+        except Exception as ge:
+            print(f"Error generating semantic graph on upload: {ge}")
+
         return analysis
 
     @staticmethod
@@ -271,6 +278,13 @@ class ProjectService:
 
         from app.projects.services.version_service import VersionService
         VersionService.record_ingestion_version(db, project_id, analysis.id, summary=f"Ingested pasted code file: '{filename}'.")
+
+        # Generate semantic graph cache (v2.2)
+        try:
+            from app.projects.services.semantic_graph_service import SemanticGraphService
+            SemanticGraphService.generate_graph(db, project_id)
+        except Exception as ge:
+            print(f"Error generating semantic graph on paste: {ge}")
 
         return analysis
 
@@ -339,6 +353,13 @@ class ProjectService:
 
         from app.projects.services.version_service import VersionService
         VersionService.record_ingestion_version(db, project_id, analysis.id, summary="Linked public Git repository baseline.")
+
+        # Generate semantic graph cache (v2.2)
+        try:
+            from app.projects.services.semantic_graph_service import SemanticGraphService
+            SemanticGraphService.generate_graph(db, project_id)
+        except Exception as ge:
+            print(f"Error generating semantic graph on repository save: {ge}")
 
         return analysis
 
@@ -423,6 +444,13 @@ class ProjectService:
 
         from app.projects.services.version_service import VersionService
         VersionService.record_ingestion_version(db, project_id, analysis.id, summary=f"Synced GitHub repository to commit {metadata['last_commit_sha'][:7]}.")
+
+        # Generate semantic graph cache (v2.2)
+        try:
+            from app.projects.services.semantic_graph_service import SemanticGraphService
+            SemanticGraphService.generate_graph(db, project_id)
+        except Exception as ge:
+            print(f"Error generating semantic graph on repository sync: {ge}")
 
         return {
             "status": "synced",

@@ -100,6 +100,10 @@
                         <span class="nav-icon">📝</span>
                         <span class="nav-text">Review Findings</span>
                     </button>
+                    <button class="nav-item" data-view="view-semantic" id="nav-item-semantic" style="display: none;">
+                        <span class="nav-icon">🕸</span>
+                        <span class="nav-text">Semantic Explorer</span>
+                    </button>
                 </nav>
             </aside>
 
@@ -1144,6 +1148,111 @@
                         </div>
                     </div>
                 </div>
+
+    <!-- view-semantic pane (v2.2) -->
+    <div class="view-pane" id="view-semantic" style="display: none; padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h1 style="font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">Semantic Code Graph Explorer</h1>
+                <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Navigate code relations, call graphs, class inheritance, cycles, and impacts</p>
+            </div>
+            <button id="btn-regenerate-graph" class="btn btn-secondary">Regenerate Graph</button>
+        </div>
+
+        <!-- Stats Dashboard Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 20px;">
+            <div class="metric-card glass" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: var(--text-muted); font-size: 12px; font-weight: 500;">Classes</div>
+                <div id="sem-stat-classes" style="font-size: 24px; font-weight: 700; color: #60a5fa; margin-top: 8px;">0</div>
+            </div>
+            <div class="metric-card glass" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: var(--text-muted); font-size: 12px; font-weight: 500;">Functions</div>
+                <div id="sem-stat-functions" style="font-size: 24px; font-weight: 700; color: #a78bfa; margin-top: 8px;">0</div>
+            </div>
+            <div class="metric-card glass" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: var(--text-muted); font-size: 12px; font-weight: 500;">APIs</div>
+                <div id="sem-stat-apis" style="font-size: 24px; font-weight: 700; color: #34d399; margin-top: 8px;">0</div>
+            </div>
+            <div class="metric-card glass" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: var(--text-muted); font-size: 12px; font-weight: 500;">Circular Deps</div>
+                <div id="sem-stat-cycles" style="font-size: 24px; font-weight: 700; color: #f87171; margin-top: 8px;">0</div>
+            </div>
+            <div class="metric-card glass" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05);">
+                <div style="color: var(--text-muted); font-size: 12px; font-weight: 500;">Dead Symbols</div>
+                <div id="sem-stat-dead" style="font-size: 24px; font-weight: 700; color: #fbbf24; margin-top: 8px;">0</div>
+            </div>
+        </div>
+
+        <!-- Main Workspace Split Panel -->
+        <div style="display: flex; gap: 20px; height: calc(100vh - 280px); min-height: 500px;">
+            <!-- Left Side: Interactive Viewer -->
+            <div style="flex: 2; display: flex; flex-direction: column; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 16px; padding: 16px; position: relative; overflow: hidden;">
+                <!-- Controls Toolbar -->
+                <div style="display: flex; gap: 12px; margin-bottom: 12px; z-index: 10;">
+                    <select id="sem-graph-view" class="glass-input" style="padding: 6px 12px; font-size: 13px; max-width: 200px; border-radius: 8px;">
+                        <option value="all">Dependency Graph</option>
+                        <option value="class">Class Explorer</option>
+                        <option value="function">Function Explorer</option>
+                        <option value="api">API Flow</option>
+                        <option value="call">Call Graph</option>
+                    </select>
+                    <input type="text" id="sem-graph-search" class="glass-input" style="padding: 6px 12px; font-size: 13px; flex: 1; border-radius: 8px;" placeholder="Search symbol or file name...">
+                </div>
+                
+                <!-- Canvas Graph Holder -->
+                <div style="flex: 1; position: relative;">
+                    <canvas id="sem-graph-canvas" style="width: 100%; height: 100%; display: block; border-radius: 12px; background: #0f172a; cursor: grab;"></canvas>
+                    <div style="position: absolute; bottom: 12px; right: 12px; display: flex; gap: 8px; z-index: 10;">
+                        <button class="btn btn-secondary" id="btn-sem-zoom-in" style="padding: 4px 10px; font-size: 14px;">+</button>
+                        <button class="btn btn-secondary" id="btn-sem-zoom-out" style="padding: 4px 10px; font-size: 14px;">-</button>
+                        <button class="btn btn-secondary" id="btn-sem-reset" style="padding: 4px 10px; font-size: 12px;">Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side: Detail side-panel / Impact Analyzer -->
+            <div style="flex: 1; display: flex; flex-direction: column; gap: 16px; width: 300px; overflow-y: auto;">
+                <!-- Impact Analyzer Panel -->
+                <div class="card glass" style="padding: 16px; border-radius: 16px;">
+                    <h3 style="font-size: 15px; font-weight: 700; margin: 0 0 12px 0;">Impact Analysis</h3>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 11px;">File Path</label>
+                            <input type="text" id="impact-file-path" class="glass-input" style="padding: 6px; font-size: 12px;" placeholder="e.g. app/auth.py">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 11px;">Symbol (Optional)</label>
+                            <input type="text" id="impact-symbol" class="glass-input" style="padding: 6px; font-size: 12px;" placeholder="e.g. login">
+                        </div>
+                        <button id="btn-run-impact" class="btn btn-primary" style="margin-top: 4px; padding: 8px;">Analyze Impact</button>
+                    </div>
+                    
+                    <!-- Impact results -->
+                    <div id="impact-results" style="display: none; margin-top: 14px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-size: 12px; color: var(--text-muted);">Risk Rating:</span>
+                            <span id="impact-risk-badge" class="badge badge-error" style="font-size: 11px; padding: 2px 8px;">High Risk</span>
+                        </div>
+                        <div style="margin-top: 8px; font-size: 12px;">
+                            <strong>Risk Score:</strong> <span id="impact-risk-score">0</span>/100
+                        </div>
+                        <div style="margin-top: 8px;">
+                            <strong style="font-size: 11px; color: var(--text-muted);">Dependent Files:</strong>
+                            <div id="impact-deps" style="font-size: 11px; max-height: 80px; overflow-y: auto; margin-top: 4px; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 4px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graph Element Details card -->
+                <div class="card glass" style="padding: 16px; border-radius: 16px; flex: 1;">
+                    <h3 style="font-size: 15px; font-weight: 700; margin: 0 0 12px 0;">Selected Node Details</h3>
+                    <div id="sem-node-details" style="color: var(--text-muted); font-size: 12px;">
+                        Select any class, function, api_route, or file node in the graph viewer to inspect definitions, callers, and dependencies.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
                 <!-- view-findings pane -->
                 <div class="view-pane" id="view-findings" style="display: none; padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">

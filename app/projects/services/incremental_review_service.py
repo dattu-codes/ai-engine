@@ -124,6 +124,13 @@ class IncrementalReviewService:
             analysis.status = "running"
             db.commit()
             
+            # Regenerate Semantic Graph cache (v2.2)
+            try:
+                from app.projects.services.semantic_graph_service import SemanticGraphService
+                SemanticGraphService.generate_graph(db, analysis.project_id)
+            except Exception as ge:
+                print(f"Error generating semantic graph on PR review: {ge}")
+
             # Run the existing ReviewOrchestrator pipeline using only the PR files
             await ReviewOrchestrator.execute_pipeline(
                 db=db,
@@ -131,6 +138,58 @@ class IncrementalReviewService:
                 files=db_files,
                 api_key=api_key
             )
+
+            # Calculate overall PR impact (v2.2)
+            pr_impact_details = []
+            max_risk = "Low Risk"
+            overall_impacted_files = set()
+            overall_impacted_modules = set()
+            
+            try:
+                from app.projects.services.impact_analysis_service import ImpactAnalysisService
+                from app.projects.services.review_pipeline_services import ModuleGrouper
+                for dbf in db_files:
+                    fpath = dbf.filename.replace("\\", "/")
+                    impact = ImpactAnalysisService.analyze_impact(db, analysis.project_id, fpath)
+                    
+                    if impact["risk_rating"] == "High Risk":
+                        max_risk = "High Risk"
+                    elif impact["risk_rating"] == "Medium Risk" and max_risk != "High Risk":
+                        max_risk = "Medium Risk"
+                        
+                    for f in impact["dependent_files"]:
+                        overall_impacted_files.add(f)
+                        _, mod, _ = ModuleGrouper.get_priority_and_module(f)
+                        if mod:
+                            overall_impacted_modules.add(mod)
+                            
+                    pr_impact_details.append({
+                        "file_path": fpath,
+                        "risk_score": impact["risk_score"],
+                        "risk_rating": impact["risk_rating"],
+                        "dependent_files": impact["dependent_files"]
+                    })
+            except Exception as ie:
+                print(f"Error calculating PR impact metrics: {ie}")
+
+            # Enrich generated report with semantic impact
+            from app.projects.models.project_models import Report
+            report = db.query(Report).filter(Report.analysis_id == analysis_id).first()
+            if report:
+                try:
+                    rep_details = json.loads(report.details_json) if report.details_json else {}
+                except Exception:
+                    rep_details = {}
+                
+                rep_details["pr_semantic_impact"] = {
+                    "overall_risk": max_risk,
+                    "impacted_files": list(overall_impacted_files),
+                    "impacted_modules": list(overall_impacted_modules),
+                    "file_details": pr_impact_details
+                }
+                report.summary = f"Pull Request review completed. Dependency Risk: {max_risk}. " + (report.summary or "")
+                report.details_json = json.dumps(rep_details)
+                db.commit()
             
             # Update PullRequest record's latest_analysis_id
             if analysis.pull_request_id:

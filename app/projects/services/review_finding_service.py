@@ -70,6 +70,24 @@ class ReviewFindingService:
                 matched_finding.confidence = confidence
                 matched_finding.updated_at = datetime.utcnow()
 
+                # Calculate dependency risk context (v2.2)
+                try:
+                    from app.projects.services.impact_analysis_service import ImpactAnalysisService
+                    from app.projects.services.review_pipeline_services import ModuleGrouper
+                    impact = ImpactAnalysisService.analyze_impact(db, project_id, file_path)
+                    
+                    matched_finding.dependency_chain = json.dumps(impact["dependent_files"])
+                    matched_finding.downstream_risk = impact["risk_rating"]
+                    
+                    imp_mods = set()
+                    for fp in impact["dependent_files"]:
+                        _, mod, _ = ModuleGrouper.get_priority_and_module(fp)
+                        if mod:
+                            imp_mods.add(mod)
+                    matched_finding.impacted_modules = json.dumps(list(imp_mods))
+                except Exception as de:
+                    print(f"Error compiling finding dependency risk: {de}")
+
                 # Reopen finding if it was resolved or ignored
                 if matched_finding.status in ["Resolved", "Ignored"]:
                     matched_finding.status = "Open"
@@ -79,6 +97,26 @@ class ReviewFindingService:
                 matched_db_finding_ids.add(matched_finding.id)
                 synced_findings.append(matched_finding)
             else:
+                # Calculate dependency risk context (v2.2)
+                dep_chain = "[]"
+                down_risk = "Low Risk"
+                imp_modules = "[]"
+                try:
+                    from app.projects.services.impact_analysis_service import ImpactAnalysisService
+                    from app.projects.services.review_pipeline_services import ModuleGrouper
+                    impact = ImpactAnalysisService.analyze_impact(db, project_id, file_path)
+                    dep_chain = json.dumps(impact["dependent_files"])
+                    down_risk = impact["risk_rating"]
+                    
+                    imp_mods = set()
+                    for fp in impact["dependent_files"]:
+                        _, mod, _ = ModuleGrouper.get_priority_and_module(fp)
+                        if mod:
+                            imp_mods.add(mod)
+                    imp_modules = json.dumps(list(imp_mods))
+                except Exception as de:
+                    print(f"Error compiling new finding dependency risk: {de}")
+
                 # Create a new finding
                 new_finding = ReviewFinding(
                     project_id=project_id,
@@ -92,6 +130,9 @@ class ReviewFindingService:
                     recommendation=recommendation,
                     confidence=confidence,
                     status="Open",
+                    impacted_modules=imp_modules,
+                    dependency_chain=dep_chain,
+                    downstream_risk=down_risk,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow()
                 )

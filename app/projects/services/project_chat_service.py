@@ -80,6 +80,7 @@ class ProjectChatService:
             f"- Architecture: {architecture}\n"
             f"- Dependencies: {dependencies}\n"
             f"- Total Code Lines: {total_lines}\n\n"
+            f"Semantic Graph & Architectural Context:\n{semantic_graph_text}\n\n"
             f"Chronological Evolution Versions:\n{version_history_text}\n\n"
             f"Latest AI Review Findings:\n{findings_text}\n\n"
             f"Relevant Source Files Context:\n{source_files_text}\n"
