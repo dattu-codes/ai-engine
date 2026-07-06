@@ -5,9 +5,10 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 
-from app.projects.models.project_models import ProjectVersion, ProjectVersionFile, Analysis, AnalysisFile, Report
+from app.projects.models.project_models import ProjectVersion, ProjectVersionFile, Analysis, AnalysisFile, Report, Project
 from app.projects.repositories.project_repository import ProjectRepository
 from app.services.ai import GeminiClient
+from app.projects.services.activity_service import ActivityService
 
 class AIFixEngine:
     @staticmethod
@@ -119,6 +120,7 @@ class VersionService:
         # Build metadata map
         meta = {f.filename: f.hash for f in db_files}
 
+        project = db.query(Project).filter(Project.id == project_id).first()
         version = ProjectVersion(
             project_id=project_id,
             version_number=1,
@@ -126,11 +128,24 @@ class VersionService:
             source_analysis_id=analysis_id,
             applied_fixes="[]",
             summary="Baseline version created from project ingestion.",
-            snapshot_metadata=json.dumps(meta)
+            snapshot_metadata=json.dumps(meta),
+            created_by=project.user_id if project else None
         )
         db.add(version)
         db.commit()
         db.refresh(version)
+
+        # Log baseline creation activity
+        ActivityService.log_activity(
+            db=db,
+            workspace_id=project.workspace_id if project else None,
+            project_id=project_id,
+            user_id=project.user_id if project else None,
+            activity_type="Version Created",
+            entity_type="version",
+            entity_id=version.id,
+            description=f"Baseline Version 1 snapshot created from project ingestion."
+        )
 
         # Replicate files to the ProjectVersionFile snapshot table
         for f in db_files:
@@ -155,7 +170,8 @@ class VersionService:
         db: Session,
         project_id: int,
         issue: dict,
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[int] = None
     ) -> ProjectVersion:
         """
         Applies a targeted fix to the codebase, increments the project version, and creates a snapshot.
@@ -205,7 +221,8 @@ class VersionService:
             source_analysis_id=current_version.source_analysis_id, # will be updated after running analysis
             applied_fixes=json.dumps(applied_list),
             summary=f"Version {new_version_num} - Applied fix for {issue.get('category')} in '{target_file}'.",
-            snapshot_metadata="{}"
+            snapshot_metadata="{}",
+            created_by=user_id
         )
         db.add(new_version)
         db.commit()
@@ -268,6 +285,19 @@ class VersionService:
         db.commit()
         db.refresh(new_version)
 
+        # Log Version Created activity
+        project = db.query(Project).filter(Project.id == project_id).first()
+        ActivityService.log_activity(
+            db=db,
+            workspace_id=project.workspace_id if project else None,
+            project_id=project_id,
+            user_id=user_id,
+            activity_type="Version Created",
+            entity_type="version",
+            entity_id=new_version.id,
+            description=f"Version {new_version_num} created: Applied AI Fix for {issue.get('category')} in '{target_file}'."
+        )
+
         # Generate semantic graph cache (v2.2)
         try:
             from app.projects.services.semantic_graph_service import SemanticGraphService
@@ -278,7 +308,7 @@ class VersionService:
         return new_version
 
     @staticmethod
-    def restore_version(db: Session, project_id: int, target_version_id: int) -> ProjectVersion:
+    def restore_version(db: Session, project_id: int, target_version_id: int, user_id: Optional[int] = None) -> ProjectVersion:
         """
         Restores the codebase back to a historical version snapshot by creating a new head version.
         """
@@ -310,7 +340,8 @@ class VersionService:
             source_analysis_id=target_version.source_analysis_id,
             applied_fixes=json.dumps([{"restored_from": target_version.version_number}]),
             summary=summary,
-            snapshot_metadata=target_version.snapshot_metadata
+            snapshot_metadata=target_version.snapshot_metadata,
+            created_by=user_id
         )
         db.add(restored_version)
         db.commit()
@@ -335,6 +366,19 @@ class VersionService:
 
         db.commit()
         db.refresh(restored_version)
+
+        # Log Version Restored activity
+        project = db.query(Project).filter(Project.id == project_id).first()
+        ActivityService.log_activity(
+            db=db,
+            workspace_id=project.workspace_id if project else None,
+            project_id=project_id,
+            user_id=user_id,
+            activity_type="Version Restored",
+            entity_type="version",
+            entity_id=restored_version.id,
+            description=f"Restored codebase back to Version {target_version.version_number}."
+        )
 
         # Generate semantic graph cache (v2.2)
         try:

@@ -9,6 +9,7 @@ class Project(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True)
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -22,6 +23,7 @@ class Project(Base):
     semantic_nodes = relationship("SemanticNode", back_populates="project", cascade="all, delete-orphan")
     semantic_edges = relationship("SemanticEdge", back_populates="project", cascade="all, delete-orphan")
     user = relationship("User")
+    workspace = relationship("Workspace", back_populates="projects")
 
     # GitHub Repository Metadata
     repo_url = Column(String(512), nullable=True)
@@ -82,6 +84,7 @@ class Analysis(Base):
     reports = relationship("Report", back_populates="analysis", cascade="all, delete-orphan")
     pull_request_id = Column(Integer, ForeignKey("pull_requests.id", ondelete="SET NULL"), nullable=True)
     pull_request = relationship("PullRequest", foreign_keys=[pull_request_id], back_populates="analyses")
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     @property
     def score(self) -> Optional[int]:
@@ -137,6 +140,7 @@ class ProjectVersion(Base):
     project = relationship("Project", back_populates="versions")
     parent = relationship("ProjectVersion", remote_side=[id])
     files = relationship("ProjectVersionFile", back_populates="version", cascade="all, delete-orphan")
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class ProjectVersionFile(Base):
@@ -173,6 +177,7 @@ class ChatMessage(Base):
 
     # Relationships
     project = relationship("Project", back_populates="chat_messages")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class PullRequest(Base):
@@ -199,6 +204,7 @@ class PullRequest(Base):
     project = relationship("Project", back_populates="pull_requests")
     analyses = relationship("Analysis", foreign_keys=[Analysis.pull_request_id], back_populates="pull_request", cascade="all, delete-orphan")
     latest_analysis = relationship("Analysis", foreign_keys=[latest_analysis_id])
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
 
 class ReviewFinding(Base):
@@ -219,6 +225,9 @@ class ReviewFinding(Base):
     confidence = Column(Float, default=0.8, nullable=False)
     status = Column(String(50), default="Open", nullable=False)  # Open, In Progress, Resolved, Ignored
     assigned_to = Column(String(100), nullable=True)
+    assigned_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    assigned_at = Column(DateTime, nullable=True)
+    due_date = Column(DateTime, nullable=True)
     ignored_reason = Column(Text, nullable=True)
     
     # Semantic Code Graph Dependency Metrics (v2.2)
@@ -234,6 +243,7 @@ class ReviewFinding(Base):
     project = relationship("Project", back_populates="findings")
     analysis = relationship("Analysis")
     resolved_in_version = relationship("ProjectVersion")
+    comments = relationship("FindingComment", back_populates="finding", cascade="all, delete-orphan")
 
 
 class SemanticNode(Base):
@@ -263,5 +273,74 @@ class SemanticEdge(Base):
 
     # Relationships
     project = orm_relationship("Project", back_populates="semantic_edges")
+
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    projects = relationship("Project", back_populates="workspace", cascade="all, delete-orphan")
+    members = relationship("WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan")
+    activities = relationship("ActivityLog", back_populates="workspace", cascade="all, delete-orphan")
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_members"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role = Column(String(50), nullable=False)  # Owner, Admin, Developer, Viewer
+    invited_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    workspace = relationship("Workspace", back_populates="members")
+    user = relationship("User", foreign_keys=[user_id])
+    inviter = relationship("User", foreign_keys=[invited_by])
+
+
+class FindingComment(Base):
+    __tablename__ = "finding_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    finding_id = Column(Integer, ForeignKey("review_findings.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    parent_comment_id = Column(Integer, ForeignKey("finding_comments.id", ondelete="CASCADE"), nullable=True)
+    comment = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Relationships
+    finding = relationship("ReviewFinding", back_populates="comments")
+    user = relationship("User")
+    parent = relationship("FindingComment", back_populates="replies", remote_side=[id])
+    replies = relationship("FindingComment", back_populates="parent", cascade="all, delete-orphan")
+
+
+class ActivityLog(Base):
+    __tablename__ = "activity_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    activity_type = Column(String(100), nullable=False)
+    entity_type = Column(String(100), nullable=False)
+    entity_id = Column(Integer, nullable=True)
+    description = Column(Text, nullable=False)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    workspace = relationship("Workspace", back_populates="activities")
+    project = relationship("Project")
+    user = relationship("User")
 
 

@@ -10,6 +10,7 @@ from app.auth.models.auth_models import User
 from app.projects.repositories.project_repository import ProjectRepository
 from app.projects.models.project_models import ReviewFinding
 from app.projects.services.review_finding_service import ReviewFindingService
+from app.projects.services.permission_service import PermissionService
 
 # Define Pydantic request / response schemas
 class StatusUpdateRequest(BaseModel):
@@ -17,6 +18,7 @@ class StatusUpdateRequest(BaseModel):
 
 class AssignRequest(BaseModel):
     assigned_to: Optional[str] = None
+    due_date: Optional[datetime] = None
 
 class IgnoreRequest(BaseModel):
     reason: Optional[str] = None
@@ -36,6 +38,9 @@ class ReviewFindingResponse(BaseModel):
     confidence: float
     status: str
     assigned_to: Optional[str] = None
+    assigned_by: Optional[int] = None
+    assigned_at: Optional[datetime] = None
+    due_date: Optional[datetime] = None
     ignored_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -98,13 +103,16 @@ def update_status(
     finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
-        
+    
     project = ProjectRepository.get_project(db, finding.project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=403, detail="Not authorized to update this finding")
         
+    if not PermissionService.can_assign_findings(db, current_user.id, finding.project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot update finding status.")
+        
     try:
-        updated = ReviewFindingService.update_finding_status(db, finding_id, req.status)
+        updated = ReviewFindingService.update_finding_status(db, finding_id, req.status, current_user.id)
         return updated
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -120,12 +128,15 @@ def assign_finding(
     finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
-        
+    
     project = ProjectRepository.get_project(db, finding.project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=403, detail="Not authorized to assign this finding")
         
-    return ReviewFindingService.assign_finding(db, finding_id, req.assigned_to)
+    if not PermissionService.can_assign_findings(db, current_user.id, finding.project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot assign findings.")
+        
+    return ReviewFindingService.assign_finding(db, finding_id, req.assigned_to, current_user.id, req.due_date)
 
 
 @finding_router.patch("/findings/{finding_id}/ignore", response_model=ReviewFindingResponse)
@@ -138,12 +149,15 @@ def ignore_finding(
     finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
-        
+    
     project = ProjectRepository.get_project(db, finding.project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=403, detail="Not authorized to ignore this finding")
         
-    return ReviewFindingService.ignore_finding(db, finding_id, req.reason)
+    if not PermissionService.can_assign_findings(db, current_user.id, finding.project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot ignore findings.")
+        
+    return ReviewFindingService.ignore_finding(db, finding_id, req.reason, current_user.id)
 
 
 @finding_router.patch("/findings/{finding_id}/reopen", response_model=ReviewFindingResponse)
@@ -155,12 +169,15 @@ def reopen_finding(
     finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
     if not finding:
         raise HTTPException(status_code=404, detail="Finding not found")
-        
+    
     project = ProjectRepository.get_project(db, finding.project_id, current_user.id)
     if not project:
         raise HTTPException(status_code=403, detail="Not authorized to reopen this finding")
         
-    return ReviewFindingService.reopen_finding(db, finding_id)
+    if not PermissionService.can_assign_findings(db, current_user.id, finding.project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot reopen findings.")
+        
+    return ReviewFindingService.reopen_finding(db, finding_id, current_user.id)
 
 
 @finding_router.get("/projects/{project_id}/findings/history")

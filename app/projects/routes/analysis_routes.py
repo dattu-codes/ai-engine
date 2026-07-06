@@ -10,6 +10,7 @@ from app.auth.models.auth_models import User
 from app.projects.models.project_models import Project, Analysis, Report
 from app.projects.repositories.project_repository import ProjectRepository
 from app.projects.services.analysis_service import AnalysisService
+from app.projects.services.permission_service import PermissionService
 
 analysis_router = APIRouter(prefix="/analysis", tags=["AI Review Analysis"])
 
@@ -65,6 +66,9 @@ async def run_project_analysis(
     """
     Triggers an asynchronous AI review analysis on the latest ingested project files.
     """
+    if not PermissionService.can_run_analysis(db, current_user.id, project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot trigger analysis runs.")
+
     analysis = AnalysisService.start_analysis(
         db, 
         project_id=project_id, 

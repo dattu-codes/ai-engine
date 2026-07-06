@@ -16,7 +16,8 @@ class ProjectChatService:
         db: Session,
         project_id: int,
         user_query: str,
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        user_id: Optional[int] = None
     ) -> AsyncGenerator[str, None]:
         """
         Retrieves context, constructs prompt, calls LLM, yields streaming tokens,
@@ -41,6 +42,31 @@ class ProjectChatService:
                 f"- Version {v.version_number}: {v.summary} (Created: {v.created_at.isoformat()})"
                 for v in context["version_history"]
             ])
+
+        # Construct semantic graph text context
+        semantic_graph_text = "No semantic code graph context available."
+        try:
+            from app.projects.models.project_models import SemanticNode, SemanticEdge
+            nodes = db.query(SemanticNode).filter(SemanticNode.project_id == project_id).all()
+            edges = db.query(SemanticEdge).filter(SemanticEdge.project_id == project_id).all()
+            if nodes:
+                node_map = {n.id: n for n in nodes}
+                nodes_desc = []
+                for n in nodes:
+                    nodes_desc.append(f"- {n.node_type.upper()}: '{n.name}' in file '{n.file_path}' (lines {n.start_line}-{n.end_line})")
+                
+                edges_desc = []
+                for e in edges:
+                    src = node_map.get(e.source_node_id)
+                    tgt = node_map.get(e.target_node_id)
+                    if src and tgt:
+                        edges_desc.append(f"- '{src.name}' ({src.node_type}) {e.relationship} -> '{tgt.name}' ({tgt.node_type})")
+                
+                semantic_graph_text = "Nodes:\n" + "\n".join(nodes_desc)
+                if edges_desc:
+                    semantic_graph_text += "\nRelationships:\n" + "\n".join(edges_desc)
+        except Exception as ge:
+            semantic_graph_text = f"Error retrieving semantic graph: {ge}"
 
         # Construct findings text from persistent database ReviewFinding model
         try:
@@ -103,8 +129,27 @@ class ProjectChatService:
             project_id=project_id,
             role="user",
             content=user_query,
-            referenced_version=context.get("version_number", 1)
+            referenced_version=context.get("version_number", 1),
+            user_id=user_id
         )
+
+        # Log Activity
+        try:
+            from app.projects.models.project_models import Project
+            from app.projects.services.activity_service import ActivityService
+            project_obj = db.query(Project).filter(Project.id == project_id).first()
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=project_obj.workspace_id if project_obj else None,
+                project_id=project_id,
+                user_id=user_id,
+                activity_type="Chat Message Sent",
+                entity_type="chat",
+                entity_id=None,
+                description=f"User sent a chat query: '{user_query[:60]}...'"
+            )
+        except Exception as ae:
+            print(f"Error logging chat message activity: {ae}")
 
         # 4. Stream response candidate generator
         generated_text = ""
@@ -245,7 +290,8 @@ class ProjectChatService:
             referenced_classes=citations["classes"],
             referenced_functions=citations["functions"],
             referenced_reports=citations["reports"],
-            referenced_version=citations["version"]
+            referenced_version=citations["version"],
+            user_id=user_id
         )
         yield "data: [DONE]\n\n"
 

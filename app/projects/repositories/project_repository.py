@@ -6,7 +6,19 @@ from app.projects.models.project_models import Project, Analysis, AnalysisFile, 
 class ProjectRepository:
     @staticmethod
     def get_project(db: Session, project_id: int, user_id: int) -> Optional[Project]:
-        return db.query(Project).filter(Project.id == project_id, Project.user_id == user_id).first()
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            return None
+        if not project.workspace_id:
+            return project if project.user_id == user_id else None
+        
+        # Check workspace membership
+        from app.projects.models.project_models import WorkspaceMember
+        member = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == project.workspace_id,
+            WorkspaceMember.user_id == user_id
+        ).first()
+        return project if member else None
 
     @staticmethod
     def get_projects_by_user(db: Session, user_id: int) -> List[Project]:
@@ -24,7 +36,8 @@ class ProjectRepository:
         current_branch: Optional[str] = None,
         last_commit_sha: Optional[str] = None,
         last_commit_message: Optional[str] = None,
-        last_sync_time: Optional[datetime] = None
+        last_sync_time: Optional[datetime] = None,
+        workspace_id: Optional[int] = None
     ) -> Project:
         project = Project(
             user_id=user_id, 
@@ -36,7 +49,8 @@ class ProjectRepository:
             current_branch=current_branch,
             last_commit_sha=last_commit_sha,
             last_commit_message=last_commit_message,
-            last_sync_time=last_sync_time
+            last_sync_time=last_sync_time,
+            workspace_id=workspace_id
         )
         db.add(project)
         db.commit()

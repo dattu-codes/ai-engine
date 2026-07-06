@@ -13,6 +13,7 @@ from app.projects.services.analysis_simulator import MockAnalysisSimulator
 from app.projects.services.code_analyzer import CodeAnalyzerService
 from app.services.ai import GeminiClient
 from app.projects.services.review_pipeline_services import ReviewOrchestrator
+from app.projects.services.activity_service import ActivityService
 
 class AnalysisService:
     @staticmethod
@@ -59,6 +60,7 @@ class AnalysisService:
             source_type=latest_completed.source_type, 
             status="pending"
         )
+        analysis.created_by = user_id
         
         # Add execution fields
         analysis.started_at = datetime.utcnow()
@@ -73,6 +75,18 @@ class AnalysisService:
         if latest_version:
             latest_version.source_analysis_id = analysis.id
             db.commit()
+
+        # Log Activity
+        ActivityService.log_activity(
+            db=db,
+            workspace_id=project.workspace_id,
+            project_id=project_id,
+            user_id=user_id,
+            activity_type="Analysis Started",
+            entity_type="analysis",
+            entity_id=analysis.id,
+            description=f"AI Review Analysis run #{analysis.id} started on project '{project.name}'."
+        )
 
         # Launch the background async task
         asyncio.create_task(
@@ -123,6 +137,21 @@ class AnalysisService:
                 files=db_files,
                 api_key=api_key
             )
+
+            # Log Activity Success
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                project = db.query(Project).filter(Project.id == analysis.project_id).first()
+                ActivityService.log_activity(
+                    db=db,
+                    workspace_id=project.workspace_id if project else None,
+                    project_id=analysis.project_id,
+                    user_id=analysis.created_by,
+                    activity_type="Analysis Completed",
+                    entity_type="analysis",
+                    entity_id=analysis_id,
+                    description=f"AI Review Analysis run #{analysis_id} completed successfully for '{project.name if project else 'project'}'."
+                )
         except Exception as e:
             # Handle unexpected failures
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
@@ -139,6 +168,19 @@ class AnalysisService:
                 )
                 db.add(err_report)
                 db.commit()
+
+                # Log Activity Failure
+                project = db.query(Project).filter(Project.id == analysis.project_id).first()
+                ActivityService.log_activity(
+                    db=db,
+                    workspace_id=project.workspace_id if project else None,
+                    project_id=analysis.project_id,
+                    user_id=analysis.created_by,
+                    activity_type="Analysis Failed",
+                    entity_type="analysis",
+                    entity_id=analysis_id,
+                    description=f"AI Review Analysis run #{analysis_id} failed: {str(e)}."
+                )
             print(f"Analysis task exception: {str(e)}")
         finally:
             db.close()

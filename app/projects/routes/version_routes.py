@@ -13,6 +13,7 @@ from app.projects.services.version_service import VersionService
 from app.projects.services.comparison_service import ComparisonService
 from app.projects.services.snapshot_service import SnapshotService
 from app.projects.services.analysis_service import AnalysisService
+from app.projects.services.permission_service import PermissionService
 
 version_router = APIRouter(prefix="/projects/{project_id}/versions", tags=["Project Versioning"])
 
@@ -47,8 +48,11 @@ async def restore_version(
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
+    if not PermissionService.can_restore_version(db, current_user.id, project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot restore versions.")
+
     try:
-        new_version = VersionService.restore_version(db, project_id, version_id)
+        new_version = VersionService.restore_version(db, project_id, version_id, current_user.id)
         
         # Replicate version files to a new Analysis run so we can run review on it
         analysis = ProjectRepository.create_analysis(
@@ -57,6 +61,7 @@ async def restore_version(
             source_type="restore",
             status="completed"
         )
+        analysis.created_by = current_user.id
         
         vf_files = db.query(ProjectVersionFile).filter(ProjectVersionFile.version_id == new_version.id).all()
         for vf in vf_files:
@@ -154,13 +159,17 @@ async def apply_ai_fix(
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
+    if not PermissionService.can_apply_fix(db, current_user.id, project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot apply AI fixes.")
+
     try:
         # Apply the fix and create a new head version snapshot
         new_version = await VersionService.apply_fix_and_create_version(
             db=db,
             project_id=project_id,
             issue=req.issue,
-            api_key=req.api_key
+            api_key=req.api_key,
+            user_id=current_user.id
         )
 
         # Replicate version files to a completed Analysis so the review pipeline has access to them
@@ -170,6 +179,7 @@ async def apply_ai_fix(
             source_type="fix_applied",
             status="completed"
         )
+        analysis.created_by = current_user.id
         
         vf_files = db.query(ProjectVersionFile).filter(ProjectVersionFile.version_id == new_version.id).all()
         for vf in vf_files:

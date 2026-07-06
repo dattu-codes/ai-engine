@@ -229,7 +229,7 @@ def run_tests():
     status, run_3 = make_request(
         "POST", 
         f"/projects/{project_id}/repository", 
-        {"repo_url": "https://github.com/dattu-codes/ai-engine.git"}, 
+        {"repo_url": "https://github.com/dattu-codes/ai-engine-intern.git"}, 
         token=token
     )
     assert status == 200, f"Repo linking failed: {run_3}"

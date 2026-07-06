@@ -14,6 +14,7 @@ from app.projects.services.github_pr_service import GitHubPRService
 from app.projects.services.incremental_review_service import IncrementalReviewService
 from app.projects.services.pr_summary_service import PRSummaryService
 from app.projects.services.git_service import GitService
+from app.projects.services.permission_service import PermissionService
 
 pr_router = APIRouter(tags=["Pull Requests"])
 
@@ -83,6 +84,9 @@ async def trigger_pull_request_review(
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
+    if not PermissionService.can_run_analysis(db, current_user.id, id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot trigger PR reviews.")
+
     # 2. Extract repo owner and name
     owner, repo = "mock-owner", "mock-repo"
     if project.repo_url:
@@ -119,7 +123,8 @@ async def trigger_pull_request_review(
             additions=pr_details["additions"],
             deletions=pr_details["deletions"],
             commits=pr_details["commits"],
-            pr_files_json=json.dumps(pr_files)
+            pr_files_json=json.dumps(pr_files),
+            created_by=current_user.id
         )
         db.add(pr)
     else:
@@ -143,7 +148,8 @@ async def trigger_pull_request_review(
         db=db,
         project_id=id,
         pr_id=pr.id,
-        changed_files=pr_files
+        changed_files=pr_files,
+        user_id=current_user.id
     )
     
     pr.latest_analysis_id = analysis.id

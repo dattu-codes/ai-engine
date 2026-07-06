@@ -104,6 +104,10 @@
                         <span class="nav-icon">🕸</span>
                         <span class="nav-text">Semantic Explorer</span>
                     </button>
+                    <button class="nav-item" data-view="view-workspace" id="nav-item-workspace" style="display: none;">
+                        <span class="nav-icon">🏢</span>
+                        <span class="nav-text">Workspaces</span>
+                    </button>
                 </nav>
             </aside>
 
@@ -1024,8 +1028,8 @@
                     </div>
                 </div>
 
-                <!-- View: Pull Requests -->
-                <div class="view-pane" id="view-pull-requests" style="display: none;">
+                <!-- View: Pull Requests (v2.0) -->
+                <div class="view-pane" id="view-pull-requests">
                     <div style="display: flex; gap: 20px; height: calc(100vh - 185px); align-items: stretch;">
                         
                         <!-- Left Panel: PR List & Trigger -->
@@ -1150,7 +1154,7 @@
                 </div>
 
     <!-- view-semantic pane (v2.2) -->
-    <div class="view-pane" id="view-semantic" style="display: none; padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
+    <div class="view-pane" id="view-semantic" style="padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <div>
                 <h1 style="font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">Semantic Code Graph Explorer</h1>
@@ -1254,15 +1258,123 @@
         </div>
     </div>
 
-                <!-- view-findings pane -->
-                <div class="view-pane" id="view-findings" style="display: none; padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
-                    <!-- Title & Header -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <div>
-                            <h1 style="font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #a78bfa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">Review Quality Center</h1>
-                            <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Monitor project health and track resolution lifecycle of AI findings</p>
+    <!-- view-workspace pane -->
+    <div class="view-pane" id="view-workspace" style="padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
+        <!-- Title & Header -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h1 style="font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #a78bfa, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">Collaborative Workspaces</h1>
+                <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Manage workspace members, assign roles, and track team activities</p>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btn-create-workspace-modal" style="background: var(--accent-purple); margin: 0;">+ New Workspace</button>
+        </div>
+
+        <!-- Workspaces Layout Grid -->
+        <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start;">
+            <!-- Left Panel: Workspaces Selector -->
+            <div class="card glass" style="padding: 15px; display: flex; flex-direction: column; gap: 15px;">
+                <h3 style="font-size: 12px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1px; margin: 0;">Your Workspaces</h3>
+                <div id="workspace-selector-list" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Workspaces loaded dynamically -->
+                </div>
+            </div>
+
+            <!-- Right Panel: Selected Workspace Details -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                <!-- Placeholder when no workspace is selected -->
+                <div class="card glass" id="workspace-detail-placeholder" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                    <span style="font-size: 40px; display: block; margin-bottom: 10px;">🏢</span>
+                    <h3 style="color: var(--text-bright); font-size: 16px; margin: 0 0 8px 0;">Select a Workspace</h3>
+                    <p style="font-size: 13px; margin: 0;">Choose a workspace from the left panel to manage members, assign roles, and view activities.</p>
+                </div>
+
+                <!-- Workspace Content (Loaded when a workspace is selected) -->
+                <div id="workspace-detail-content" style="display: none; display: flex; flex-direction: column; gap: 20px;">
+                    <!-- Workspace Header Info -->
+                    <div class="card glass" style="padding: 20px; display: flex; flex-direction: column; gap: 8px;">
+                        <h2 id="workspace-display-name" style="font-size: 18px; font-weight: 700; color: var(--text-bright); margin: 0;">Workspace Name</h2>
+                        <p id="workspace-display-desc" style="color: var(--text-muted); font-size: 13px; margin: 0;">Workspace description...</p>
+                    </div>
+
+                    <!-- Members Management and Invite Section -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- Workspace Members Card -->
+                        <div class="card glass" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                            <h3 style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin: 0;">Workspace Members</h3>
+                            <div id="workspace-members-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto;">
+                                <!-- Members loaded dynamically -->
+                            </div>
+                        </div>
+
+                        <!-- Invite Member Card -->
+                        <div class="card glass" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                            <h3 style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin: 0;">Add Member</h3>
+                            <form id="workspace-invite-form" style="display: flex; flex-direction: column; gap: 12px;">
+                                <div class="form-group" style="margin: 0;">
+                                    <label for="invite-username" style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Username</label>
+                                    <input type="text" id="invite-username" placeholder="Enter username..." required style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label for="invite-role" style="font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 4px;">Role</label>
+                                    <select id="invite-role" style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                                        <option value="Viewer">Viewer (Read-only)</option>
+                                        <option value="Developer">Developer (Run review & fix)</option>
+                                        <option value="Admin">Admin (Manage members & projects)</option>
+                                        <option value="Owner">Owner (Full permissions)</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm" style="margin: 5px 0 0 0; background: var(--accent-purple); width: 100%;">Add Member</button>
+                            </form>
                         </div>
                     </div>
+
+                    <!-- Workspace Activity Timeline -->
+                    <div class="card glass" style="padding: 20px; display: flex; flex-direction: column; gap: 15px;">
+                        <h3 style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin: 0;">Workspace Activity Feed</h3>
+                        <div id="workspace-activity-timeline" style="display: flex; flex-direction: column; gap: 12px; max-height: 350px; overflow-y: auto; padding-left: 10px;">
+                            <!-- Activities loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Workspace Modal -->
+    <div class="auth-overlay hidden" id="create-workspace-modal" style="z-index: 10000;">
+        <div class="auth-card glass">
+            <div class="auth-card-header">
+                <h2>Create New Workspace</h2>
+                <p>Define a collaborative engineering space</p>
+            </div>
+            <div class="auth-card-body">
+                <form id="create-workspace-form">
+                    <div class="form-group">
+                        <label for="workspace-name">Workspace Name</label>
+                        <input type="text" id="workspace-name" placeholder="E.g. Core Engineering Team" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="workspace-desc">Description</label>
+                        <textarea id="workspace-desc" placeholder="Describe the workspace purpose..." rows="3" style="width: 100%; padding: 8px 12px; border-radius: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright); resize: vertical;" required></textarea>
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-top: 10px;">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-workspace-modal" style="flex: 1;">Cancel</button>
+                        <button type="submit" class="btn btn-primary" style="flex: 1; margin: 0; background: var(--accent-purple);">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+<!-- view-findings pane -->
+<div class="view-pane" id="view-findings" style="padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
+    <!-- Title & Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h1 style="font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #a78bfa, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">Review Quality Center</h1>
+            <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Monitor project health and track resolution lifecycle of AI findings</p>
+        </div>
+    </div>
 
                     <!-- Dashboard Overview Cards -->
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 15px; margin-bottom: 20px;">
@@ -1426,6 +1538,18 @@
                                         <div><strong>Detected in:</strong> Run #<span id="finding-meta-analysis">--</span></div>
                                         <div id="finding-meta-resolved-version-container" style="display: none;"><strong>Resolved in:</strong> Version <span id="finding-meta-resolved-version">--</span></div>
                                     </div>
+
+                                    <!-- Comments Thread (v2.3) -->
+                                    <div style="padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.04); display: flex; flex-direction: column; gap: 10px;">
+                                        <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 1.5px; margin: 0;">Discussion Thread</h4>
+                                        <div id="finding-comments-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; padding-right: 5px;">
+                                            <!-- comments loaded here -->
+                                        </div>
+                                        <div style="display: flex; gap: 8px; margin-top: 5px;">
+                                            <input type="text" id="finding-comment-input" placeholder="Type a comment..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                                            <button class="btn btn-primary btn-sm" id="btn-add-finding-comment" style="margin: 0; padding: 8px 12px; font-size: 12px; height: auto; background: var(--accent-purple);">Send</button>
+                                        </div>
+                                    </div>
                                 </div>
                                 
                                 <!-- Finding Actions Footer -->
@@ -1493,6 +1617,12 @@
                     <div class="form-group">
                         <label for="project-modal-repo-url">GitHub Repository URL (Optional)</label>
                         <input type="url" id="project-modal-repo-url" placeholder="https://github.com/username/repository.git">
+                    </div>
+                    <div class="form-group">
+                        <label for="project-modal-workspace-id">Workspace (Optional)</label>
+                        <select id="project-modal-workspace-id" style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                            <option value="">Personal Project (No Workspace)</option>
+                        </select>
                     </div>
                     <div style="display: flex; gap: 12px; margin-top: 10px;">
                         <button type="button" class="btn btn-secondary" id="btn-project-modal-cancel" style="flex: 1;">Cancel</button>

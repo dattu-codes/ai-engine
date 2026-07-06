@@ -37,7 +37,8 @@ class ConversationService:
         referenced_classes: Optional[List[str]] = None,
         referenced_functions: Optional[List[str]] = None,
         referenced_reports: Optional[List[int]] = None,
-        referenced_version: Optional[int] = None
+        referenced_version: Optional[int] = None,
+        user_id: Optional[int] = None
     ) -> ChatMessage:
         """
         Saves a user or assistant message to the database with citations.
@@ -50,7 +51,8 @@ class ConversationService:
             referenced_classes=json.dumps(referenced_classes or []),
             referenced_functions=json.dumps(referenced_functions or []),
             referenced_reports=json.dumps(referenced_reports or []),
-            referenced_version=referenced_version
+            referenced_version=referenced_version,
+            user_id=user_id
         )
         db.add(msg)
         db.commit()

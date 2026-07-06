@@ -11,6 +11,7 @@ from app.projects.repositories.project_repository import ProjectRepository
 from app.projects.schemas.project_schemas import ChatRequest, ChatMessageResponse
 from app.projects.services.conversation_service import ConversationService
 from app.projects.services.project_chat_service import ProjectChatService
+from app.projects.services.permission_service import PermissionService
 
 chat_router = APIRouter(prefix="/projects/{project_id}/chat", tags=["Project Chat"])
 
@@ -32,12 +33,16 @@ async def run_chat(
             detail="Project not found or access denied"
         )
 
+    if not PermissionService.can_use_chat(db, current_user.id, project_id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot send chat messages.")
+
     # Return the stream content using project chat service
     generator = ProjectChatService.chat_stream(
         db=db,
         project_id=project_id,
         user_query=request.message,
-        api_key=request.api_key
+        api_key=request.api_key,
+        user_id=current_user.id
     )
 
     return StreamingResponse(generator, media_type="text/event-stream")

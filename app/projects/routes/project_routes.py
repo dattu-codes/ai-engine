@@ -13,6 +13,7 @@ from app.projects.schemas.project_schemas import (
 )
 from app.projects.services.project_service import ProjectService
 from app.projects.repositories.project_repository import ProjectRepository
+from app.projects.services.permission_service import PermissionService
 
 project_router = APIRouter(prefix="/projects", tags=["Project Management"])
 
@@ -24,7 +25,7 @@ class RepositoryLinkRequest(BaseModel):
 @project_router.post("", status_code=status.HTTP_201_CREATED, response_model=ProjectResponse)
 def create_project(req: ProjectCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Creates a new project for the authenticated user."""
-    return ProjectService.create_project(db, current_user.id, req.name, req.repo_url)
+    return ProjectService.create_project(db, current_user.id, req.name, req.repo_url, req.workspace_id)
 
 
 @project_router.get("", response_model=List[ProjectResponse])
@@ -42,12 +43,26 @@ def get_project(id: int, current_user: User = Depends(get_current_user), db: Ses
 @project_router.put("/{id}", response_model=ProjectResponse)
 def rename_project(id: int, req: ProjectRename, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Renames an existing user project."""
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    if not PermissionService.can_run_analysis(db, current_user.id, id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot rename projects.")
     return ProjectService.rename_project(db, id, current_user.id, req.name)
 
 
 @project_router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Deletes a project and all associated analyses, files, and reports."""
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if project.workspace_id:
+        if not PermissionService.can_manage_workspace(db, current_user.id, project.workspace_id):
+            raise HTTPException(status_code=403, detail="Only workspace Owners or Admins can delete projects.")
+    elif project.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the project creator can delete this project.")
+
     ProjectService.delete_project(db, id, current_user.id)
     return None
 
@@ -65,6 +80,12 @@ async def upload_source(
     Accepts source code ingestion for a project.
     Can ingest a ZIP archive containing files, OR a single pasted code snippet with its target filename.
     """
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    if not PermissionService.can_run_analysis(db, current_user.id, id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot upload or ingest code.")
+        
     if file:
         zip_bytes = await file.read()
         return ProjectService.upload_project_zip(db, id, current_user.id, zip_bytes)
@@ -80,12 +101,22 @@ async def upload_source(
 @project_router.post("/{id}/repository", response_model=AnalysisResponse)
 def link_repository(id: int, req: RepositoryLinkRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Saves a Git repository URL linkage metadata (architecture placeholder)."""
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    if not PermissionService.can_run_analysis(db, current_user.id, id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot link code repositories.")
     return ProjectService.save_project_repository(db, id, current_user.id, req.repo_url)
 
 
 @project_router.post("/{id}/sync")
 def sync_repository(id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Synchronizes a GitHub-linked project, pulling the latest commit changes."""
+    project = ProjectRepository.get_project(db, id, current_user.id)
+    if not project:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
+    if not PermissionService.can_run_analysis(db, current_user.id, id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot synchronize code repositories.")
     return ProjectService.sync_project_repository(db, id, current_user.id)
 
 
@@ -131,14 +162,16 @@ def get_project_latest_report(id: int, current_user: User = Depends(get_current_
 
 @project_router.post("/{id}/semantic-graph/regenerate")
 def regenerate_project_semantic_graph(
-    id: int, 
-    current_user: User = Depends(get_current_user), 
+    id: int,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     project = ProjectRepository.get_project(db, id, current_user.id)
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-    
+    if not PermissionService.can_run_analysis(db, current_user.id, id):
+        raise HTTPException(status_code=403, detail="Viewer role cannot regenerate semantic graph.")
+
     from app.projects.services.semantic_graph_service import SemanticGraphService
     stats = SemanticGraphService.generate_graph(db, id)
     return stats

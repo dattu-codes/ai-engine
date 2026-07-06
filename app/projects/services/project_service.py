@@ -5,14 +5,21 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from fastapi import HTTPException, status
 
-from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report
+from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, WorkspaceMember
 from app.projects.repositories.project_repository import ProjectRepository
 from app.projects.services.zip_processor import ZipProcessor
 from app.projects.services.git_service import GitService
+from app.projects.services.permission_service import PermissionService
+from app.projects.services.activity_service import ActivityService
 
 class ProjectService:
     @staticmethod
-    def create_project(db: Session, user_id: int, name: str, repo_url: Optional[str] = None) -> Project:
+    def create_project(db: Session, user_id: int, name: str, repo_url: Optional[str] = None, workspace_id: Optional[int] = None) -> Project:
+        if workspace_id:
+            role = PermissionService.get_user_role(db, user_id, workspace_id)
+            if role not in ["Owner", "Admin", "Developer"]:
+                raise HTTPException(status_code=403, detail="Not authorized to create a project in this workspace.")
+
         if repo_url:
             # Validate, clone, and parse repository files
             try:
@@ -38,7 +45,8 @@ class ProjectService:
                 current_branch=metadata["current_branch"],
                 last_commit_sha=metadata["last_commit_sha"],
                 last_commit_message=metadata["last_commit_message"],
-                last_sync_time=datetime.utcnow()
+                last_sync_time=datetime.utcnow(),
+                workspace_id=workspace_id
             )
 
             # Ingest files under a starting "completed" ingestion Analysis run
@@ -75,13 +83,64 @@ class ProjectService:
                 details_json=json.dumps(report_details)
             )
 
+            # Log Repository Linked and Git Sync
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=workspace_id,
+                project_id=project.id,
+                user_id=user_id,
+                activity_type="Project Created",
+                entity_type="project",
+                entity_id=project.id,
+                description=f"Project '{name}' was created.",
+                metadata_json=None
+            )
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=workspace_id,
+                project_id=project.id,
+                user_id=user_id,
+                activity_type="Repository Linked",
+                entity_type="project",
+                entity_id=project.id,
+                description=f"GitHub Repository '{repo_url}' linked to project.",
+                metadata_json=None
+            )
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=workspace_id,
+                project_id=project.id,
+                user_id=user_id,
+                activity_type="Git Sync",
+                entity_type="project",
+                entity_id=project.id,
+                description=f"Synchronized {len(files)} files from GitHub repository.",
+                metadata_json=None
+            )
+
             return project
         else:
-            return ProjectRepository.create_project(db, user_id, name)
+            project = ProjectRepository.create_project(db, user_id, name, workspace_id=workspace_id)
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=workspace_id,
+                project_id=project.id,
+                user_id=user_id,
+                activity_type="Project Created",
+                entity_type="project",
+                entity_id=project.id,
+                description=f"Project '{name}' was created.",
+                metadata_json=None
+            )
+            return project
 
     @staticmethod
     def get_projects(db: Session, user_id: int) -> List[Project]:
-        return ProjectRepository.get_projects_by_user(db, user_id)
+        memberships = db.query(WorkspaceMember).filter(WorkspaceMember.user_id == user_id).all()
+        workspace_ids = [m.workspace_id for m in memberships]
+        return db.query(Project).filter(
+            (Project.user_id == user_id) | (Project.workspace_id.in_(workspace_ids))
+        ).order_by(Project.created_at.desc()).all()
 
     @staticmethod
     def get_project_details(db: Session, project_id: int, user_id: int) -> Dict[str, Any]:
@@ -120,6 +179,7 @@ class ProjectService:
         return {
             "id": project.id,
             "name": project.name,
+            "workspace_id": project.workspace_id,
             "created_at": project.created_at,
             "updated_at": project.updated_at,
             "total_files": total_files,

@@ -2,6 +2,8 @@ import time
 import asyncio
 import hashlib
 from datetime import datetime
+from typing import Optional, List, Dict, Any
+import json
 from sqlalchemy.orm import Session
 from app.projects.models.project_models import Analysis, AnalysisFile, PullRequest, Project
 from app.projects.services.review_pipeline_services import ReviewOrchestrator
@@ -15,7 +17,8 @@ class IncrementalReviewService:
         project_id: int, 
         pr_id: int, 
         changed_files: list, 
-        api_key: str = None
+        api_key: str = None,
+        user_id: Optional[int] = None
     ) -> Analysis:
         """
         Creates a new Analysis record associated with the PullRequest, constructs the 
@@ -28,12 +31,30 @@ class IncrementalReviewService:
             source_type="repository",
             status="pending"
         )
+        analysis.created_by = user_id
         
         # Link to the pull request
         analysis.pull_request_id = pr_id
         analysis.started_at = datetime.utcnow()
         db.commit()
         db.refresh(analysis)
+
+        # Log Activity
+        try:
+            from app.projects.services.activity_service import ActivityService
+            project = db.query(Project).filter(Project.id == project_id).first()
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=project.workspace_id if project else None,
+                project_id=project_id,
+                user_id=user_id,
+                activity_type="PR Review Started",
+                entity_type="analysis",
+                entity_id=analysis.id,
+                description=f"PR Review started for analysis run #{analysis.id}."
+            )
+        except Exception as ae:
+            print(f"Error logging PR review start activity: {ae}")
         
         # 2. Insert only the modified files into the AnalysisFile table for this analysis run
         db_files = []
@@ -197,6 +218,23 @@ class IncrementalReviewService:
                 if pr:
                     pr.latest_analysis_id = analysis_id
                     db.commit()
+
+            # Log Activity Success
+            try:
+                from app.projects.services.activity_service import ActivityService
+                project = db.query(Project).filter(Project.id == analysis.project_id).first()
+                ActivityService.log_activity(
+                    db=db,
+                    workspace_id=project.workspace_id if project else None,
+                    project_id=analysis.project_id,
+                    user_id=analysis.created_by,
+                    activity_type="PR Review Completed",
+                    entity_type="analysis",
+                    entity_id=analysis_id,
+                    description=f"PR Review completed successfully for analysis run #{analysis_id}."
+                )
+            except Exception as ae:
+                print(f"Error logging PR review success activity: {ae}")
         except Exception as e:
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
@@ -204,7 +242,6 @@ class IncrementalReviewService:
                 analysis.completed_at = datetime.utcnow()
                 
                 from app.projects.models.project_models import Report
-                import json
                 err_report = Report(
                     analysis_id=analysis_id,
                     score=0,
@@ -213,6 +250,23 @@ class IncrementalReviewService:
                 )
                 db.add(err_report)
                 db.commit()
+
+                # Log Activity Failure
+                try:
+                    from app.projects.services.activity_service import ActivityService
+                    project = db.query(Project).filter(Project.id == analysis.project_id).first()
+                    ActivityService.log_activity(
+                        db=db,
+                        workspace_id=project.workspace_id if project else None,
+                        project_id=analysis.project_id,
+                        user_id=analysis.created_by,
+                        activity_type="PR Review Failed",
+                        entity_type="analysis",
+                        entity_id=analysis_id,
+                        description=f"PR Review failed for analysis run #{analysis_id}: {str(e)}."
+                    )
+                except Exception as ae:
+                    print(f"Error logging PR review failure activity: {ae}")
             print(f"PR Analysis task exception: {str(e)}")
         finally:
             db.close()

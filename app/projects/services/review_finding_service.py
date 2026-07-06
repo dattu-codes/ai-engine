@@ -2,7 +2,8 @@ import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from app.projects.models.project_models import ReviewFinding, ProjectVersion, Analysis
+from app.projects.models.project_models import ReviewFinding, ProjectVersion, Analysis, Project
+from app.projects.services.activity_service import ActivityService
 
 class ReviewFindingService:
     @staticmethod
@@ -139,6 +140,20 @@ class ReviewFindingService:
                 db.add(new_finding)
                 db.commit()
                 db.refresh(new_finding)
+                
+                # Log Activity
+                project_obj = db.query(Project).filter(Project.id == project_id).first()
+                ActivityService.log_activity(
+                    db=db,
+                    workspace_id=project_obj.workspace_id if project_obj else None,
+                    project_id=project_id,
+                    user_id=None,
+                    activity_type="Finding Created",
+                    entity_type="finding",
+                    entity_id=new_finding.id,
+                    description=f"New finding #{new_finding.id} discovered in {file_path}: '{title}'."
+                )
+
                 matched_db_finding_ids.add(new_finding.id)
                 synced_findings.append(new_finding)
 
@@ -158,6 +173,7 @@ class ReviewFindingService:
             )
 
         findings_to_resolve = active_findings_to_resolve_query.all()
+        project_obj = db.query(Project).filter(Project.id == project_id).first()
         for f in findings_to_resolve:
             f.status = "Resolved"
             f.resolved_at = datetime.utcnow()
@@ -167,6 +183,19 @@ class ReviewFindingService:
             ).order_by(ProjectVersion.version_number.desc()).first()
             if latest_version:
                 f.resolved_in_version_id = latest_version.id
+            
+            # Log Activity
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=project_obj.workspace_id if project_obj else None,
+                project_id=project_id,
+                user_id=None,
+                activity_type="Finding Resolved",
+                entity_type="finding",
+                entity_id=f.id,
+                description=f"Finding #{f.id} in {f.file_path} was automatically resolved.",
+                metadata_json={"resolved_by": "sync"}
+            )
 
         db.commit()
         return synced_findings
@@ -195,7 +224,7 @@ class ReviewFindingService:
         return history
 
     @staticmethod
-    def update_finding_status(db: Session, finding_id: int, status: str) -> ReviewFinding:
+    def update_finding_status(db: Session, finding_id: int, status: str, operator_id: Optional[int] = None) -> ReviewFinding:
         finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
         if not finding:
             raise ValueError(f"Finding with ID {finding_id} not found.")
@@ -220,21 +249,55 @@ class ReviewFindingService:
             
         db.commit()
         db.refresh(finding)
+
+        if operator_id:
+            project = db.query(Project).filter(Project.id == finding.project_id).first()
+            ActivityService.log_activity(
+                db=db,
+                workspace_id=project.workspace_id if project else None,
+                project_id=finding.project_id,
+                user_id=operator_id,
+                activity_type="Finding Resolved" if status == "Resolved" else ("Finding Ignored" if status == "Ignored" else "Finding Reopened"),
+                entity_type="finding",
+                entity_id=finding.id,
+                description=f"Finding #{finding.id} status was changed to {status}.",
+                metadata_json={"status": status}
+            )
+
         return finding
 
     @staticmethod
-    def assign_finding(db: Session, finding_id: int, username: Optional[str]) -> ReviewFinding:
+    def assign_finding(db: Session, finding_id: int, username: Optional[str], operator_id: int, due_date: Optional[datetime] = None) -> ReviewFinding:
         finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
         if not finding:
             raise ValueError(f"Finding with ID {finding_id} not found.")
+        
         finding.assigned_to = username
+        finding.assigned_by = operator_id
+        finding.assigned_at = datetime.utcnow() if username else None
+        finding.due_date = due_date
         finding.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(finding)
+
+        project = db.query(Project).filter(Project.id == finding.project_id).first()
+        desc = f"Finding #{finding.id} was assigned to {username}." if username else f"Finding #{finding.id} was unassigned."
+        ActivityService.log_activity(
+            db=db,
+            workspace_id=project.workspace_id if project else None,
+            project_id=finding.project_id,
+            user_id=operator_id,
+            activity_type="Finding Assigned",
+            entity_type="finding",
+            entity_id=finding.id,
+            description=desc,
+            metadata_json={"assigned_to": username, "due_date": due_date.isoformat() if due_date else None}
+        )
+
         return finding
 
     @staticmethod
-    def ignore_finding(db: Session, finding_id: int, reason: Optional[str]) -> ReviewFinding:
+    def ignore_finding(db: Session, finding_id: int, reason: Optional[str], operator_id: int) -> ReviewFinding:
         finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
         if not finding:
             raise ValueError(f"Finding with ID {finding_id} not found.")
@@ -245,10 +308,24 @@ class ReviewFindingService:
         finding.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(finding)
+
+        project = db.query(Project).filter(Project.id == finding.project_id).first()
+        ActivityService.log_activity(
+            db=db,
+            workspace_id=project.workspace_id if project else None,
+            project_id=finding.project_id,
+            user_id=operator_id,
+            activity_type="Finding Ignored",
+            entity_type="finding",
+            entity_id=finding.id,
+            description=f"Finding #{finding.id} was ignored. Reason: {reason or 'None'}.",
+            metadata_json={"reason": reason}
+        )
+
         return finding
 
     @staticmethod
-    def reopen_finding(db: Session, finding_id: int) -> ReviewFinding:
+    def reopen_finding(db: Session, finding_id: int, operator_id: int) -> ReviewFinding:
         finding = db.query(ReviewFinding).filter(ReviewFinding.id == finding_id).first()
         if not finding:
             raise ValueError(f"Finding with ID {finding_id} not found.")
@@ -259,4 +336,18 @@ class ReviewFindingService:
         finding.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(finding)
+
+        project = db.query(Project).filter(Project.id == finding.project_id).first()
+        ActivityService.log_activity(
+            db=db,
+            workspace_id=project.workspace_id if project else None,
+            project_id=finding.project_id,
+            user_id=operator_id,
+            activity_type="Finding Reopened",
+            entity_type="finding",
+            entity_id=finding.id,
+            description=f"Finding #{finding.id} was reopened.",
+            metadata_json=None
+        )
+
         return finding

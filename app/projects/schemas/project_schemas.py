@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Any
 class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255, description="Project name")
     repo_url: Optional[str] = Field(None, description="Optional public GitHub Repository URL")
+    workspace_id: Optional[int] = Field(None, description="Optional Workspace ID to assign the project to")
 
 
 class ProjectRename(BaseModel):
@@ -14,6 +15,7 @@ class ProjectRename(BaseModel):
 class ProjectResponse(BaseModel):
     id: int
     name: str
+    workspace_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -79,6 +81,7 @@ class PastedCodeRequest(BaseModel):
 class ProjectDetailsResponse(BaseModel):
     id: int
     name: str
+    workspace_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     total_files: int

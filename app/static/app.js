@@ -613,6 +613,8 @@ async function handleLogout() {
     if (findingsBtn) findingsBtn.style.display = 'none';
     const semanticBtn = document.getElementById('nav-item-semantic');
     if (semanticBtn) semanticBtn.style.display = 'none';
+    const workspaceBtn = document.getElementById('nav-item-workspace');
+    if (workspaceBtn) workspaceBtn.style.display = 'none';
 
     if (refreshToken) {
         try {
@@ -644,13 +646,13 @@ async function checkUserSession() {
             
             // Set header authentication state
             document.getElementById('user-display-name').textContent = user.username;
-            document.getElementById('user-display-role').textContent = user.role.toUpperCase();
-            
-            // Adjust visual system indicators if needed
+            document.getElementById('user-display-role').textContent = user.role.toUpperCase();            // Adjust visual system indicators if needed
             document.getElementById('header-auth').style.display = 'flex';
             document.getElementById('auth-overlay').classList.add('hidden');
-            
+
             // Auto-load projects on login
+            const workspaceBtn = document.getElementById('nav-item-workspace');
+            if (workspaceBtn) workspaceBtn.style.display = 'block';
             loadProjects();
         } else if (res.status === 401) {
             // Attempt rotation
@@ -763,6 +765,8 @@ function initSidebar() {
                 loadProjectPullRequests(activeProjectId);
             } else if (targetView === 'view-findings') {
                 loadProjectFindings(activeProjectId);
+            } else if (targetView === 'view-workspace') {
+                loadWorkspaces();
             }
         });
     });
@@ -775,11 +779,12 @@ function initProjectsTab() {
     const projectModal = document.getElementById('project-modal');
     const projectCreateForm = document.getElementById('project-create-form');
 
-    btnCreateModal.addEventListener('click', () => {
+    btnCreateModal.addEventListener('click', async () => {
         projectModal.classList.remove('hidden');
         document.getElementById('project-modal-name').value = '';
         const repoInput = document.getElementById('project-modal-repo-url');
         if (repoInput) repoInput.value = '';
+        await populateProjectModalWorkspaces();
     });
 
     btnModalCancel.addEventListener('click', () => {
@@ -791,6 +796,8 @@ function initProjectsTab() {
         const name = document.getElementById('project-modal-name').value.trim();
         const repoInput = document.getElementById('project-modal-repo-url');
         const repoUrl = repoInput ? repoInput.value.trim() : '';
+        const workspaceIdVal = document.getElementById('project-modal-workspace-id').value;
+        const workspaceId = workspaceIdVal ? parseInt(workspaceIdVal) : null;
         if (!name) return;
 
         const submitBtn = projectCreateForm.querySelector('button[type="submit"]');
@@ -802,7 +809,7 @@ function initProjectsTab() {
             const res = await authorizedFetch('/projects', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, repo_url: repoUrl || null })
+                body: JSON.stringify({ name, repo_url: repoUrl || null, workspace_id: workspaceId })
             });
 
             if (res.ok) {
@@ -3138,7 +3145,9 @@ async function selectFinding(findingId) {
         const res = await authorizedFetch(`/findings/${findingId}`);
         if (res.ok) {
             const finding = await res.json();
+            await updateAssigneeSelectOptions(activeProjectId);
             renderFindingDetail(finding);
+            loadFindingComments(findingId);
         }
     } catch (err) {
         console.error('Error fetching finding detail:', err);
@@ -4201,5 +4210,451 @@ async function runSemanticImpactAnalysis() {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Analyze Impact';
+    }
+}
+
+// ==========================================
+// Collaborative Workspace & Activity Feed Features (v2.3)
+// ==========================================
+
+let activeWorkspaceId = null;
+let workspaceList = [];
+
+// Initialize Workspaces, members and comments features
+document.addEventListener('DOMContentLoaded', () => {
+    initWorkspacesTab();
+});
+
+function initWorkspacesTab() {
+    // Modal controls for Workspace Creation
+    const btnCreateWSModal = document.getElementById('btn-create-workspace-modal');
+    const wsModal = document.getElementById('create-workspace-modal');
+    const btnCancelWSModal = document.getElementById('btn-cancel-workspace-modal');
+    const createWSForm = document.getElementById('create-workspace-form');
+    
+    if (btnCreateWSModal) {
+        btnCreateWSModal.addEventListener('click', () => {
+            wsModal.classList.remove('hidden');
+            document.getElementById('workspace-name').value = '';
+            document.getElementById('workspace-desc').value = '';
+        });
+    }
+    
+    if (btnCancelWSModal) {
+        btnCancelWSModal.addEventListener('click', () => {
+            wsModal.classList.add('hidden');
+        });
+    }
+    
+    if (createWSForm) {
+        createWSForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('workspace-name').value.trim();
+            const description = document.getElementById('workspace-desc').value.trim();
+            if (!name) return;
+            
+            try {
+                const res = await authorizedFetch('/workspaces', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description })
+                });
+                if (res.ok) {
+                    wsModal.classList.add('hidden');
+                    await loadWorkspaces();
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to create workspace.');
+                }
+            } catch (err) {
+                alert('Error creating workspace: ' + err.message);
+            }
+        });
+    }
+    
+    // Invite member form
+    const inviteForm = document.getElementById('workspace-invite-form');
+    if (inviteForm) {
+        inviteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!activeWorkspaceId) return;
+            
+            const username = document.getElementById('invite-username').value.trim();
+            const role = document.getElementById('invite-role').value;
+            if (!username) return;
+            
+            try {
+                const res = await authorizedFetch(`/workspaces/${activeWorkspaceId}/members`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, role })
+                });
+                if (res.ok) {
+                    document.getElementById('invite-username').value = '';
+                    await loadWorkspaceDetails(activeWorkspaceId);
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to add member.');
+                }
+            } catch (err) {
+                alert('Error adding member: ' + err.message);
+            }
+        });
+    }
+    
+    // Comments submit binding
+    const btnSendComment = document.getElementById('btn-add-finding-comment');
+    if (btnSendComment) {
+        btnSendComment.addEventListener('click', async () => {
+            if (!activeFindingId) return;
+            const input = document.getElementById('finding-comment-input');
+            const content = input.value.trim();
+            if (!content) return;
+            
+            try {
+                const res = await authorizedFetch(`/findings/${activeFindingId}/comments`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comment: content })
+                });
+                if (res.ok) {
+                    input.value = '';
+                    await loadFindingComments(activeFindingId);
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to post comment.');
+                }
+            } catch (err) {
+                alert('Error posting comment: ' + err.message);
+            }
+        });
+    }
+}
+
+// Load Workspaces list
+async function loadWorkspaces() {
+    const listContainer = document.getElementById('workspace-selector-list');
+    if (!listContainer) return;
+    
+    listContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 10px;">Loading workspaces...</div>';
+    
+    try {
+        const res = await authorizedFetch('/workspaces');
+        if (res.ok) {
+            workspaceList = await res.json();
+            listContainer.innerHTML = '';
+            
+            if (workspaceList.length === 0) {
+                listContainer.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 10px; font-size: 13px;">No workspaces found. Click "+ New Workspace" to create one.</div>';
+                document.getElementById('workspace-detail-placeholder').style.display = 'block';
+                document.getElementById('workspace-detail-content').style.display = 'none';
+                activeWorkspaceId = null;
+                return;
+            }
+            
+            workspaceList.forEach(ws => {
+                const item = document.createElement('div');
+                item.className = `project-card ${activeWorkspaceId === ws.id ? 'active' : ''}`;
+                item.style.margin = '0 0 8px 0';
+                item.style.padding = '10px 12px';
+                item.style.cursor = 'pointer';
+                item.style.border = activeWorkspaceId === ws.id ? '1px solid var(--accent-purple)' : '1px solid rgba(255,255,255,0.06)';
+                item.style.borderRadius = '8px';
+                
+                item.innerHTML = `
+                    <h4 style="margin: 0; font-size: 14px; font-weight: 600; color: var(--text-bright);">${escapeHtml(ws.name)}</h4>
+                    <p style="margin: 4px 0 0 0; font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(ws.description || '')}</p>
+                `;
+                
+                item.addEventListener('click', () => {
+                    document.querySelectorAll('#workspace-selector-list .project-card').forEach(c => {
+                        c.classList.remove('active');
+                        c.style.borderColor = 'rgba(255,255,255,0.06)';
+                    });
+                    item.classList.add('active');
+                    item.style.borderColor = 'var(--accent-purple)';
+                    loadWorkspaceDetails(ws.id);
+                });
+                
+                listContainer.appendChild(item);
+            });
+            
+            // Auto select first
+            if (!activeWorkspaceId && workspaceList.length > 0) {
+                activeWorkspaceId = workspaceList[0].id;
+                const cards = listContainer.querySelectorAll('.project-card');
+                if (cards.length > 0) {
+                    cards[0].classList.add('active');
+                    cards[0].style.borderColor = 'var(--accent-purple)';
+                }
+                loadWorkspaceDetails(activeWorkspaceId);
+            }
+        }
+    } catch (err) {
+        console.error('Error loading workspaces:', err);
+    }
+}
+
+// Load Selected Workspace details
+async function loadWorkspaceDetails(workspaceId) {
+    activeWorkspaceId = workspaceId;
+    document.getElementById('workspace-detail-placeholder').style.display = 'none';
+    document.getElementById('workspace-detail-content').style.display = 'flex';
+    
+    try {
+        const res = await authorizedFetch(`/workspaces/${workspaceId}`);
+        if (res.ok) {
+            const ws = await res.json();
+            document.getElementById('workspace-display-name').textContent = ws.name;
+            document.getElementById('workspace-display-desc').textContent = ws.description || 'No description.';
+            
+            await loadWorkspaceMembers(workspaceId);
+            await loadWorkspaceActivities(workspaceId);
+        }
+    } catch (err) {
+        console.error('Error loading workspace details:', err);
+    }
+}
+
+// Load workspace members list
+async function loadWorkspaceMembers(workspaceId) {
+    const listContainer = document.getElementById('workspace-members-list');
+    if (!listContainer) return;
+    
+    listContainer.innerHTML = '';
+    
+    try {
+        const res = await authorizedFetch(`/workspaces/${workspaceId}/members`);
+        if (res.ok) {
+            const members = await res.json();
+            members.forEach(member => {
+                const item = document.createElement('div');
+                item.style.display = 'flex';
+                item.style.justifyContent = 'space-between';
+                item.style.alignItems = 'center';
+                item.style.padding = '8px 12px';
+                item.style.borderRadius = '8px';
+                item.style.background = 'rgba(255,255,255,0.02)';
+                item.style.border = '1px solid rgba(255,255,255,0.04)';
+                
+                // Role badge colors
+                const roleColors = {
+                    Owner: '#ef4444',
+                    Admin: '#a78bfa',
+                    Developer: '#3b82f6',
+                    Viewer: '#34d399'
+                };
+                const color = roleColors[member.role] || 'var(--text-muted)';
+                
+                item.innerHTML = `
+                    <div>
+                        <strong style="color: var(--text-bright); font-size: 13px;">${escapeHtml(member.user.username)}</strong>
+                        <span style="font-size: 11px; margin-left: 6px; color: ${color}; font-weight: 600;">${member.role}</span>
+                    </div>
+                `;
+                
+                // If owner or admin, allow changing role / deleting member (simplified for demonstration)
+                const actionDiv = document.createElement('div');
+                actionDiv.style.display = 'flex';
+                actionDiv.style.gap = '5px';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-secondary btn-sm';
+                deleteBtn.style.margin = '0';
+                deleteBtn.style.padding = '4px 8px';
+                deleteBtn.style.fontSize = '10px';
+                deleteBtn.style.background = 'rgba(239, 68, 68, 0.1)';
+                deleteBtn.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                deleteBtn.style.color = '#fca5a5';
+                deleteBtn.textContent = 'Remove';
+                
+                deleteBtn.addEventListener('click', async () => {
+                    if (confirm(`Are you sure you want to remove ${member.user.username} from this workspace?`)) {
+                        try {
+                            const delRes = await authorizedFetch(`/workspaces/${workspaceId}/members/${member.user.id}`, {
+                                method: 'DELETE'
+                            });
+                            if (delRes.ok) {
+                                await loadWorkspaceMembers(workspaceId);
+                            } else {
+                                const data = await delRes.json();
+                                alert(data.detail || 'Failed to remove member.');
+                            }
+                        } catch (err) {
+                            alert('Remove member error: ' + err.message);
+                        }
+                    }
+                });
+                
+                actionDiv.appendChild(deleteBtn);
+                item.appendChild(actionDiv);
+                listContainer.appendChild(item);
+            });
+        }
+    } catch (err) {
+        console.error('Error loading workspace members:', err);
+    }
+}
+
+// Load workspace activities
+async function loadWorkspaceActivities(workspaceId) {
+    const feed = document.getElementById('workspace-activity-timeline');
+    if (!feed) return;
+    
+    feed.innerHTML = '';
+    
+    try {
+        const res = await authorizedFetch(`/workspaces/${workspaceId}/activities`);
+        if (res.ok) {
+            const data = await res.json();
+            const logs = data.activities || [];
+            if (logs.length === 0) {
+                feed.innerHTML = '<div style="color: var(--text-muted); font-style: italic; padding: 10px; font-size: 13px;">No activities recorded yet in this workspace.</div>';
+                return;
+            }
+            
+            logs.forEach(log => {
+                const item = document.createElement('div');
+                item.style.display = 'flex';
+                item.style.gap = '10px';
+                item.style.alignItems = 'start';
+                item.style.padding = '8px 0';
+                item.style.borderBottom = '1px solid rgba(255,255,255,0.03)';
+                
+                const timeStr = new Date(log.created_at).toLocaleString();
+                
+                item.innerHTML = `
+                    <span style="font-size: 14px;">📝</span>
+                    <div style="flex: 1; font-size: 13px;">
+                        <span style="color: var(--text-muted); font-size: 11px; display: block; margin-bottom: 2px;">${timeStr}</span>
+                        <strong style="color: var(--text-bright);">${escapeHtml(log.username)}</strong> 
+                        <span style="color: var(--text-muted);">${escapeHtml(log.action)}</span>
+                        ${log.details ? `<div style="margin-top: 4px; font-size: 12px; color: var(--text-bright); background: rgba(255,255,255,0.02); padding: 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.04); font-family: var(--font-mono);">${escapeHtml(log.details)}</div>` : ''}
+                    </div>
+                `;
+                feed.appendChild(item);
+            });
+        }
+    } catch (err) {
+        console.error('Error loading workspace activities:', err);
+    }
+}
+
+// Populate Project creation modal with workspaces list
+async function populateProjectModalWorkspaces() {
+    const dropdown = document.getElementById('project-modal-workspace-id');
+    if (!dropdown) return;
+    
+    dropdown.innerHTML = '<option value="">Personal Project (No Workspace)</option>';
+    
+    try {
+        const res = await authorizedFetch('/workspaces');
+        if (res.ok) {
+            const list = await res.json();
+            list.forEach(ws => {
+                const opt = document.createElement('option');
+                opt.value = ws.id;
+                opt.textContent = ws.name;
+                dropdown.appendChild(opt);
+            });
+        }
+    } catch (err) {
+        console.error('Error populating workspaces dropdown:', err);
+    }
+}
+
+// Populate Assignee select dynamically
+async function updateAssigneeSelectOptions(projectId) {
+    const select = document.getElementById('finding-assignee-select');
+    if (!select) return;
+    
+    // Cache current value
+    const prevVal = select.value;
+    
+    // Clear and add placeholder options
+    select.innerHTML = '<option value="">Unassigned</option>';
+    
+    if (!projectId) {
+        select.innerHTML += `
+            <option value="dattu">dattu</option>
+            <option value="gemini-bot">Gemini Bot</option>
+            <option value="reviewer">Reviewer</option>
+        `;
+        select.value = prevVal;
+        return;
+    }
+    
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}`);
+        if (res.ok) {
+            const project = await res.json();
+            if (project.workspace_id) {
+                const memRes = await authorizedFetch(`/workspaces/${project.workspace_id}/members`);
+                if (memRes.ok) {
+                    const members = await memRes.json();
+                    members.forEach(member => {
+                        const opt = document.createElement('option');
+                        opt.value = member.username;
+                        opt.textContent = `${member.username} (${member.role})`;
+                        select.appendChild(opt);
+                    });
+                }
+            } else {
+                select.innerHTML += `
+                    <option value="dattu">dattu</option>
+                    <option value="gemini-bot">Gemini Bot</option>
+                    <option value="reviewer">Reviewer</option>
+                `;
+            }
+            select.value = prevVal;
+        }
+    } catch (err) {
+        console.error('Error updating finding assignee options:', err);
+    }
+}
+
+// Load finding comments history
+async function loadFindingComments(findingId) {
+    const container = document.getElementById('finding-comments-list');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="color: var(--text-muted); font-style: italic; font-size: 12px; padding: 5px;">Loading comments...</div>';
+    
+    try {
+        const res = await authorizedFetch(`/findings/${findingId}/comments`);
+        if (res.ok) {
+            const comments = await res.json();
+            container.innerHTML = '';
+            
+            if (comments.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-muted); font-style: italic; font-size: 12px; padding: 5px;">No comments posted yet.</div>';
+                return;
+            }
+            
+            comments.forEach(comment => {
+                const div = document.createElement('div');
+                div.style.background = 'rgba(255,255,255,0.02)';
+                div.style.border = '1px solid rgba(255,255,255,0.06)';
+                div.style.padding = '8px';
+                div.style.borderRadius = '8px';
+                div.style.fontSize = '12px';
+                
+                const timeStr = new Date(comment.created_at).toLocaleString();
+                
+                div.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <strong style="color: var(--accent-purple);">${escapeHtml(comment.username)}</strong>
+                        <span style="font-size: 10px; color: var(--text-muted);">${timeStr}</span>
+                    </div>
+                    <div style="color: var(--text-bright); line-height: 1.4; word-break: break-word;">${escapeHtml(comment.content)}</div>
+                `;
+                container.appendChild(div);
+            });
+            
+            // Scroll comments to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+    } catch (err) {
+        console.error('Error loading comments:', err);
     }
 }
