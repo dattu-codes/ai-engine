@@ -1,6 +1,6 @@
 # AI Engine – Self-Healing Code Review & Project Management Platform
 
-A premium, production-ready AI Code Review and Project Management platform built on FastAPI. It allows developers to organize source code into multi-tenant Projects, ingest entire codebases via ZIP archives or copy-pastes, run asynchronous AI Code Reviews using Gemini, and inspect detailed visual report cards on a glassmorphic dark-theme dashboard.
+A premium, production-ready AI Code Review and Project Management platform built on FastAPI. It allows developers to organize source code into multi-tenant Workspaces and Projects, ingest entire codebases via ZIP archives, Git repositories, or copy-pastes, construct a Semantic Code Graph of cross-file dependencies, run asynchronous AI Code Reviews using Gemini, track issues in a Review Quality Center, apply self-healing AI Fixes, and collaborate in real-time.
 
 ---
 
@@ -16,19 +16,45 @@ The platform follows clean architecture principles and isolates logic across sep
 - **Role-Based Guards**: Distinguishes between standard `user` and `admin` scopes.
 
 ### 2. Phase 2 – Project & Repository Ingestion
-- **Multi-Tenant Database Design**: Relational SQLAlchemy mappings in SQLite:
-  `User` $\rightarrow$ `Project` $\rightarrow$ `Analysis` $\rightarrow$ `AnalysisFile` $\rightarrow$ `Report`.
-- **Clean Sidebar Layout**: A left glassmorphic navigation sidebar to switch between the Single Snippet Dashboard and the multi-tenant Projects tab.
+- **Multi-Tenant Database Design**: Relational SQLAlchemy mappings in SQLite.
+- **Clean Sidebar Layout**: A left glassmorphic navigation sidebar to switch between Dashboard, Projects, Versions, Chat, Pull Requests, Semantic Graph, Workspaces, and Quality Center views.
 - **ZIP & Paste Ingestion Engine**:
-  - In-memory decompressor that extracts ZIP archives, automatically skips trash directories (`.git`, `node_modules`, `venv`, `build`, etc.), and filters only supported source code files (`.py`, `.java`, `.js`, `.ts`).
+  - In-memory decompressor that extracts ZIP archives, automatically skips trash directories (`.git`, `node_modules`, `venv`, etc.), and filters only supported source code files (`.py`, `.java`, `.js`, `.ts`).
   - Identifies programming languages, tracks file sizes, and records SHA-256 integrity hashes.
 - **Ownership Security Guards**: Checks ownership before any project CRUD operations.
 
-### 3. Phase 3A – AI Review Engine (Production MVP)
+### 3. Phase 3 – AI Review Engine & Code Intelligence
 - **Prompt Builder Service**: Standardized prompt generator that feeds Gemini code samples and strict rules to output structured JSON.
-- **Hardcoded Model Logic**: Targets the `gemini-2.5-flash` model for high-efficiency code analysis.
+- **Gemini Live Integration**: Targets the `gemini-2.5-flash` model for high-efficiency code analysis.
 - **Offline Mock Simulator**: If a Gemini API Key is not configured, the engine automatically switches to a local mock parser to scan code files for common defects (eval commands, print statements, broad exception silencers, and TODO comments).
-- **Persistence & Polling**: Uses asynchronous execution tasks. The UI polls the run status and renders a comprehensive report card (executive summaries, quality score badges, strengths/weaknesses split grids, recommendations, and an issues catalog).
+- **Code Intelligence Engine**: Automatically maps codebase topology (project type, frameworks, dependencies, entry points, and file priorities) using deterministic AST parsing.
+
+### 4. Phase 4 – Pull Request Review Dashboard
+- **PR Ingestion**: Parses Git diff files to run incremental code reviews.
+- **Visual Diff Dashboard**: Highlights additions, deletions, and changed lines alongside file selection tabs.
+- **Line-Level Comments**: Ingests and renders line-level quality feedback alongside changed code blocks.
+
+### 5. Phase 5 – Semantic Code Graph & Cross-File Analysis
+- **Graph Construction**: Deterministically parses files using abstract syntax trees (ASTs) to extract symbols (classes, interfaces, methods, functions, API routes, and imports).
+- **Relationship Mapping**: Establishes links representing inheritance, call chains, imports, and definitions.
+- **Interactive Visualizer**: Renders an interactive 2D node-link diagram mapping project topology, color-coded by symbol types.
+
+### 6. Phase 6 – AI Fix Engine & Versioning
+- **Project Versioning**: Creates baseline and incremental version snapshots of projects upon ingestion or refactoring.
+- **Version Control Comparison**: Computes line change metrics, addition/deletion stats, and structural file diffs between versions.
+- **Self-Healing Code Refactoring**: Automates code fix proposals, applies selected fixes directly to the workspace filesystem, and allows rollbacks.
+
+### 7. Phase 7 – Review Quality Center
+- **Deduplication & Match-Merging**: Match findings across multiple runs by checking file path, category, and line number or explanation/evidence text similarity.
+- **Auto-Resolution**: Automatically marks resolved findings upon codebase sync.
+- **Suppressions**: Supports ignoring findings with a documented reason.
+
+### 8. Phase 8 – Team Collaboration & Review Workflow
+- **Shared Workspaces**: Groups projects and members under a collaborative organization unit.
+- **Role-Based Access Control (RBAC)**: Enforces RBAC permissions (`Owner`, `Admin`, `Developer`, `Viewer`) for all API and frontend operations.
+- **Discussion Threads**: Threaded live chat and comments directly attached to review findings.
+- **Finding Assignment**: Allows assigning issue cards to workspace members.
+- **Audit Logging**: Logs all actions (creations, members, analyses, comments, edits, resolves) to a workspace audit timeline.
 
 ---
 
@@ -40,38 +66,31 @@ ai-engine/
 ├── app/
 │   ├── auth/              # Authentication System (Clean Architecture)
 │   │   ├── config/        # JWT / DB configuration & settings
-│   │   ├── database/      # SQLite / PostgreSQL DB connection details
+│   │   ├── database/      # SQLite DB connection details
 │   │   ├── models/        # SQLAlchemy tables (User, RefreshToken, Session)
 │   │   ├── schemas/       # Input validation schemas (Signup, Login, etc.)
 │   │   ├── services/      # Password hashing, JWT generation, & rate-limiting
-│   │   ├── dependencies.py# Route access guards and role authorizations
-│   │   └── routes/        # Router endpoints (/auth/signup, /auth/login, etc.)
+│   │   └── routes/        # Router endpoints (/auth/signup, /auth/login)
 │   │
-│   ├── projects/          # Project & Analysis System (Clean Architecture)
-│   │   ├── models/        # Tables (Project, Analysis, AnalysisFile, Report)
+│   ├── projects/          # Project & Workspace System (Clean Architecture)
+│   │   ├── models/        # Tables (Project, Workspace, WorkspaceMember, ReviewFinding, Comment, ActivityLog, etc.)
 │   │   ├── repositories/  # Database session queries (Repository Pattern)
 │   │   ├── schemas/       # Input validators and output serializers
-│   │   ├── services/      # ZIP processors, prompt builders, and orchestrators
-│   │   └── routes/        # Endpoints for projects, uploads, and analyses
-│   │
-│   ├── engine/            # Phase 1 graph definitions and step runners
-│   ├── models/            # Phase 1 schemas
-│   ├── workflows/         # Phase 1 modular review nodes and graph workflows
+│   │   ├── services/      # Code Graph, AI Fix, Quality, Permissions, Workspaces, and Comments services
+│   │   └── routes/        # Endpoints for projects, workspaces, findings, comments, and activities
 │   │
 │   ├── static/            # Static Web Assets
-│   │   ├── index.html     # Main dashboard layout
-│   │   ├── style.css      # Dark-mode styling rules
-│   │   └── app.js         # Event listeners, API fetches, and rendering logic
+│   │   ├── index.html     # Main Glassmorphic SPA Dashboard layout
+│   │   ├── style.css      # Custom styling rules and variables
+│   │   └── app.js         # Event listeners, API fetches, and UI rendering logic
 │   │
-│   ├── db.py              # Phase 1 in-memory stores
-│   ├── main.py            # FastAPI entry point & custom file endpoints
-│   └── registry.py        # Generic node function registry
+│   └── main.py            # FastAPI entry point & custom file endpoints
 │
-├── auth.db                # Auto-generated SQLite Database
-├── run.bat                # Windows quick launcher
 ├── verify_auth.py         # Automated JWT authentication test script
 ├── verify_projects.py     # Automated project CRUD and ZIP loader test script
-├── verify_analysis.py     # Automated AI review engine and report test script
+├── verify_review_pipeline.py# Automated AI review engine and report test script
+├── verify_versioning.py   # Automated versioning and AI Fix engine test script
+├── verify_team_collaboration.py# Automated workspace collaboration and audit log test script
 ├── requirements.txt
 └── README.md
 ```
@@ -99,11 +118,7 @@ pip install -r requirements.txt
 
 ### 3. Run the Server
 ```bash
-# Via Quick Launcher script (Windows)
-.\run.bat
-
-# Or run manually
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --port 8000
 ```
 
 ### 4. Access the App
@@ -117,22 +132,21 @@ uvicorn app.main:app --reload --port 8000
 The platform includes full integration test suites to assert correctness, security, and performance. Ensure the backend server is running on port 8000 before executing tests:
 
 ```bash
-# 1. Verify Authentication (JWT token rotation, rate limits, lockouts)
+# 1. Verify Authentication
 python verify_auth.py
 
-# 2. Verify Projects (ZIP uploading, language parsers, project CRUD)
+# 2. Verify Projects
 python verify_projects.py
 
-# 3. Verify AI Reviews (Analysis polling, mock simulations, report saving)
-python verify_analysis.py
+# 3. Verify AI Review Pipeline
+python verify_review_pipeline.py
+
+# 4. Verify Versioning & AI Fix Rollbacks
+python verify_versioning.py
+
+# 5. Verify Workspace Collaboration, Assignment, and Timeline Audit logs
+python verify_team_collaboration.py
 ```
-
----
-
-## Live vs. Offline Demo Mode
-
-- **Demo/Offline Mode**: Keep the "Gemini API Key" field blank inside the project details panel. The engine will run using the offline AST scanner to review codebases locally.
-- **Live Mode**: Paste your Gemini API Key in the API Key input field, and the platform will trigger live reviews using the `gemini-2.5-flash` model.
 
 ---
 
