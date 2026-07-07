@@ -1813,35 +1813,77 @@
 
     <!-- Authentication Overlay Gate -->
     <div class="auth-overlay" id="auth-overlay">
-        <div class="auth-card glass">
-            <div class="auth-card-header">
-                <h2>Secure Access Gateway</h2>
-                <p>AI Engine Self-Healing Workflow Platform</p>
+        <div class="auth-split-left">
+            <div class="auth-info-header">
+                <div class="auth-logo">Æ</div>
+                <span class="auth-brand-name">AI Engine Platform</span>
             </div>
-            <div class="auth-tabs">
-                <button class="auth-tab-btn active" id="tab-login-btn">Login</button>
-                <button class="auth-tab-btn" id="tab-signup-btn">Sign Up</button>
+            
+            <div class="auth-info-content">
+                <h1 class="auth-hero-title">The Self-Healing<br>Engineering Workflow.</h1>
+                <p class="auth-hero-desc">Automated codebase analysis, vulnerability detection, dynamic test suite orchestration, and patch fixes.</p>
+                
+                <div class="auth-features-list">
+                    <div class="auth-feature-item">
+                        <span class="auth-feature-icon">🛡</span>
+                        <div class="auth-feature-text">
+                            <h3>AST-Backed Security Scans</h3>
+                            <p>Matches real-time vulnerability traces.</p>
+                        </div>
+                    </div>
+                    <div class="auth-feature-item">
+                        <span class="auth-feature-icon">🤖</span>
+                        <div class="auth-feature-text">
+                            <h3>AI-Driven Patch Generation</h3>
+                            <p>Cursor AI-style code repair diffs.</p>
+                        </div>
+                    </div>
+                    <div class="auth-feature-item">
+                        <span class="auth-feature-icon">🧪</span>
+                        <div class="auth-feature-text">
+                            <h3>CI/CD Test Generation</h3>
+                            <p>Runs dynamic pytest checks automatically.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="auth-card-body">
-                <form id="auth-form">
-                    <div class="form-group">
-                        <label for="auth-username">Username</label>
-                        <input type="text" id="auth-username" required placeholder="Enter username...">
-                    </div>
-                    <div class="form-group">
-                        <label for="auth-password">Password</label>
-                        <input type="password" id="auth-password" required placeholder="Enter password (min. 6 chars)...">
-                    </div>
-                    <div class="form-group" id="signup-role-group" style="display: none;">
-                        <label for="auth-role">Access Role</label>
-                        <select id="auth-role">
-                            <option value="user">Standard User</option>
-                            <option value="admin">Administrator</option>
-                        </select>
-                    </div>
-                    <div id="auth-error-msg" class="auth-error" style="display: none;"></div>
-                    <button type="submit" id="btn-auth-submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Login</button>
-                </form>
+            
+            <div class="auth-info-footer">
+                © 2026 AI Engine Inc. SaaS Quality Platform.
+            </div>
+        </div>
+        
+        <div class="auth-split-right">
+            <div class="auth-card">
+                <div class="auth-card-header">
+                    <h2>Secure Access Gateway</h2>
+                    <p>Enter credentials to access your workspaces</p>
+                </div>
+                <div class="auth-tabs">
+                    <button class="auth-tab-btn active" id="tab-login-btn">Login</button>
+                    <button class="auth-tab-btn" id="tab-signup-btn">Sign Up</button>
+                </div>
+                <div class="auth-card-body">
+                    <form id="auth-form">
+                        <div class="form-group">
+                            <label for="auth-username">USERNAME</label>
+                            <input type="text" id="auth-username" required placeholder="Enter username...">
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-password">PASSWORD</label>
+                            <input type="password" id="auth-password" required placeholder="Enter password (min. 6 chars)...">
+                        </div>
+                        <div class="form-group" id="signup-role-group" style="display: none;">
+                            <label for="auth-role">ACCESS ROLE</label>
+                            <select id="auth-role">
+                                <option value="user">Standard User</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+                        <div id="auth-error-msg" class="auth-error" style="display: none;"></div>
+                        <button type="submit" id="btn-auth-submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Authenticate</button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
