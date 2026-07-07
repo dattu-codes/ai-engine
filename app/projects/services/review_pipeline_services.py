@@ -563,6 +563,24 @@ class ReviewOrchestrator:
         except Exception as fe:
             print(f"Error syncing review findings: {fe}")
 
+        # Link findings/analyses with FixExecution & store verification metadata
+        try:
+            from app.projects.models.project_models import FixExecution
+            fix_exec = db.query(FixExecution).filter(
+                FixExecution.project_id == analysis.project_id,
+                FixExecution.analysis_after_id == analysis.id
+            ).first()
+            if not fix_exec:
+                fix_exec = db.query(FixExecution).filter(
+                    FixExecution.project_id == analysis.project_id,
+                    FixExecution.status == "Verifying"
+                ).first()
+            if fix_exec:
+                fix_exec.analysis_after_id = analysis.id
+                db.commit()
+        except Exception as fe:
+            print(f"Error linking review run to FixExecution: {fe}")
+
         # Finish tracking
         analysis.status = "completed"
         analysis.completed_at = datetime.utcnow()

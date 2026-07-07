@@ -443,3 +443,51 @@ class VersionService:
         db.commit()
         db.refresh(version)
         return version
+
+    @staticmethod
+    def create_fix_version(
+        db: Session,
+        project_id: int,
+        parent_version_id: int,
+        patch_summary: str,
+        verification_score: int,
+        files_changed: list,
+        ai_model: str,
+        execution_metadata: dict,
+        user_id: Optional[int] = None
+    ) -> ProjectVersion:
+        """
+        Creates an immutable ProjectVersion record after a successful AI Fix application.
+        """
+        current_version = db.query(ProjectVersion).filter(
+            ProjectVersion.id == parent_version_id
+        ).first()
+
+        new_version_num = current_version.version_number + 1 if current_version else 1
+        
+        meta = {
+            "parent_version": parent_version_id,
+            "patch_summary": patch_summary,
+            "verification_score": verification_score,
+            "files_changed": files_changed,
+            "ai_model": ai_model,
+            "execution_metadata": execution_metadata
+        }
+
+        new_version = ProjectVersion(
+            project_id=project_id,
+            version_number=new_version_num,
+            parent_version_id=parent_version_id,
+            applied_fixes=json.dumps([{
+                "patch_summary": patch_summary, 
+                "files_changed": files_changed, 
+                "ai_model": ai_model
+            }]),
+            summary=f"Version {new_version_num} - AI Fix applied by {ai_model}.",
+            snapshot_metadata=json.dumps(meta),
+            created_by=user_id
+        )
+        db.add(new_version)
+        db.commit()
+        db.refresh(new_version)
+        return new_version

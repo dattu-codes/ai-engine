@@ -24,6 +24,14 @@ class SemanticGraphService:
         db.commit()
 
     @classmethod
+    def refresh_after_patch(cls, db: Session, project_id: int, files: List[str]) -> Dict[str, Any]:
+        """
+        Regenerates semantic graph after applying a patch to the codebase.
+        Refreshes dependency nodes and impact analysis metrics.
+        """
+        return cls.generate_graph(db, project_id)
+
+    @classmethod
     def generate_graph(cls, db: Session, project_id: int) -> Dict[str, Any]:
         """
         Parses project source files to construct the semantic graph.

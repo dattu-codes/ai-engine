@@ -81,6 +81,24 @@ class ProjectChatService:
         except Exception as fe:
             findings_text = f"Error loading persistent findings context: {fe}"
 
+        # Construct fix executions history context
+        try:
+            from app.projects.models.project_models import FixExecution
+            fixes = db.query(FixExecution).filter(FixExecution.project_id == project_id).all()
+            fixes_text = "No AI Fix executions recorded for this project."
+            if fixes:
+                fixes_text = "\n".join([
+                    f"- [FixExecution ID: {fx.id}] Finding ID: {fx.finding_id} | Status: {fx.status} | "
+                    f"AI Model: {fx.ai_model} | Files Modified: {fx.files_modified or '[]'} | "
+                    f"Lines Added: {fx.lines_added} | Lines Removed: {fx.lines_removed} | "
+                    f"Plan: {fx.fix_plan_json or 'None'} | Patch: {fx.patch_summary or 'None'} | "
+                    f"Verification Score: {fx.verification_score if fx.verification_score is not None else 'N/A'} | "
+                    f"Failure Reason: {fx.failure_reason or 'None'}"
+                    for fx in fixes
+                ])
+        except Exception as fe:
+            fixes_text = f"Error loading fix executions context: {fe}"
+
         # Construct source files text context
         source_files_text = "No relevant source files retrieved for this query context."
         if context["files"]:
@@ -109,6 +127,7 @@ class ProjectChatService:
             f"Semantic Graph & Architectural Context:\n{semantic_graph_text}\n\n"
             f"Chronological Evolution Versions:\n{version_history_text}\n\n"
             f"Latest AI Review Findings:\n{findings_text}\n\n"
+            f"AI Fix Center Executions Context:\n{fixes_text}\n\n"
             f"Relevant Source Files Context:\n{source_files_text}\n"
         )
 

@@ -108,6 +108,10 @@
                         <span class="nav-icon">🏢</span>
                         <span class="nav-text">Workspaces</span>
                     </button>
+                    <button class="nav-item" data-view="view-fix-center" id="nav-item-fix-center" style="display: none;">
+                        <span class="nav-icon">🤖</span>
+                        <span class="nav-text">AI Fix Center</span>
+                    </button>
                 </nav>
             </aside>
 
@@ -1558,6 +1562,121 @@
                                     <button class="btn btn-secondary btn-sm" id="btn-finding-ignore">Ignore</button>
                                     <button class="btn btn-secondary btn-sm" id="btn-finding-resolve">Resolve</button>
                                     <button class="btn btn-primary btn-sm" id="btn-finding-apply-fix" style="margin: 0; background: var(--accent-purple);">Apply AI Fix</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- view-fix-center pane -->
+                <div class="view-pane" id="view-fix-center" style="padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <div>
+                            <h1 style="font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #a78bfa, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">🤖 AI Fix Center</h1>
+                            <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Inspect engineering plans, validate patches, approve fixes, and track self-healing executions.</p>
+                        </div>
+                    </div>
+
+                    <!-- Dashboard Metrics Grid -->
+                    <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                        <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Pending Fixes</p>
+                            <h3 id="fix-metric-pending" style="font-size: 22px; font-weight: 700; margin: 0; color: #facc15;">0</h3>
+                        </div>
+                        <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Successful Fixes</p>
+                            <h3 id="fix-metric-success" style="font-size: 22px; font-weight: 700; margin: 0; color: #34d399;">0</h3>
+                        </div>
+                        <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Failed Fixes</p>
+                            <h3 id="fix-metric-failed" style="font-size: 22px; font-weight: 700; margin: 0; color: #ef4444;">0</h3>
+                        </div>
+                        <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Pass Rate</p>
+                            <h3 id="fix-metric-passrate" style="font-size: 22px; font-weight: 700; margin: 0; color: #60a5fa;">0%</h3>
+                        </div>
+                        <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Avg Confidence</p>
+                            <h3 id="fix-metric-confidence" style="font-size: 22px; font-weight: 700; margin: 0; color: var(--accent-purple);">0%</h3>
+                        </div>
+                        <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Average Risk</p>
+                            <h3 id="fix-metric-risk" style="font-size: 18px; font-weight: 700; margin: 3px 0 0 0; color: #ffedd5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Low</h3>
+                        </div>
+                        <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                            <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Avg Time</p>
+                            <h3 id="fix-metric-time" style="font-size: 22px; font-weight: 700; margin: 0; color: #a78bfa;">0.0s</h3>
+                        </div>
+                    </div>
+
+                    <!-- Main Content Workspace Split -->
+                    <div style="display: flex; gap: 20px; align-items: start;">
+                        <!-- Left Panel: Execution List / History -->
+                        <div style="width: 320px; display: flex; flex-direction: column; gap: 20px;">
+                            <div class="card glass" style="padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+                                <h3 style="font-size: 13px; font-weight: 700; margin: 0 0 12px 0; text-transform: uppercase; color: var(--text-bright); letter-spacing: 1px;">Approval Queue & History</h3>
+                                <div id="fix-executions-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 550px; overflow-y: auto;">
+                                    <!-- list elements populated dynamically -->
+                                    <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">No fix executions found.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Active Fix & Preview Panel -->
+                        <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;" id="active-fix-details-panel">
+                            <div class="card glass" style="padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; min-height: 400px; justify-content: center; align-items: center;" id="fix-details-empty">
+                                <span style="font-size: 40px; margin-bottom: 12px;">🤖</span>
+                                <h4 style="font-size: 15px; margin: 0 0 6px 0; color: var(--text-bright);">No Fix Run Selected</h4>
+                                <p style="color: var(--text-muted); font-size: 13px; margin: 0; text-align: center;">Select a fix attempt from the left panel list or trigger "Apply AI Fix" on a Review Finding card to configure repair patches.</p>
+                            </div>
+
+                            <div class="card glass" style="padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: none;" id="fix-details-active">
+                                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 15px;">
+                                    <div>
+                                        <h2 style="font-size: 18px; font-weight: 700; color: var(--text-bright); margin: 0;" id="active-fix-title">Fix Run #--</h2>
+                                        <p style="color: var(--text-muted); font-size: 12px; margin: 4px 0 0 0;">Status: <strong id="active-fix-status-badge" style="color: #facc15;">Pending</strong> | Created: <span id="active-fix-created">--</span></p>
+                                    </div>
+                                    <div style="display: flex; gap: 10px;" id="active-fix-actions-container">
+                                        <button class="btn btn-secondary btn-sm" id="btn-fix-reject" style="margin:0;">Reject Patch</button>
+                                        <button class="btn btn-primary btn-sm" id="btn-fix-approve" style="margin:0; background: var(--accent-purple);">Approve & Apply</button>
+                                        <button class="btn btn-secondary btn-sm" id="btn-fix-rollback" style="margin:0; background: #ef4444; color: white; display: none;">Rollback Revert</button>
+                                    </div>
+                                </div>
+
+                                <!-- Plan details (Root Cause, Risk, Explanation) -->
+                                <div class="grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+                                        <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Engineering Plan</h4>
+                                        <p style="font-size: 13px; font-weight: 600; color: var(--text-bright); margin: 0 0 4px 0;">Root Cause:</p>
+                                        <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0;" id="active-fix-root-cause">--</p>
+                                        <p style="font-size: 13px; font-weight: 600; color: var(--text-bright); margin: 0 0 4px 0;">Technical Impact:</p>
+                                        <p style="font-size: 12px; color: var(--text-muted); margin: 0;" id="active-fix-impact">--</p>
+                                    </div>
+                                    <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
+                                        <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Risk Analysis</h4>
+                                        <p style="font-size: 13px; font-weight: 600; color: var(--text-bright); margin: 0 0 4px 0;">Estimated Risk:</p>
+                                        <p style="font-size: 12px; color: var(--text-muted); margin: 0 0 8px 0;" id="active-fix-risk">--</p>
+                                        <p style="font-size: 13px; font-weight: 600; color: var(--text-bright); margin: 0 0 4px 0;">Confidence Score:</p>
+                                        <p style="font-size: 12px; color: var(--text-muted); margin: 0;" id="active-fix-confidence">--</p>
+                                    </div>
+                                </div>
+
+                                <!-- Verification Timeline Logs -->
+                                <div style="background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 20px; display: none;" id="active-fix-verification-container">
+                                    <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 8px 0; letter-spacing: 1px;">Verification Timeline & Score</h4>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div id="active-fix-verification-log" style="font-size: 12px; color: var(--text-muted);">Verification in progress...</div>
+                                        <div style="text-align: right;">
+                                            <span style="font-size: 11px; color: var(--text-muted); display: block;">Verification Score</span>
+                                            <strong id="active-fix-verification-score" style="font-size: 18px; color: #34d399;">--</strong>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Before/After Diff Viewer -->
+                                <div>
+                                    <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 8px 0; letter-spacing: 1px;">Patch Preview (Unified Diff)</h4>
+                                    <pre style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); padding: 15px; border-radius: 8px; max-height: 350px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; color: #e2e8f0; margin: 0;" id="active-fix-diff-viewer"></pre>
                                 </div>
                             </div>
                         </div>

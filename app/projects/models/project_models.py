@@ -344,3 +344,42 @@ class ActivityLog(Base):
     user = relationship("User")
 
 
+class FixExecution(Base):
+    __tablename__ = "fix_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    finding_id = Column(Integer, ForeignKey("review_findings.id", ondelete="CASCADE"), nullable=False)
+    
+    version_before_id = Column(Integer, ForeignKey("project_versions.id", ondelete="SET NULL"), nullable=True)
+    version_after_id = Column(Integer, ForeignKey("project_versions.id", ondelete="SET NULL"), nullable=True)
+    
+    analysis_before_id = Column(Integer, ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True)
+    analysis_after_id = Column(Integer, ForeignKey("analyses.id", ondelete="SET NULL"), nullable=True)
+    
+    status = Column(String(50), default="Pending", nullable=False)
+    ai_model = Column(String(100), nullable=True)
+    fix_plan_json = Column(Text, nullable=True)
+    patch_summary = Column(Text, nullable=True)
+    files_modified = Column(Text, nullable=True)  # JSON-serialized list of strings
+    lines_added = Column(Integer, default=0, nullable=False)
+    lines_removed = Column(Integer, default=0, nullable=False)
+    confidence_score = Column(Float, default=0.0, nullable=False)
+    impact_score = Column(Float, default=0.0, nullable=False)
+    estimated_risk = Column(String(50), nullable=True)
+    verification_score = Column(Integer, nullable=True)
+    execution_time = Column(Float, nullable=True)
+    failure_reason = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    project = relationship("Project")
+    finding = relationship("ReviewFinding")
+    version_before = relationship("ProjectVersion", foreign_keys=[version_before_id])
+    version_after = relationship("ProjectVersion", foreign_keys=[version_after_id])
+    analysis_before = relationship("Analysis", foreign_keys=[analysis_before_id])
+    analysis_after = relationship("Analysis", foreign_keys=[analysis_after_id])
+
+
+

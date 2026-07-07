@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initDemoSetup();
     initAuth();
     initProjectsTab();
+    initFixCenterControls();
 });
 
 // Tab Navigation logic
@@ -613,6 +614,8 @@ async function handleLogout() {
     if (findingsBtn) findingsBtn.style.display = 'none';
     const semanticBtn = document.getElementById('nav-item-semantic');
     if (semanticBtn) semanticBtn.style.display = 'none';
+    const fixCenterBtn = document.getElementById('nav-item-fix-center');
+    if (fixCenterBtn) fixCenterBtn.style.display = 'none';
     const workspaceBtn = document.getElementById('nav-item-workspace');
     if (workspaceBtn) workspaceBtn.style.display = 'none';
 
@@ -767,6 +770,8 @@ function initSidebar() {
                 loadProjectFindings(activeProjectId);
             } else if (targetView === 'view-workspace') {
                 loadWorkspaces();
+            } else if (targetView === 'view-fix-center') {
+                loadFixCenter(activeProjectId);
             }
         });
     });
@@ -1243,6 +1248,8 @@ async function selectProject(id) {
         if (findingsBtn) findingsBtn.style.display = 'block';
         const semanticBtn = document.getElementById('nav-item-semantic');
         if (semanticBtn) semanticBtn.style.display = 'block';
+const fixCenterBtn = document.getElementById('nav-item-fix-center');
+if (fixCenterBtn) fixCenterBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -3605,46 +3612,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (applyFixBtn) {
         applyFixBtn.addEventListener('click', async () => {
             if (!activeFindingId || !activeProjectId) return;
-            
-            const findRes = await authorizedFetch(`/findings/${activeFindingId}`);
-            if (!findRes.ok) return;
-            const finding = await findRes.json();
-
-            const issue = {
-                file: finding.file_path,
-                line: finding.line_number,
-                category: finding.category,
-                severity: finding.severity,
-                explanation: finding.description,
-                recommendation: finding.recommendation,
-                evidence: finding.title
-            };
 
             const originalText = applyFixBtn.textContent;
             applyFixBtn.disabled = true;
-            applyFixBtn.textContent = 'Applying Fix...';
+            applyFixBtn.textContent = 'Generating Plan...';
 
             try {
-                const apiKey = localStorage.getItem('gemini_api_key') || '';
-                const res = await authorizedFetch(`/projects/${activeProjectId}/versions/apply-fix`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        issue: issue,
-                        api_key: apiKey || null
-                    })
+                const res = await authorizedFetch(`/findings/${activeFindingId}/generate-fix`, {
+                    method: 'POST'
                 });
 
                 if (res.ok) {
-                    const newVer = await res.json();
-                    alert(`Successfully applied patch for finding! New Version ${newVer.version_number} has been created, and this finding is now Resolved.`);
-                    loadProjectFindings(activeProjectId);
+                    const fixExec = await res.json();
+                    alert(`AI Fix plan and patch preview generated successfully! Redirecting you to the AI Fix Center.`);
+                    
+                    // Hide details modal if open (it might be open inside view-findings)
+                    const findingModal = document.getElementById('finding-detail-modal');
+                    if (findingModal) findingModal.classList.add('hidden');
+                    
+                    // Switch sidebar view to AI Fix Center
+                    const fixCenterNav = document.getElementById('nav-item-fix-center');
+                    if (fixCenterNav) {
+                        fixCenterNav.click();
+                        // Load the newly created fix run details
+                        showFixDetails(fixExec);
+                    }
                 } else {
                     const data = await res.json();
-                    alert(data.detail || 'Failed to apply AI patch.');
+                    alert(data.detail || 'Failed to generate AI fix plan.');
                 }
             } catch (err) {
-                alert('Apply fix error: ' + err.message);
+                alert('Generate fix error: ' + err.message);
             } finally {
                 applyFixBtn.disabled = false;
                 applyFixBtn.textContent = originalText;
@@ -4657,4 +4655,325 @@ async function loadFindingComments(findingId) {
     } catch (err) {
         console.error('Error loading comments:', err);
     }
+}
+
+// AI Fix Center functions
+let activeFixExecutionId = null;
+
+async function loadFixCenter(projectId) {
+    if (!projectId) return;
+    
+    // Clear details pane
+    document.getElementById('fix-details-empty').style.display = 'flex';
+    document.getElementById('fix-details-active').style.display = 'none';
+    
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/fix-history`);
+        if (!res.ok) {
+            document.getElementById('fix-executions-list').innerHTML = '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">Failed to load fix history.</div>';
+            return;
+        }
+        
+        const history = await res.json();
+        
+        // Calculate Metrics
+        let pending = 0;
+        let success = 0;
+        let failed = 0;
+        let totalConfidence = 0;
+        let totalTime = 0;
+        let completedCount = 0;
+        let riskCounts = { "Low": 0, "Medium": 0, "High": 0 };
+        
+        history.forEach(fx => {
+            const status = fx.status.toLowerCase();
+            if (['pending', 'planning', 'generating', 'preview ready', 'waiting approval', 'validating', 'applying', 'versioning', 'verifying'].includes(status)) {
+                pending++;
+            } else if (status === 'completed') {
+                success++;
+                completedCount++;
+                totalTime += fx.execution_time || 0;
+            } else if (['failed', 'rolled back'].includes(status)) {
+                failed++;
+                completedCount++;
+                totalTime += fx.execution_time || 0;
+            }
+            
+            totalConfidence += fx.confidence_score || 0;
+            const r = fx.estimated_risk || "Low";
+            riskCounts[r] = (riskCounts[r] || 0) + 1;
+        });
+        
+        const total = success + failed;
+        const passRate = total > 0 ? Math.round((success / total) * 100) : 0;
+        const avgConfidence = history.length > 0 ? Math.round((totalConfidence / history.length) * 100) : 0;
+        const avgTime = completedCount > 0 ? (totalTime / completedCount).toFixed(1) : "0.0";
+        
+        // Find dominant risk level
+        let dominantRisk = "Low";
+        let maxCount = -1;
+        for (const [r, count] of Object.entries(riskCounts)) {
+            if (count > maxCount) {
+                maxCount = count;
+                dominantRisk = r;
+            }
+        }
+        if (history.length === 0) dominantRisk = "Low";
+
+        // Render metrics
+        document.getElementById('fix-metric-pending').textContent = pending;
+        document.getElementById('fix-metric-success').textContent = success;
+        document.getElementById('fix-metric-failed').textContent = failed;
+        document.getElementById('fix-metric-passrate').textContent = `${passRate}%`;
+        document.getElementById('fix-metric-confidence').textContent = `${avgConfidence}%`;
+        document.getElementById('fix-metric-risk').textContent = dominantRisk;
+        document.getElementById('fix-metric-time').textContent = `${avgTime}s`;
+        
+        // Render List
+        const listContainer = document.getElementById('fix-executions-list');
+        listContainer.innerHTML = '';
+        
+        if (history.length === 0) {
+            listContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">No fix executions found.</div>';
+            return;
+        }
+        
+        history.forEach(fx => {
+            const card = document.createElement('div');
+            card.className = 'glass';
+            card.style.padding = '12px';
+            card.style.borderRadius = '8px';
+            card.style.border = '1px solid rgba(255,255,255,0.06)';
+            card.style.background = 'rgba(255,255,255,0.01)';
+            card.style.cursor = 'pointer';
+            card.style.transition = 'all 0.2s ease';
+            card.style.marginBottom = '8px';
+            
+            const dateStr = new Date(fx.created_at).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            
+            let statusColor = '#facc15';
+            if (fx.status.toLowerCase() === 'completed') statusColor = '#34d399';
+            if (['failed', 'rolled back'].includes(fx.status.toLowerCase())) statusColor = '#ef4444';
+            
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <strong style="color: var(--text-bright); font-size: 13px;">Fix Run #${fx.id}</strong>
+                    <span style="font-size: 11px; font-weight: 600; color: ${statusColor};">${fx.status}</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Finding ID: #${fx.finding_id}</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted);">
+                    <span>${dateStr}</span>
+                    <span>Risk: ${fx.estimated_risk || 'Low'}</span>
+                </div>
+            `;
+            
+            card.addEventListener('mouseenter', () => {
+                card.style.background = 'rgba(255,255,255,0.03)';
+                card.style.borderColor = 'rgba(255,255,255,0.12)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.background = 'rgba(255,255,255,0.01)';
+                card.style.borderColor = 'rgba(255,255,255,0.06)';
+            });
+            card.addEventListener('click', () => {
+                showFixDetails(fx);
+            });
+            
+            listContainer.appendChild(card);
+        });
+        
+    } catch (e) {
+        console.error('Error loading fix center:', e);
+    }
+}
+
+async function showFixDetails(fx) {
+    activeFixExecutionId = fx.id;
+    
+    document.getElementById('fix-details-empty').style.display = 'none';
+    const activePane = document.getElementById('fix-details-active');
+    activePane.style.display = 'block';
+    
+    // Set text elements
+    document.getElementById('active-fix-title').textContent = `Fix Run #${fx.id}`;
+    document.getElementById('active-fix-created').textContent = new Date(fx.created_at).toLocaleString();
+    
+    const badge = document.getElementById('active-fix-status-badge');
+    badge.textContent = fx.status;
+    let statusColor = '#facc15';
+    if (fx.status.toLowerCase() === 'completed') statusColor = '#34d399';
+    if (['failed', 'rolled back'].includes(fx.status.toLowerCase())) statusColor = '#ef4444';
+    badge.style.color = statusColor;
+    
+    // Engineering Plan
+    let plan = {};
+    if (fx.fix_plan_json) {
+        try {
+            plan = JSON.parse(fx.fix_plan_json);
+        } catch (e) {
+            console.error('Error parsing fix plan json:', e);
+        }
+    }
+    document.getElementById('active-fix-root-cause').textContent = plan.root_cause || "Unvalidated parameter or resource leakage.";
+    document.getElementById('active-fix-impact').textContent = plan.technical_explanation || fx.failure_reason || "Code execution logic bypass.";
+    
+    // Risk & Confidence
+    document.getElementById('active-fix-risk').textContent = fx.estimated_risk || plan.risk_analysis || "Low";
+    document.getElementById('active-fix-confidence').textContent = `${Math.round(fx.confidence_score * 100)}%`;
+    
+    // Verification Container
+    const verifyContainer = document.getElementById('active-fix-verification-container');
+    const verifyLog = document.getElementById('active-fix-verification-log');
+    const verifyScore = document.getElementById('active-fix-verification-score');
+    
+    if (fx.status.toLowerCase() === 'verifying' || fx.verification_score !== null || fx.failure_reason) {
+        verifyContainer.style.display = 'block';
+        if (fx.status.toLowerCase() === 'verifying') {
+            verifyLog.textContent = 'Executing AST security review pipeline stages on patch sandbox...';
+            verifyScore.textContent = '--';
+        } else if (fx.status.toLowerCase() === 'completed') {
+            verifyLog.textContent = 'All verification pipeline stages completed successfully. No regression found.';
+            verifyScore.textContent = fx.verification_score;
+            verifyScore.style.color = '#34d399';
+        } else {
+            verifyLog.textContent = fx.failure_reason || 'Verification run failed. Patch has been reverted.';
+            verifyScore.textContent = fx.verification_score || '0';
+            verifyScore.style.color = '#ef4444';
+        }
+    } else {
+        verifyContainer.style.display = 'none';
+    }
+    
+    // Action buttons display
+    const btnApprove = document.getElementById('btn-fix-approve');
+    const btnReject = document.getElementById('btn-fix-reject');
+    const btnRollback = document.getElementById('btn-fix-rollback');
+    
+    if (fx.status === 'Waiting Approval') {
+        btnApprove.style.display = 'block';
+        btnReject.style.display = 'block';
+        btnRollback.style.display = 'none';
+        btnApprove.textContent = 'Approve & Apply';
+        btnApprove.disabled = false;
+    } else if (fx.status === 'Completed') {
+        btnApprove.style.display = 'none';
+        btnReject.style.display = 'none';
+        btnRollback.style.display = 'block';
+    } else {
+        btnApprove.style.display = 'none';
+        btnReject.style.display = 'none';
+        btnRollback.style.display = 'none';
+    }
+    
+    // Patch Diff
+    const diffViewer = document.getElementById('active-fix-diff-viewer');
+    diffViewer.textContent = fx.patch_summary || 'No unified diff generated.';
+}
+
+function initFixCenterControls() {
+    const btnApprove = document.getElementById('btn-fix-approve');
+    const btnReject = document.getElementById('btn-fix-reject');
+    const btnRollback = document.getElementById('btn-fix-rollback');
+    
+    if (btnApprove) {
+        btnApprove.addEventListener('click', async () => {
+            if (!activeFixExecutionId) return;
+            btnApprove.disabled = true;
+            btnApprove.textContent = 'Applying...';
+            
+            try {
+                const res = await authorizedFetch(`/fixes/${activeFixExecutionId}/approve`, {
+                    method: 'POST'
+                });
+                
+                if (res.ok) {
+                    const fx = await res.json();
+                    alert(`Patch approved! Verification pipeline run started.`);
+                    showFixDetails(fx);
+                    loadFixCenter(activeProjectId);
+                    pollFixStatus(activeFixExecutionId);
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to approve patch.');
+                    loadFixCenter(activeProjectId);
+                }
+            } catch (err) {
+                alert('Approve error: ' + err.message);
+                loadFixCenter(activeProjectId);
+            }
+        });
+    }
+    
+    if (btnReject) {
+        btnReject.addEventListener('click', async () => {
+            if (!activeFixExecutionId) return;
+            if (!confirm('Are you sure you want to reject this patch?')) return;
+            
+            try {
+                const res = await authorizedFetch(`/fixes/${activeFixExecutionId}/reject`, {
+                    method: 'POST'
+                });
+                
+                if (res.ok) {
+                    const fx = await res.json();
+                    showFixDetails(fx);
+                    loadFixCenter(activeProjectId);
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to reject patch.');
+                }
+            } catch (err) {
+                alert('Reject error: ' + err.message);
+            }
+        });
+    }
+    
+    if (btnRollback) {
+        btnRollback.addEventListener('click', async () => {
+            if (!activeFixExecutionId) return;
+            if (!confirm('Are you sure you want to rollback this fix? This will restore the codebase to its prior version snapshot.')) return;
+            
+            try {
+                const res = await authorizedFetch(`/fixes/${activeFixExecutionId}/rollback`, {
+                    method: 'POST'
+                });
+                
+                if (res.ok) {
+                    const fx = await res.json();
+                    alert('Rollback completed successfully! Codebase has been reverted.');
+                    showFixDetails(fx);
+                    loadFixCenter(activeProjectId);
+                } else {
+                    const data = await res.json();
+                    alert(data.detail || 'Failed to rollback fix.');
+                }
+            } catch (err) {
+                alert('Rollback error: ' + err.message);
+            }
+        });
+    }
+}
+
+function pollFixStatus(fixId) {
+    const interval = setInterval(async () => {
+        try {
+            const res = await authorizedFetch(`/fixes/${fixId}`);
+            if (res.ok) {
+                const fx = await res.json();
+                if (activeFixExecutionId === fixId) {
+                    showFixDetails(fx);
+                }
+                
+                const status = fx.status.toLowerCase();
+                if (!['planning', 'generating', 'waiting approval', 'validating', 'applying', 'versioning', 'verifying'].includes(status)) {
+                    clearInterval(interval);
+                    loadFixCenter(activeProjectId);
+                }
+            } else {
+                clearInterval(interval);
+            }
+        } catch (e) {
+            clearInterval(interval);
+        }
+    }, 1500);
 }
