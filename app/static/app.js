@@ -616,6 +616,8 @@ async function handleLogout() {
     if (semanticBtn) semanticBtn.style.display = 'none';
     const fixCenterBtn = document.getElementById('nav-item-fix-center');
     if (fixCenterBtn) fixCenterBtn.style.display = 'none';
+    const testCenterBtn = document.getElementById('nav-item-test-center');
+    if (testCenterBtn) testCenterBtn.style.display = 'none';
     const workspaceBtn = document.getElementById('nav-item-workspace');
     if (workspaceBtn) workspaceBtn.style.display = 'none';
 
@@ -772,6 +774,8 @@ function initSidebar() {
                 loadWorkspaces();
             } else if (targetView === 'view-fix-center') {
                 loadFixCenter(activeProjectId);
+            } else if (targetView === 'view-test-center') {
+                loadTestCenter(activeProjectId);
             }
         });
     });
@@ -1248,8 +1252,12 @@ async function selectProject(id) {
         if (findingsBtn) findingsBtn.style.display = 'block';
         const semanticBtn = document.getElementById('nav-item-semantic');
         if (semanticBtn) semanticBtn.style.display = 'block';
-const fixCenterBtn = document.getElementById('nav-item-fix-center');
-if (fixCenterBtn) fixCenterBtn.style.display = 'block';
+        const fixCenterBtn = document.getElementById('nav-item-fix-center');
+        if (fixCenterBtn) fixCenterBtn.style.display = 'block';
+        const testCenterBtn = document.getElementById('nav-item-test-center');
+        if (testCenterBtn) testCenterBtn.style.display = 'block';
+        const workspaceBtn = document.getElementById('nav-item-workspace');
+        if (workspaceBtn) workspaceBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -4977,3 +4985,228 @@ function pollFixStatus(fixId) {
         }
     }, 1500);
 }
+
+
+// Test Center client module
+let activeTestExecutionId = null;
+
+async function loadTestCenter(projectId) {
+    if (!projectId) return;
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/tests`);
+        if (!res.ok) throw new Error("Failed to fetch project tests history.");
+        const history = await res.json();
+        
+        // Render history list
+        const container = document.getElementById('test-executions-list');
+        if (!container) return;
+        
+        if (history.length === 0) {
+            container.innerHTML = `<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">No test runs found.</div>`;
+            document.getElementById('test-details-empty').style.display = 'flex';
+            document.getElementById('test-details-active').style.display = 'none';
+            resetTestMetrics();
+            return;
+        }
+        
+        container.innerHTML = '';
+        history.forEach(t => {
+            const card = document.createElement('div');
+            card.className = `glass test-run-card ${activeTestExecutionId === t.id ? 'active' : ''}`;
+            card.style.cssText = `padding: 12px; border-radius: 8px; border: 1px solid ${activeTestExecutionId === t.id ? 'var(--accent-purple)' : 'rgba(255,255,255,0.06)'}; cursor: pointer; transition: all 0.2s ease; background: ${activeTestExecutionId === t.id ? 'rgba(167, 139, 250, 0.1)' : 'rgba(255,255,255,0.01)'}`;
+            
+            let statusColor = '#94a3b8';
+            if (t.status === 'Completed') statusColor = '#34d399';
+            if (t.status === 'Failed') statusColor = '#ef4444';
+            if (t.status === 'Running' || t.status === 'Generating') statusColor = '#facc15';
+
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-weight: 700; font-size: 13px; color: var(--text-bright);">Run #${t.id}</span>
+                    <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.3); color: ${statusColor}; font-weight: 600;">${t.status}</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted);">
+                    <div>Framework: ${t.framework || 'N/A'}</div>
+                    <div style="margin-top: 4px; display: flex; justify-content: space-between;">
+                        <span>Passed: ${t.passed_tests}/${t.total_tests}</span>
+                        <span>Coverage: ${t.coverage_percentage}%</span>
+                    </div>
+                </div>
+            `;
+            
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.test-run-card').forEach(c => {
+                    c.style.borderColor = 'rgba(255,255,255,0.06)';
+                    c.style.background = 'rgba(255,255,255,0.01)';
+                });
+                card.style.borderColor = 'var(--accent-purple)';
+                card.style.background = 'rgba(167, 139, 250, 0.1)';
+                
+                activeTestExecutionId = t.id;
+                showTestDetails(t);
+            });
+            
+            container.appendChild(card);
+        });
+
+        // Set metrics based on the latest run
+        const latest = history[0];
+        updateTestMetrics(latest);
+
+        if (activeTestExecutionId) {
+            const activeRun = history.find(x => x.id === activeTestExecutionId);
+            if (activeRun) {
+                showTestDetails(activeRun);
+            }
+        } else {
+            activeTestExecutionId = latest.id;
+            showTestDetails(latest);
+        }
+
+    } catch (err) {
+        console.error("loadTestCenter error:", err);
+    }
+}
+
+function resetTestMetrics() {
+    document.getElementById('test-metric-passed').innerText = '0';
+    document.getElementById('test-metric-failed').innerText = '0';
+    document.getElementById('test-metric-skipped').innerText = '0';
+    document.getElementById('test-metric-coverage').innerText = '0%';
+    document.getElementById('test-metric-regression').innerText = 'N/A';
+    document.getElementById('test-metric-regression').style.color = 'var(--text-muted)';
+    document.getElementById('test-metric-time').innerText = '0.0s';
+}
+
+function updateTestMetrics(t) {
+    if (!t) return;
+    document.getElementById('test-metric-passed').innerText = t.passed_tests;
+    document.getElementById('test-metric-failed').innerText = t.failed_tests;
+    document.getElementById('test-metric-skipped').innerText = t.skipped_tests;
+    document.getElementById('test-metric-coverage').innerText = t.coverage_percentage + '%';
+    
+    const regressionEl = document.getElementById('test-metric-regression');
+    if (t.failed_tests === 0 && t.status === 'Completed') {
+        regressionEl.innerText = 'Clean';
+        regressionEl.style.color = '#34d399';
+    } else if (t.status === 'Failed') {
+        regressionEl.innerText = 'Unstable';
+        regressionEl.style.color = '#ef4444';
+    } else {
+        regressionEl.innerText = t.status;
+        regressionEl.style.color = '#facc15';
+    }
+    
+    document.getElementById('test-metric-time').innerText = (t.execution_time || 0.0).toFixed(2) + 's';
+}
+
+function showTestDetails(t) {
+    if (!t) return;
+    document.getElementById('test-details-empty').style.display = 'none';
+    document.getElementById('test-details-active').style.display = 'block';
+    
+    document.getElementById('active-test-title').innerText = `Test Run #${t.id}`;
+    document.getElementById('active-test-lang').innerText = t.language || 'Python';
+    document.getElementById('active-test-framework').innerText = t.framework || 'pytest';
+    
+    const badge = document.getElementById('active-test-status-badge');
+    badge.innerText = t.status;
+    badge.className = 'badge';
+    if (t.status === 'Completed') badge.style.cssText = 'background: rgba(52, 211, 153, 0.1); color: #34d399;';
+    else if (t.status === 'Failed') badge.style.cssText = 'background: rgba(239, 68, 68, 0.1); color: #ef4444;';
+    else badge.style.cssText = 'background: rgba(250, 204, 21, 0.1); color: #facc15;';
+
+    // Show button only if executable or pending
+    const runBtn = document.getElementById('btn-test-run-execute');
+    if (t.status === 'Pending') {
+        runBtn.style.display = 'block';
+        runBtn.innerText = 'Execute Test Suite';
+    } else if (t.status === 'Running') {
+        runBtn.style.display = 'block';
+        runBtn.innerText = 'Running...';
+    } else {
+        runBtn.style.display = 'block';
+        runBtn.innerText = 'Re-run Test Suite';
+    }
+
+    // Render generated test files
+    const codeViewer = document.getElementById('active-test-code-viewer');
+    if (t.generated_tests_json) {
+        try {
+            const data = JSON.parse(t.generated_tests_json);
+            if (data.files && data.files.length > 0) {
+                let codeStr = '';
+                data.files.forEach(f => {
+                    codeStr += `/* === File: ${f.filename} === */\n${f.content}\n\n`;
+                });
+                codeViewer.innerText = codeStr;
+            } else {
+                codeViewer.innerText = 'No test code stubs generated.';
+            }
+        } catch (e) {
+            codeViewer.innerText = 'Error decoding generated test files: ' + e.message;
+        }
+    } else {
+        codeViewer.innerText = 'Pending test code generation...';
+    }
+
+    // Render execution logs
+    document.getElementById('active-test-logs-viewer').innerText = t.execution_log || 'Waiting for test run completion...';
+    
+    // Auto poll if running
+    if (t.status === 'Running' || t.status === 'Generating') {
+        pollTestStatus(t.id);
+    }
+}
+
+async function executeTestRun(testId) {
+    try {
+        const res = await authorizedFetch(`/tests/${testId}/execute`, {
+            method: 'POST'
+        });
+        if (!res.ok) throw new Error("Failed to trigger test suite execution.");
+        const updated = await res.json();
+        showTestDetails(updated);
+        loadTestCenter(activeProjectId);
+    } catch (e) {
+        alert("Execution Error: " + e.message);
+    }
+}
+
+function pollTestStatus(testId) {
+    const interval = setInterval(async () => {
+        try {
+            const res = await authorizedFetch(`/tests/${testId}`);
+            if (res.ok) {
+                const t = await res.json();
+                if (activeTestExecutionId === testId) {
+                    showTestDetails(t);
+                }
+                
+                if (t.status !== 'Running' && t.status !== 'Generating') {
+                    clearInterval(interval);
+                    loadTestCenter(activeProjectId);
+                }
+            } else {
+                clearInterval(interval);
+            }
+        } catch (e) {
+            clearInterval(interval);
+        }
+    }, 1500);
+}
+
+function initTestCenterControls() {
+    const runBtn = document.getElementById('btn-test-run-execute');
+    if (runBtn) {
+        runBtn.addEventListener('click', () => {
+            if (activeTestExecutionId) {
+                executeTestRun(activeTestExecutionId);
+            }
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTestCenterControls();
+});

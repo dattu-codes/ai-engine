@@ -382,4 +382,33 @@ class FixExecution(Base):
     analysis_after = relationship("Analysis", foreign_keys=[analysis_after_id])
 
 
+class TestExecution(Base):
+    __tablename__ = "test_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    version_id = Column(Integer, ForeignKey("project_versions.id", ondelete="SET NULL"), nullable=True)
+    fix_execution_id = Column(Integer, ForeignKey("fix_executions.id", ondelete="SET NULL"), nullable=True)
+    
+    language = Column(String(50), nullable=True)
+    framework = Column(String(50), nullable=True)
+    test_type = Column(String(50), nullable=True)  # Unit, Integration, Regression, Edge-case
+    generated_tests_json = Column(Text, nullable=True)  # JSON-serialized list of tests
+    execution_log = Column(Text, nullable=True)
+    
+    total_tests = Column(Integer, default=0, nullable=False)
+    passed_tests = Column(Integer, default=0, nullable=False)
+    failed_tests = Column(Integer, default=0, nullable=False)
+    skipped_tests = Column(Integer, default=0, nullable=False)
+    coverage_percentage = Column(Float, default=0.0, nullable=False)
+    execution_time = Column(Float, nullable=True)
+    status = Column(String(50), default="Pending", nullable=False)  # Pending, Generating, Running, Completed, Failed
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Relationships
+    project = relationship("Project")
+    version = relationship("ProjectVersion")
+    fix_execution = relationship("FixExecution")
+
+
 

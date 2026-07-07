@@ -25,7 +25,8 @@ from app.projects.routes.workspace_routes import workspace_router
 from app.projects.routes.comment_routes import comment_router
 from app.projects.routes.activity_routes import activity_router
 from app.projects.routes.fix_routes import fix_router
-from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, ReviewFinding, SemanticNode, SemanticEdge, Workspace, WorkspaceMember, FindingComment, ActivityLog, FixExecution
+from app.projects.routes.test_routes import test_router
+from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, ReviewFinding, SemanticNode, SemanticEdge, Workspace, WorkspaceMember, FindingComment, ActivityLog, FixExecution, TestExecution
 
 # Create database tables automatically on startup
 Base.metadata.create_all(bind=engine)
@@ -54,6 +55,7 @@ app.include_router(workspace_router)
 app.include_router(comment_router)
 app.include_router(activity_router)
 app.include_router(fix_router)
+app.include_router(test_router)
 
 # In-memory stores
 graph_store = GraphStore()

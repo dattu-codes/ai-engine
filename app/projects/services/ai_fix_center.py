@@ -222,6 +222,16 @@ class AIFixCenter:
             
             fix_exec.status = "Completed"
             db.commit()
+
+            # Automatically generate and execute tests
+            try:
+                from app.projects.services.test_generation_service import TestGenerationService
+                from app.projects.services.test_runner_service import TestRunnerService
+                
+                test_exec = await TestGenerationService.generate_tests(db, fix_exec.id, api_key=api_key)
+                await TestRunnerService.execute_tests(db, test_exec.id)
+            except Exception as te:
+                print(f"Error executing auto test generation/run: {te}")
         else:
             # Revert to version_before_id!
             fix_exec.status = "Failed"

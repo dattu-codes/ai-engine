@@ -112,6 +112,10 @@
                         <span class="nav-icon">🤖</span>
                         <span class="nav-text">AI Fix Center</span>
                     </button>
+                    <button class="nav-item" data-view="view-test-center" id="nav-item-test-center" style="display: none;">
+                        <span class="nav-icon">🧪</span>
+                        <span class="nav-text">Test Center</span>
+                    </button>
                 </nav>
             </aside>
 
@@ -1682,6 +1686,90 @@
                         </div>
                     </div>
                 </div>
+
+        <!-- view-test-center pane -->
+        <div class="view-pane" id="view-test-center" style="padding: 20px; overflow-y: auto; height: calc(100vh - 70px);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h1 style="font-size: 22px; font-weight: 800; background: linear-gradient(135deg, #a78bfa, #60a5fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 0;">🧪 Test Center</h1>
+                    <p style="color: var(--text-muted); font-size: 13px; margin: 4px 0 0 0;">Inspect generated regression suites, run dynamic tests, view line coverage, and assert bug resolutions.</p>
+                </div>
+            </div>
+
+            <!-- Test Dashboard Metrics Grid -->
+            <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 15px; margin-bottom: 25px;">
+                <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Tests Passed</p>
+                    <h3 id="test-metric-passed" style="font-size: 22px; font-weight: 700; margin: 0; color: #34d399;">0</h3>
+                </div>
+                <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Tests Failed</p>
+                    <h3 id="test-metric-failed" style="font-size: 22px; font-weight: 700; margin: 0; color: #ef4444;">0</h3>
+                </div>
+                <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Skipped</p>
+                    <h3 id="test-metric-skipped" style="font-size: 22px; font-weight: 700; margin: 0; color: #facc15;">0</h3>
+                </div>
+                <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Line Coverage</p>
+                    <h3 id="test-metric-coverage" style="font-size: 22px; font-weight: 700; margin: 0; color: #60a5fa;">0%</h3>
+                </div>
+                <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Regression Status</p>
+                    <h3 id="test-metric-regression" style="font-size: 22px; font-weight: 700; margin: 0; color: #a78bfa;">Clean</h3>
+                </div>
+                <div class="metric-card glass" style="padding: 15px; border-radius: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <p style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 6px 0; letter-spacing: 1px;">Execution Time</p>
+                    <h3 id="test-metric-time" style="font-size: 22px; font-weight: 700; margin: 0; color: #e2e8f0;">0.0s</h3>
+                </div>
+            </div>
+
+            <!-- Split Panel layout -->
+            <div style="display: flex; gap: 20px; height: calc(100vh - 250px);">
+                <!-- Left panel: Test suite runs list -->
+                <div class="glass" style="width: 320px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); padding: 15px; display: flex; flex-direction: column; background: rgba(0,0,0,0.15);">
+                    <h3 style="font-size: 14px; font-weight: 700; color: var(--text-bright); margin: 0 0 15px 0;">Test Execution Runs</h3>
+                    <div id="test-executions-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 5px;">
+                        <div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0;">No test runs found.</div>
+                    </div>
+                </div>
+
+                <!-- Right panel: Active run details -->
+                <div class="glass" style="flex: 1; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); padding: 20px; overflow-y: auto; background: rgba(0,0,0,0.15);">
+                    <!-- Empty State -->
+                    <div id="test-details-empty" style="display: flex; height: 100%; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: var(--text-muted);">
+                        <span style="font-size: 40px; margin-bottom: 10px;">🧪</span>
+                        <p style="font-size: 13px; margin: 0;">Select a test execution run from the left panel to inspect stubs and outputs.</p>
+                    </div>
+
+                    <!-- Active State -->
+                    <div id="test-details-active" style="display: none;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 15px; margin-bottom: 20px;">
+                            <div>
+                                <h2 style="font-size: 16px; font-weight: 700; color: var(--text-bright); margin: 0;" id="active-test-title">Test Run #0</h2>
+                                <p style="color: var(--text-muted); font-size: 12px; margin: 4px 0 0 0;">Language: <span id="active-test-lang">Python</span> | Framework: <span id="active-test-framework">pytest</span></p>
+                            </div>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <span id="active-test-status-badge" class="badge" style="font-size: 11px; font-weight: 600;">Pending</span>
+                                <button id="btn-test-run-execute" class="btn" style="padding: 6px 12px; font-size: 12px; background: var(--accent-purple); color: #fff; border-radius: 6px; border: none; cursor: pointer; transition: background 0.2s ease;">Execute Test Suite</button>
+                            </div>
+                        </div>
+
+                        <!-- Generated Code block -->
+                        <div style="margin-bottom: 25px;">
+                            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 8px 0; letter-spacing: 1px;">Generated Test Suites</h4>
+                            <pre style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.06); padding: 15px; border-radius: 8px; max-height: 250px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; color: #34d399; margin: 0;" id="active-test-code-viewer"></pre>
+                        </div>
+
+                        <!-- Full raw execution logs console -->
+                        <div>
+                            <h4 style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); margin: 0 0 8px 0; letter-spacing: 1px;">Test Execution Raw Logs</h4>
+                            <pre style="background: #000; border: 1px solid rgba(255,255,255,0.06); padding: 15px; border-radius: 8px; max-height: 250px; overflow-y: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.5; color: #cbd5e1; margin: 0;" id="active-test-logs-viewer"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
             </main>
         </div>
 

@@ -99,6 +99,23 @@ class ProjectChatService:
         except Exception as fe:
             fixes_text = f"Error loading fix executions context: {fe}"
 
+        # Construct test executions history context
+        try:
+            from app.projects.models.project_models import TestExecution
+            tests = db.query(TestExecution).filter(TestExecution.project_id == project_id).all()
+            tests_text = "No automated test executions recorded for this project."
+            if tests:
+                tests_text = "\n".join([
+                    f"- [TestExecution ID: {t.id}] Fix ID: {t.fix_execution_id} | Status: {t.status} | "
+                    f"Language: {t.language} | Framework: {t.framework} | Test Type: {t.test_type} | "
+                    f"Total Tests: {t.total_tests} | Passed: {t.passed_tests} | Failed: {t.failed_tests} | "
+                    f"Coverage: {t.coverage_percentage}% | Time: {t.execution_time or 0.0}s | "
+                    f"Log Summary: {t.execution_log[:200] if t.execution_log else 'None'}..."
+                    for t in tests
+                ])
+        except Exception as te:
+            tests_text = f"Error loading test executions context: {te}"
+
         # Construct source files text context
         source_files_text = "No relevant source files retrieved for this query context."
         if context["files"]:
@@ -128,6 +145,7 @@ class ProjectChatService:
             f"Chronological Evolution Versions:\n{version_history_text}\n\n"
             f"Latest AI Review Findings:\n{findings_text}\n\n"
             f"AI Fix Center Executions Context:\n{fixes_text}\n\n"
+            f"AI Test Center Executions Context:\n{tests_text}\n\n"
             f"Relevant Source Files Context:\n{source_files_text}\n"
         )
 
