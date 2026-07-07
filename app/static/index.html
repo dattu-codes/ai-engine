@@ -47,80 +47,116 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
-            <div class="brand">
-                <div class="brand-logo">
-                    <span class="logo-dot"></span>
-                    <span class="logo-pulse"></span>
+    <!-- Main Layout Wrapper -->
+    <div class="app-layout">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="app-sidebar" id="sidebar-panel">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">Æ</div>
+                <div class="sidebar-brand-name">AI Engine</div>
+            </div>
+            
+            <div class="sidebar-content">
+                <div>
+                    <div class="sidebar-group-title">Platform</div>
+                    <nav class="sidebar-nav">
+                        <button class="nav-item active" data-view="view-dashboard">
+                            <span class="nav-icon">📊</span>
+                            <span class="nav-text">Dashboard</span>
+                        </button>
+                        <button class="nav-item" data-view="view-projects">
+                            <span class="nav-icon">📁</span>
+                            <span class="nav-text">Projects</span>
+                        </button>
+                        <button class="nav-item" data-view="view-workspace" id="nav-item-workspace" style="display: none;">
+                            <span class="nav-icon">🏢</span>
+                            <span class="nav-text">Workspaces</span>
+                        </button>
+                    </nav>
                 </div>
-                <div class="brand-text">
-                    <h1>AI Engine</h1>
-                    <p>Self-Healing Workflow Execution API</p>
+                
+                <div>
+                    <div class="sidebar-group-title">Analysis</div>
+                    <nav class="sidebar-nav">
+                        <button class="nav-item" data-view="view-findings" id="nav-item-findings" style="display: none;">
+                            <span class="nav-icon">📝</span>
+                            <span class="nav-text">Review Findings</span>
+                        </button>
+                        <button class="nav-item" data-view="view-pull-requests" id="nav-item-pull-requests" style="display: none;">
+                            <span class="nav-icon">💻</span>
+                            <span class="nav-text">Pull Requests</span>
+                        </button>
+                        <button class="nav-item" data-view="view-semantic" id="nav-item-semantic" style="display: none;">
+                            <span class="nav-icon">🕸</span>
+                            <span class="nav-text">Semantic Explorer</span>
+                        </button>
+                    </nav>
+                </div>
+
+                <div>
+                    <div class="sidebar-group-title">Heal & Validate</div>
+                    <nav class="sidebar-nav">
+                        <button class="nav-item" data-view="view-fix-center" id="nav-item-fix-center" style="display: none;">
+                            <span class="nav-icon">🤖</span>
+                            <span class="nav-text">AI Fix Center</span>
+                        </button>
+                        <button class="nav-item" data-view="view-test-center" id="nav-item-test-center" style="display: none;">
+                            <span class="nav-icon">🧪</span>
+                            <span class="nav-text">Test Center</span>
+                        </button>
+                        <button class="nav-item" data-view="view-versions" id="nav-item-versions" style="display: none;">
+                            <span class="nav-icon">📜</span>
+                            <span class="nav-text">Versions</span>
+                        </button>
+                        <button class="nav-item" data-view="view-chat" id="nav-item-chat" style="display: none;">
+                            <span class="nav-icon">💬</span>
+                            <span class="nav-text">Project Chat</span>
+                        </button>
+                    </nav>
                 </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 16px;">
-                <div class="header-auth" id="header-auth" style="display: none;">
-                    <span>User: <strong id="user-display-name">...</strong> (<span id="user-display-role">...</span>)</span>
-                    <button id="btn-logout">Logout</button>
-                </div>
-                <div class="system-status">
-                    <span class="status-indicator online"></span>
-                    <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+
+            <!-- Sidebar User Profile Footer Section -->
+            <div class="sidebar-footer">
+                <div class="header-auth" id="header-auth" style="display: none; align-items: center; gap: 12px; width: 100%;">
+                    <div class="user-avatar">U</div>
+                    <div class="user-meta" style="flex: 1; min-width: 0;">
+                        <span class="username-display" id="user-display-name">...</span>
+                        <span class="user-role-badge" id="user-display-role">...</span>
+                    </div>
+                    <button id="btn-logout" class="logout-btn-nav">Logout</button>
                 </div>
             </div>
-        </header>
+            
+            <!-- Collapsible toggle button -->
+            <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()">◀</button>
+        </aside>
 
-        <!-- Main Layout with Sidebar -->
-        <div class="app-layout">
-            <!-- Sidebar -->
-            <aside class="app-sidebar glass">
-                <nav class="sidebar-nav">
-                    <button class="nav-item active" data-view="view-dashboard">
-                        <span class="nav-icon">📊</span>
-                        <span class="nav-text">Dashboard</span>
-                    </button>
-                    <button class="nav-item" data-view="view-projects">
-                        <span class="nav-icon">📁</span>
-                        <span class="nav-text">Projects</span>
-                    </button>
-                    <button class="nav-item" data-view="view-versions" id="nav-item-versions" style="display: none;">
-                        <span class="nav-icon">📜</span>
-                        <span class="nav-text">Versions</span>
-                    </button>
-                    <button class="nav-item" data-view="view-chat" id="nav-item-chat" style="display: none;">
-                        <span class="nav-icon">💬</span>
-                        <span class="nav-text">Project Chat</span>
-                    </button>
-                    <button class="nav-item" data-view="view-pull-requests" id="nav-item-pull-requests" style="display: none;">
-                        <span class="nav-icon">💻</span>
-                        <span class="nav-text">Pull Requests</span>
-                    </button>
-                    <button class="nav-item" data-view="view-findings" id="nav-item-findings" style="display: none;">
-                        <span class="nav-icon">📝</span>
-                        <span class="nav-text">Review Findings</span>
-                    </button>
-                    <button class="nav-item" data-view="view-semantic" id="nav-item-semantic" style="display: none;">
-                        <span class="nav-icon">🕸</span>
-                        <span class="nav-text">Semantic Explorer</span>
-                    </button>
-                    <button class="nav-item" data-view="view-workspace" id="nav-item-workspace" style="display: none;">
-                        <span class="nav-icon">🏢</span>
-                        <span class="nav-text">Workspaces</span>
-                    </button>
-                    <button class="nav-item" data-view="view-fix-center" id="nav-item-fix-center" style="display: none;">
-                        <span class="nav-icon">🤖</span>
-                        <span class="nav-text">AI Fix Center</span>
-                    </button>
-                    <button class="nav-item" data-view="view-test-center" id="nav-item-test-center" style="display: none;">
-                        <span class="nav-icon">🧪</span>
-                        <span class="nav-text">Test Center</span>
-                    </button>
-                </nav>
-            </aside>
+        <!-- Main Content Area -->
+        <main class="app-main-content">
+            
+            <!-- Sticky Top Navigation -->
+            <nav class="top-nav">
+                <div class="top-nav-left">
+                    <div class="breadcrumbs">
+                        <span>Workspace</span>
+                        <span class="breadcrumbs-sep">/</span>
+                        <span class="breadcrumbs-active" id="nav-breadcrumbs-view">Dashboard</span>
+                    </div>
+                </div>
+                
+                <div class="top-nav-right">
+                    <div class="system-status" style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted);">
+                        <span class="status-indicator online" style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); display: inline-block;"></span>
+                        <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+                    </div>
+                </div>
+            </nav>
 
-            <!-- Main Content Area -->
-            <main class="main-content">
+            <!-- Scrollable View Contents Wrapper -->
+            <div style="padding: 24px; flex: 1; overflow-y: auto;">
+                
                 <!-- View: Dashboard (The original single code analysis view) -->
                 <div class="view-pane active" id="view-dashboard">
                     <div style="display: flex; gap: 20px; align-items: start;">
@@ -1770,8 +1806,10 @@
                 </div>
             </div>
         </div>
-            </main>
-        </div>
+            </div>
+        </main>
+    </div>
+</div>
 
     <!-- Authentication Overlay Gate -->
     <div class="auth-overlay" id="auth-overlay">
@@ -1845,5 +1883,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
     <!-- Custom Application Logic -->
     <script src="/static/app.js"></script>
+    <script>
+        // Collapsible sidebar functionality
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar-panel');
+            const toggleBtn = document.getElementById('sidebar-toggle-btn');
+            sidebar.classList.toggle('collapsed');
+            if (sidebar.classList.contains('collapsed')) {
+                toggleBtn.innerText = '▶';
+            } else {
+                toggleBtn.innerText = '◀';
+            }
+        }
+    </script>
 </body>
 </html>
