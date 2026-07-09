@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Engine - Production-Grade Code Intelligence Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #09090b;
+            --text-bright: #fafafa;
+            --text-main: #d4d4d8;
+            --text-muted: #71717a;
+            --accent-purple: #8b5cf6;
+            --accent-purple-glow: rgba(139, 92, 246, 0.15);
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-orange: #f59e0b;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --glass-bg: rgba(255, 255, 255, 0.02);
+            --glass-border: rgba(255, 255, 255, 0.04);
+            --font-sans: 'Outfit', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Hero Wrapper Glows */
+        .glow-sphere {
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, var(--accent-purple-glow) 0%, transparent 70%);
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .landing-header {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            position: relative;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--text-bright);
+            letter-spacing: -0.03em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-symbol {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+
+        .header-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            transition: color 0.2s ease;
+        }
+
+        .header-nav a:hover {
+            color: var(--text-bright);
+        }
+
+        .cta-btn {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: #fff;
+            border: none;
+            padding: 8px 18px;
+            font-weight: 600;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .cta-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Hero section */
+        .hero {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 80px 24px 60px 24px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+
+        .badge {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            color: #c084fc;
+            padding: 6px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 9999px;
+            display: inline-block;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .hero h1 {
+            font-size: 52px;
+            font-weight: 800;
+            color: var(--text-bright);
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #c084fc, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 18px;
+            color: var(--text-muted);
+            max-width: 650px;
+            margin: 0 auto 36px auto;
+        }
+
+        /* Features Section */
+        .section-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 60px 24px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .section-title h2 {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-bright);
+            letter-spacing: -0.02em;
+        }
+
+        .section-title p {
+            color: var(--text-muted);
+            font-size: 15px;
+            margin-top: 8px;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 24px;
+            transition: all 0.2s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .feature-icon {
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        .feature-card h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Pricing section */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 32px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 400px;
+            transition: all 0.2s ease;
+        }
+
+        .pricing-card.premium {
+            border-color: var(--accent-purple);
+            background: rgba(139, 92, 246, 0.03);
+            box-shadow: 0 0 20px rgba(139, 92, 246, 0.08);
+            position: relative;
+        }
+
+        .pricing-card.premium::after {
+            content: 'POPULAR';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent-purple);
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 99px;
+            letter-spacing: 0.1em;
+        }
+
+        .plan-name {
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .plan-price {
+            font-size: 40px;
+            font-weight: 800;
+            color: var(--text-bright);
+            margin-bottom: 24px;
+        }
+
+        .plan-price span {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        .plan-features {
+            list-style: none;
+            margin-bottom: 32px;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .plan-features li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .plan-features li::before {
+            content: '✓';
+            color: var(--accent-green);
+            font-weight: bold;
+        }
+
+        .pricing-btn {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-bright);
+            border: none;
+            padding: 10px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: block;
+        }
+
+        .pricing-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .pricing-card.premium .pricing-btn {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+        }
+
+        .footer {
+            border-top: 1px solid var(--border-color);
+            padding: 40px 24px;
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 80px;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-sphere"></div>
+    
+    <header class="landing-header">
+        <div class="logo">
+            <div class="logo-symbol">Æ</div>
+            AI Engine
+        </div>
+        <nav class="header-nav">
+            <a href="/docs">Documentation</a>
+            <a href="/dashboard" class="cta-btn">Sign In</a>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="badge">Version 3.0 Live</div>
+        <h1>The Production-Grade <span>Code Intelligence</span> Platform</h1>
+        <p>Connect your GitHub repository and automatically analyze code quality, evaluate semantic graphs, run unit tests, and secure deployment pathways in one unified SaaS cockpit.</p>
+        <div>
+            <a href="/dashboard" class="cta-btn" style="padding: 12px 28px; font-size: 16px;">Get Started for Free</a>
+        </div>
+    </section>
+
+    <section class="section-container" id="features">
+        <div class="section-title">
+            <h2>Platform Core Capabilities</h2>
+            <p>A multi-language code quality controller designed for scaling engineering organizations.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🕸</div>
+                <h3>Semantic Explorer</h3>
+                <p>Builds interactive codebase dependency mappings, linking structs, classes, methods, and functions visually.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🛡</div>
+                <h3>Security Code reviews</h3>
+                <p>Identifies SQL injection risks, concurrency deadlocks, unbuffered channel locks, and context propagation skips.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>AI Fix Center</h3>
+                <p>Generates production-grade refactored code and applies patches directly back to your workspace files.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🧪</div>
+                <h3>Test Center</h3>
+                <p>Autogenerates unit tests, mocks endpoints, executes test runners, and reports coverage rates instantly.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Repository Insights</h3>
+                <p>Scores architecture, testing, security, maintainability, and provides a prioritized roadmap timeline to evolve code.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🚀</div>
+                <h3>Deployment readiness</h3>
+                <p>Audits database health, Redis pools, worker daemon statuses, and memory telemetries automatically.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-container" id="pricing">
+        <div class="section-title">
+            <h2>Flexible Subscription Pricing</h2>
+            <p>Start free, scale subscription tiers as your engineering team grows.</p>
+        </div>
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <div>
+                    <div class="plan-name">Free</div>
+                    <div class="plan-price">$0</div>
+                    <ul class="plan-features">
+                        <li>1 Project Repository limit</li>
+                        <li>Max 3 source files per review</li>
+                        <li>Standard Code analysis</li>
+                        <li>Basic Repository Insights</li>
+                    </ul>
+                </div>
+                <a href="/dashboard" class="pricing-btn">Get Started</a>
+            </div>
+
+            <div class="pricing-card premium">
+                <div>
+                    <div class="plan-name">Pro</div>
+                    <div class="plan-price">$19<span>/mo</span></div>
+                    <ul class="plan-features">
+                        <li>Up to 5 Project Repositories</li>
+                        <li>Max 20 source files per review</li>
+                        <li>Full AI Code reviews & Refactoring</li>
+                        <li>Detailed Evolution Roadmap</li>
+                        <li>Public API (v1) access tokens</li>
+                    </ul>
+                </div>
+                <a href="/dashboard" class="pricing-btn">Upgrade Plan</a>
+            </div>
+
+            <div class="pricing-card">
+                <div>
+                    <div class="plan-name">Enterprise</div>
+                    <div class="plan-price">Custom</div>
+                    <ul class="plan-features">
+                        <li>Unlimited Project Repositories</li>
+                        <li>Unlimited files parsing</li>
+                        <li>SLA Uptime guarantees</li>
+                        <li>Custom AI model fine-tunings</li>
+                        <li>Admin portal dashboard console</li>
+                    </ul>
+                </div>
+                <a href="/dashboard" class="pricing-btn">Contact Sales</a>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <p>&copy; 2026 AI Engine Inc. All rights reserved. Made by Google DeepMind team.</p>
+    </footer>
+</body>
+</html>

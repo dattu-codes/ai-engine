@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrative Dashboard - AI Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #09090b;
+            --bg-panel: #18181b;
+            --text-bright: #fafafa;
+            --text-main: #d4d4d8;
+            --text-muted: #71717a;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --font-sans: 'Outfit', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            padding: 40px;
+        }
+
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 32px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-bright);
+            letter-spacing: -0.03em;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .back-link {
+            color: var(--accent-purple);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto 32px auto;
+        }
+
+        .card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .card-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 6px;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--text-bright);
+            font-family: var(--font-mono);
+        }
+
+        .layout-main {
+            display: flex;
+            gap: 32px;
+            max-width: 1200px;
+            margin: 0 auto;
+            align-items: start;
+        }
+
+        .section-left {
+            flex: 1.5;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        .section-right {
+            flex: 0.8;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-bright);
+            margin-bottom: 16px;
+        }
+
+        /* Table */
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-panel);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: rgba(255,255,255,0.02);
+            color: var(--text-muted);
+            font-weight: 600;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .action-btn {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: var(--accent-red);
+            color: #fff;
+        }
+
+        .action-btn.enable {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent-green);
+            border-color: rgba(16, 185, 129, 0.2);
+        }
+
+        .action-btn.enable:hover {
+            background: var(--accent-green);
+            color: #fff;
+        }
+
+        .pill {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 99px;
+            text-transform: uppercase;
+        }
+
+        .pill.free { background: rgba(113, 113, 122, 0.1); color: var(--text-muted); border: 1px solid rgba(113,113,122,0.2); }
+        .pill.pro { background: rgba(59, 130, 246, 0.1); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2); }
+        .pill.enterprise { background: rgba(139, 92, 246, 0.1); color: var(--accent-purple); border: 1px solid rgba(139,92,246,0.2); }
+
+        /* Error Log Listing */
+        .logs-box {
+            background: #0f0f11;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .log-line {
+            display: flex;
+            gap: 12px;
+            line-height: 1.5;
+        }
+
+        .log-time { color: var(--text-muted); }
+        .log-level { font-weight: bold; }
+        .log-level.warning { color: var(--accent-red); }
+        .log-level.info { color: var(--accent-blue); }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div>
+            <h1>Admin Dashboard Portal</h1>
+            <p>System operational metrics, active queue telemetry, and customer administration.</p>
+        </div>
+        <a href="/dashboard" class="back-link">← Return to Dashboard</a>
+    </header>
+
+    <div class="stats-grid">
+        <div class="card">
+            <div class="card-label">SaaS Registered Users</div>
+            <div class="card-value" id="stats-total-users">--</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Plan Split (Free / Pro / Ent)</div>
+            <div class="card-value" style="font-size: 20px; padding-top: 8px;" id="stats-plans">-- / -- / --</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Active Worker threads</div>
+            <div class="card-value" id="stats-active-workers">--</div>
+        </div>
+        <div class="card">
+            <div class="card-label">Task Queue Length</div>
+            <div class="card-value" id="stats-queue-size">--</div>
+        </div>
+    </div>
+
+    <div class="layout-main">
+        <div class="section-left">
+            <div class="card">
+                <h2>User Subscriptions & Accounts</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Billing Tier</th>
+                                <th>Integrations</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-tbody">
+                            <tr>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching users database...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-right">
+            <div class="card">
+                <h2>System Health Telemetry</h2>
+                <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Database Server Pool</span>
+                        <span id="health-db" style="color: var(--accent-green); font-weight: bold;">--</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Redis In-Memory Queue</span>
+                        <span id="health-redis" style="color: var(--accent-green); font-weight: bold;">--</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Total Parsed Code Files</span>
+                        <span id="health-total-files" style="font-family: var(--font-mono);">--</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Storage pool utilized</span>
+                        <span id="health-storage" style="font-family: var(--font-mono);">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Background worker diagnostics</h2>
+                <div class="logs-box" id="admin-logs-box">
+                    <div style="color: var(--text-muted);">Loading diagnostics...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Custom headers/authorization helper using local tokens
+        async function adminAuthorizedFetch(url, options = {}) {
+            const token = localStorage.getItem("access_token");
+            if (!options.headers) options.headers = {};
+            if (token) options.headers["Authorization"] = `Bearer ${token}`;
+            return fetch(url, options);
+        }
+
+        async function loadAdminData() {
+            try {
+                // 1. Fetch system statistics
+                const statsRes = await adminAuthorizedFetch("/admin/stats");
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    document.getElementById("stats-total-users").textContent = stats.total_users;
+                    document.getElementById("stats-plans").textContent = `${stats.plans_breakdown.Free} / ${stats.plans_breakdown.Pro} / ${stats.plans_breakdown.Enterprise}`;
+                    document.getElementById("stats-active-workers").textContent = stats.active_workers;
+                    document.getElementById("stats-queue-size").textContent = stats.queue_size;
+                    
+                    document.getElementById("health-db").textContent = stats.integrations.database.toUpperCase();
+                    document.getElementById("health-redis").textContent = stats.integrations.redis.toUpperCase();
+                    document.getElementById("health-total-files").textContent = stats.total_files;
+                    
+                    // Format storage space nicely
+                    const mb = (stats.storage_utilized_bytes / (1024 * 1024)).toFixed(2);
+                    document.getElementById("health-storage").textContent = `${mb} MB`;
+                    
+                    // Render error logs
+                    const logsBox = document.getElementById("admin-logs-box");
+                    logsBox.innerHTML = "";
+                    stats.errors_list.forEach(l => {
+                        const div = document.createElement("div");
+                        div.className = "log-line";
+                        const lvlClass = l.level.toLowerCase();
+                        div.innerHTML = `<span class="log-time">[${new Date(l.timestamp).toLocaleTimeString()}]</span> <span class="log-level ${lvlClass}">${l.level}</span> <span>${l.message}</span>`;
+                        logsBox.appendChild(div);
+                    });
+                }
+
+                // 2. Fetch users list
+                const usersRes = await adminAuthorizedFetch("/admin/users");
+                if (usersRes.ok) {
+                    const users = await usersRes.json();
+                    const tbody = document.getElementById("admin-users-tbody");
+                    tbody.innerHTML = "";
+                    
+                    users.forEach(u => {
+                        const tr = document.createElement("tr");
+                        const planClass = u.billing_plan.toLowerCase();
+                        const statusLabel = u.is_active ? "Active" : "Suspended";
+                        const btnText = u.is_active ? "Suspend" : "Activate";
+                        const btnClass = u.is_active ? "action-btn" : "action-btn enable";
+                        
+                        tr.innerHTML = `
+                            <td style="font-weight: 600; color: var(--text-bright);">${u.username}</td>
+                            <td>${u.role}</td>
+                            <td><span class="pill ${planClass}">${u.billing_plan}</span></td>
+                            <td>${u.github_connected ? "✓ GitHub Connected" : "None"}</td>
+                            <td style="font-weight: 600; color: ${u.is_active ? 'var(--accent-green)' : 'var(--accent-red)'};">${statusLabel}</td>
+                            <td><button class="${btnClass}" onclick="toggleUserStatus(${u.id})">${btnText}</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to load administration dashboard data:", err);
+            }
+        }
+
+        async function toggleUserStatus(userId) {
+            try {
+                const res = await adminAuthorizedFetch(`/admin/users/${userId}/toggle-status`, {
+                    method: "POST"
+                });
+                if (res.ok) {
+                    loadAdminData();
+                } else {
+                    const d = await res.json();
+                    alert(d.detail || "Action rejected by backend.");
+                }
+            } catch (e) {
+                alert("Connection error: " + e.message);
+            }
+        }
+
+        // On load
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAdminData();
+        });
+    </script>
+</body>
+</html>

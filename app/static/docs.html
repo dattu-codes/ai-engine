@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation Center - AI Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #09090b;
+            --bg-panel: #18181b;
+            --text-bright: #fafafa;
+            --text-main: #d4d4d8;
+            --text-muted: #71717a;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --font-sans: 'Outfit', -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .docs-sidebar {
+            width: 280px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--text-bright);
+            letter-spacing: -0.03em;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .logo-symbol {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .nav-group-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        .nav-links {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .nav-links a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            display: block;
+            padding: 6px 10px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-links a:hover, .nav-links a.active {
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-bright);
+        }
+
+        /* Main Content */
+        .docs-content {
+            flex: 1;
+            padding: 40px 60px;
+            overflow-y: auto;
+            height: 100%;
+        }
+
+        .docs-section {
+            max-width: 800px;
+            margin-bottom: 60px;
+            display: none;
+        }
+
+        .docs-section.active {
+            display: block;
+        }
+
+        h1 {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--text-bright);
+            margin-bottom: 16px;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-bright);
+            margin: 32px 0 16px 0;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        p {
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 16px;
+            color: var(--text-main);
+        }
+
+        code {
+            font-family: var(--font-mono);
+            background: rgba(255, 255, 255, 0.04);
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #f472b6;
+        }
+
+        pre {
+            background: #0f0f11;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        pre code {
+            background: transparent;
+            padding: 0;
+            color: #a78bfa;
+            font-size: 13px;
+        }
+
+        .api-method {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 4px;
+            color: #fff;
+            margin-right: 8px;
+        }
+
+        .api-method.get { background: var(--accent-blue); }
+        .api-method.post { background: var(--accent-green); }
+        .api-method.delete { background: #ef4444; }
+
+        .api-endpoint {
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--text-bright);
+            font-weight: 600;
+        }
+    </style>
+    <script>
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.docs-section').forEach(sec => {
+                sec.classList.remove('active');
+            });
+            // Show target
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Toggle active menu link
+            document.querySelectorAll('.nav-links a').forEach(a => {
+                a.classList.remove('active');
+                if (a.getAttribute('onclick').includes(sectionId)) {
+                    a.classList.add('active');
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <aside class="docs-sidebar">
+        <a href="/landing" class="logo">
+            <div class="logo-symbol">Æ</div>
+            AI Engine
+        </a>
+        
+        <div>
+            <div class="nav-group-title">Introduction</div>
+            <ul class="nav-links">
+                <li><a href="#" class="active" onclick="showSection('user-guide')">User Guide</a></li>
+                <li><a href="#" onclick="showSection('architecture')">Architecture</a></li>
+            </ul>
+        </div>
+        
+        <div>
+            <div class="nav-group-title">Public API v1</div>
+            <ul class="nav-links">
+                <li><a href="#" onclick="showSection('api-keys')">API Authentication</a></li>
+                <li><a href="#" onclick="showSection('api-endpoints')">Endpoints Reference</a></li>
+            </ul>
+        </div>
+        
+        <div>
+            <div class="nav-group-title">Deployment</div>
+            <ul class="nav-links">
+                <li><a href="#" onclick="showSection('deployment-guide')">Docker Compose Guide</a></li>
+            </ul>
+        </div>
+    </aside>
+
+    <main class="docs-content">
+        <!-- Section: User Guide -->
+        <section class="docs-section active" id="user-guide">
+            <h1>User Guide</h1>
+            <p>Welcome to the AI Engine Documentation. AI Engine is a commercial-grade SaaS platform enabling automatic repository analysis, code review scans, testing execution, and deployment readiness checks in unified workspace environments.</p>
+            
+            <h2>Getting Started</h2>
+            <p>To analyze a repository, connect your GitHub account or upload a code repository ZIP file in the <strong>Projects</strong> tab. Once ingested, select the project and click <strong>Execute Workflow</strong> to start the code analysis pipeline.</p>
+            
+            <h2>Repository Insights</h2>
+            <p>Each review calculates an aggregated repository maturity score out of 100 based on 6 core vectors: Architecture, Security, Testing, Deployment, Maintainability, and Documentation. You can view these dimensions and the compiled prioritized improvement roadmap on the <strong>Repository Insights</strong> page.</p>
+        </section>
+
+        <!-- Section: Architecture -->
+        <section class="docs-section" id="architecture">
+            <h1>Architecture Overview</h1>
+            <p>AI Engine runs using a modular, decoupled microservice queue pipeline designed for scalability:</p>
+            <pre><code>[Client Dashboard] ---> [Nginx Reverse Proxy] ---> [FastAPI Gateway]
+                                                           |
+                                                           |---> [PostgreSQL Database]
+                                                           |---> [Redis Queue Pool]
+                                                           v
+                                                [Background daemon Workers]
+                                                           |
+                                                           v
+                                            [LLM / Ingestion Parser engines]</code></pre>
+            <h2>Infrastructure layers</h2>
+            <p>The backend routes write raw code payloads to an abstracted Storage Service (storing files either locally or in Amazon S3/Cloudflare R2 buckets). Jobs are enqueued into a thread-safe Redis-based FIFO list, where background daemon listener threads pop tasks and run checks sequentially.</p>
+        </section>
+
+        <!-- Section: API Keys -->
+        <section class="docs-section" id="api-keys">
+            <h1>Public API Authentication</h1>
+            <p>The versioned REST API v1 is accessible at the <code>/api/v1</code> route prefix.</p>
+            <p>To authenticate requests, generate an API token inside the Settings modal of the dashboard. Send the API key inside the <code>X-API-KEY</code> header of every request:</p>
+            <pre><code>curl -X GET "http://localhost:8000/api/v1/projects" \
+  -H "X-API-KEY: ae_your_api_key_hash_here"</code></pre>
+        </section>
+
+        <!-- Section: Endpoints Reference -->
+        <section class="docs-section" id="api-endpoints">
+            <h1>REST API v1 Endpoints</h1>
+            
+            <h2>Projects</h2>
+            <p><span class="api-method get">GET</span> <span class="api-endpoint">/api/v1/projects</span></p>
+            <p>Retrieves all projects owned by the authenticated account.</p>
+            
+            <p><span class="api-method post">POST</span> <span class="api-endpoint">/api/v1/projects?name=MyProject&repo_url=https://github.com/org/repo</span></p>
+            <p>Registers a new project workspace. Subject to plan gating limits.</p>
+
+            <h2>Analyses</h2>
+            <p><span class="api-method post">POST</span> <span class="api-endpoint">/api/v1/projects/{id}/analyses</span></p>
+            <p>Triggers an asynchronous code review analysis for a project.</p>
+
+            <h2>Findings & Insights</h2>
+            <p><span class="api-method get">GET</span> <span class="api-endpoint">/api/v1/projects/{id}/findings</span></p>
+            <p>Returns the detailed list of bugs, issues, and maintainability concerns detected during scans.</p>
+
+            <p><span class="api-method get">GET</span> <span class="api-endpoint">/api/v1/projects/{id}/insights</span></p>
+            <p>Returns computed architecture scores, tech debt ratings, and engineering maturity levels.</p>
+        </section>
+
+        <!-- Section: Deployment -->
+        <section class="docs-section" id="deployment-guide">
+            <h1>Docker Compose Deployment</h1>
+            <p>AI Engine can be deployed in minutes using the provided multi-stage Docker configurations.</p>
+            <h2>Quick Start</h2>
+            <p>Run the stack locally with:</p>
+            <pre><code>docker-compose up --build -d</code></pre>
+            <p>This starts Postgres (port 5432), Redis (port 6379), FastAPI Gateway (port 8000), Background Worker, and Nginx Reverse Proxy (port 80).</p>
+        </section>
+    </main>
+</body>
+</html>

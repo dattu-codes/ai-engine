@@ -123,6 +123,51 @@ def worker_loop():
             except Exception as inner_e:
                 logger.error(f"Failed to record FAILED status for job {job_id}: {inner_e}")
 
+@register_task("sync_and_analyze")
+def sync_and_analyze_task(project_id: int, analysis_id: int, repo_url: str, branch: str):
+    from app.auth.database.connection import SessionLocal
+    from app.projects.models.project_models import Project, Analysis, AnalysisFile
+    from app.projects.services.project_service import ProjectService
+    from app.projects.services.analysis_service import AnalysisService
+    
+    db = SessionLocal()
+    try:
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            return
+            
+        # Sync files from repository
+        ProjectService.sync_project_repository(db, project_id, project.user_id)
+        
+        # Load synced files
+        latest_completed = db.query(Analysis).filter(
+            Analysis.project_id == project_id,
+            Analysis.status == "completed",
+            Analysis.source_type == "repository"
+        ).order_by(Analysis.created_at.desc()).first()
+        
+        if latest_completed:
+            files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == latest_completed.id).all()
+            files_list = [{"filename": f.filename, "language": f.language, "content": f.content or ""} for f in files]
+            
+            # Start code review analysis workflow synchronously inside worker thread
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                analysis.status = "running"
+                db.commit()
+                run_async_task(AnalysisService._execute_analysis_task(analysis.id, project.name, files_list, None))
+    except Exception as e:
+        logger.error(f"Error in sync_and_analyze task: {e}")
+        try:
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if analysis:
+                analysis.status = "failed"
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
 def start_worker():
     t = threading.Thread(target=worker_loop, daemon=True)
     t.start()

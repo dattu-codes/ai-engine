@@ -30,6 +30,14 @@ from app.projects.routes.fix_routes import fix_router
 from app.projects.routes.test_routes import test_router
 from app.projects.routes.health_routes import health_router
 from app.projects.routes.repository_insights_routes import insights_router
+
+# SaaS Integrated routers
+from app.auth.routes.github_oauth_routes import router as github_oauth_router
+from app.projects.routes.github_webhook_routes import router as github_webhook_router
+from app.billing.routes.billing_routes import router as billing_router
+from app.analytics.routes.analytics_routes import router as analytics_router
+from app.admin.routes.admin_routes import router as admin_router
+from app.api.v1.public_api_v1 import router as public_api_v1_router, key_router as api_key_router
 from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, ReviewFinding, SemanticNode, SemanticEdge, Workspace, WorkspaceMember, FindingComment, ActivityLog, FixExecution, TestExecution, RepositoryInsight, RepositoryInsightHistory
 
 
@@ -74,6 +82,16 @@ app.include_router(test_router)
 app.include_router(health_router)
 app.include_router(insights_router)
 
+# Register SaaS sub-modules
+app.include_router(github_oauth_router)
+app.include_router(github_webhook_router)
+app.include_router(billing_router)
+app.include_router(analytics_router)
+app.include_router(admin_router)
+app.include_router(api_key_router)
+app.include_router(public_api_v1_router)
+
+
 
 # In-memory stores
 graph_store = GraphStore()
@@ -82,12 +100,37 @@ runner = Runner(graph_store, run_store)
 
 # Custom static file endpoints to avoid aiofiles/starlette async file dependencies
 @app.get("/")
-async def read_index():
+@app.get("/landing")
+async def read_landing():
+    path = os.path.join(os.path.dirname(__file__), "static", "landing.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>AI Engine Landing Page not found.</h1>")
+
+@app.get("/dashboard")
+async def read_dashboard():
     path = os.path.join(os.path.dirname(__file__), "static", "index.html")
     if os.path.exists(path):
         with open(path, "r", encoding="utf-8") as f:
             return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>AI Engine UI not found.</h1><p>Please create the app/static folder structure.</p>")
+    return HTMLResponse(content="<h1>AI Engine Dashboard not found.</h1>")
+
+@app.get("/docs")
+async def read_docs():
+    path = os.path.join(os.path.dirname(__file__), "static", "docs.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>AI Engine Docs not found.</h1>")
+
+@app.get("/admin")
+async def read_admin():
+    path = os.path.join(os.path.dirname(__file__), "static", "admin.html")
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>AI Engine Admin Page not found.</h1>")
 
 @app.get("/static/{file_path:path}")
 async def get_static_file(file_path: str):

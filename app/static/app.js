@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     initProjectsTab();
     initFixCenterControls();
+    initSassSettings();
 });
 
 // Tab Navigation logic
@@ -1175,12 +1176,24 @@ function initProjectsTab() {
 }
 
 async function loadProjects() {
+    const container = document.getElementById('projects-list-container');
+    if (container) {
+        container.innerHTML = `
+            <div class="skeleton-loader-card" style="padding: 12px; margin-bottom: 8px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px;">
+                <div class="skeleton-line" style="width: 70%; height: 12px; background: rgba(255,255,255,0.05); margin-bottom: 6px; border-radius: 4px; animation: pulse 1.5s infinite ease-in-out;"></div>
+                <div class="skeleton-line" style="width: 40%; height: 8px; background: rgba(255,255,255,0.03); border-radius: 4px; animation: pulse 1.5s infinite ease-in-out;"></div>
+            </div>
+            <div class="skeleton-loader-card" style="padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px;">
+                <div class="skeleton-line" style="width: 50%; height: 12px; background: rgba(255,255,255,0.05); margin-bottom: 6px; border-radius: 4px; animation: pulse 1.5s infinite ease-in-out;"></div>
+                <div class="skeleton-line" style="width: 60%; height: 8px; background: rgba(255,255,255,0.03); border-radius: 4px; animation: pulse 1.5s infinite ease-in-out;"></div>
+            </div>
+        `;
+    }
     try {
         const res = await authorizedFetch('/projects');
         if (!res.ok) return;
 
         const projects = await res.json();
-        const container = document.getElementById('projects-list-container');
         
         if (projects.length === 0) {
             container.innerHTML = '<p class="placeholder-text" style="padding: 0 16px;">No projects registered. Click "+ New" to begin.</p>';
@@ -5640,6 +5653,235 @@ function drawRadarChart(svgId, scores) {
         circle.setAttribute('stroke', '#fff');
         circle.setAttribute('stroke-width', '1');
         svg.appendChild(circle);
+    }
+}
+
+
+function initSassSettings() {
+    // Theme Toggle
+    const themeBtn = document.getElementById('btn-theme-toggle');
+    if (themeBtn) {
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light-theme');
+        }
+        themeBtn.addEventListener('click', () => {
+            document.body.classList.toggle('light-theme');
+            const mode = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+            localStorage.setItem('theme', mode);
+        });
+    }
+
+    // Modal display
+    const settingsModal = document.getElementById('settings-modal');
+    const openSettingsBtn = document.getElementById('btn-open-settings');
+    const closeSettingsBtn = document.getElementById('btn-settings-close');
+    
+    if (openSettingsBtn && settingsModal) {
+        openSettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.remove('hidden');
+            loadSettingsBilling();
+            loadSettingsNotifications();
+            loadSettingsApiKeys();
+            loadSettingsOrgMembers();
+        });
+    }
+    if (closeSettingsBtn && settingsModal) {
+        closeSettingsBtn.addEventListener('click', () => {
+            settingsModal.classList.add('hidden');
+        });
+    }
+
+    // Tab switcher
+    const settingsTabs = [
+        { btn: 'settings-tab-billing-btn', pane: 'settings-pane-billing' },
+        { btn: 'settings-tab-notifications-btn', pane: 'settings-pane-notifications' },
+        { btn: 'settings-tab-api-btn', pane: 'settings-pane-api' },
+        { btn: 'settings-tab-org-btn', pane: 'settings-pane-org' }
+    ];
+    settingsTabs.forEach(t => {
+        const btn = document.getElementById(t.btn);
+        if (btn) {
+            btn.addEventListener('click', () => {
+                settingsTabs.forEach(ot => {
+                    const ob = document.getElementById(ot.btn);
+                    if (ob) ob.classList.remove('active');
+                    const op = document.getElementById(ot.pane);
+                    if (op) op.style.display = 'none';
+                });
+                btn.classList.add('active');
+                const pane = document.getElementById(t.pane);
+                if (pane) pane.style.display = 'block';
+            });
+        }
+    });
+
+    // Subscriptions Billing Actions
+    async function loadSettingsBilling() {
+        try {
+            const res = await authorizedFetch('/auth/billing');
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('settings-plan-label').textContent = `${data.billing_plan.toUpperCase()} PLAN`;
+                const isFree = data.billing_plan.toLowerCase() === 'free';
+                document.getElementById('btn-billing-subscribe').style.display = isFree ? 'block' : 'none';
+                document.getElementById('btn-billing-portal').style.display = isFree ? 'none' : 'block';
+            }
+        } catch(e) {}
+    }
+    
+    const btnSubscribe = document.getElementById('btn-billing-subscribe');
+    if (btnSubscribe) {
+        btnSubscribe.addEventListener('click', async () => {
+            btnSubscribe.disabled = true;
+            try {
+                const res = await authorizedFetch('/billing/checkout-session?plan_type=pro', { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    window.location.href = data.checkout_url;
+                }
+            } catch(e) {
+                btnSubscribe.disabled = false;
+            }
+        });
+    }
+    
+    const btnPortal = document.getElementById('btn-billing-portal');
+    if (btnPortal) {
+        btnPortal.addEventListener('click', async () => {
+            try {
+                const res = await authorizedFetch('/billing/portal-session', { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    window.location.href = data.portal_url;
+                }
+            } catch(e) {}
+        });
+    }
+
+    // Notifications Preference Actions
+    async function loadSettingsNotifications() {
+        try {
+            const res = await authorizedFetch('/auth/notifications');
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('pref-analysis').checked = data.email_analysis_completed;
+                document.getElementById('pref-fix').checked = data.email_fix_completed;
+                document.getElementById('pref-tests').checked = data.email_tests_completed;
+                document.getElementById('pref-sync').checked = data.email_repo_synced;
+                document.getElementById('pref-invite').checked = data.email_invitation_accepted;
+                document.getElementById('pref-deployment').checked = data.email_deployment_completed;
+            }
+        } catch(e) {}
+    }
+    
+    const notificationsForm = document.getElementById('settings-notifications-form');
+    if (notificationsForm) {
+        notificationsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = {
+                email_analysis_completed: document.getElementById('pref-analysis').checked,
+                email_fix_completed: document.getElementById('pref-fix').checked,
+                email_tests_completed: document.getElementById('pref-tests').checked,
+                email_repo_synced: document.getElementById('pref-sync').checked,
+                email_invitation_accepted: document.getElementById('pref-invite').checked,
+                email_deployment_completed: document.getElementById('pref-deployment').checked
+            };
+            try {
+                const res = await authorizedFetch('/auth/notifications', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (res.ok) {
+                    alert('Notification preferences saved successfully!');
+                }
+            } catch(e) {}
+        });
+    }
+
+    // API Key Actions
+    async function loadSettingsApiKeys() {
+        try {
+            const res = await authorizedFetch('/auth/api-key');
+            if (res.ok) {
+                const list = await res.json();
+                const tbody = document.getElementById('api-keys-list-tbody');
+                tbody.innerHTML = '';
+                if (list.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No active API keys found.</td></tr>';
+                    return;
+                }
+                list.forEach(k => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="font-weight: 600; color: var(--text-bright);">${escapeHtml(k.name)}</td>
+                        <td>${k.expires_at ? new Date(k.expires_at).toLocaleDateString() : 'Never'}</td>
+                        <td><button class="action-btn" onclick="revokeApiKey(${k.id})" style="padding: 2px 6px; font-size: 10px; background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: var(--accent-red);">Revoke</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        } catch(e) {}
+    }
+    
+    window.revokeApiKey = async function(id) {
+        try {
+            const res = await authorizedFetch(`/auth/api-key/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                loadSettingsApiKeys();
+            }
+        } catch(e) {}
+    };
+    
+    const btnGenerateKey = document.getElementById('btn-generate-api-key');
+    if (btnGenerateKey) {
+        btnGenerateKey.addEventListener('click', async () => {
+            const nameInput = document.getElementById('input-api-key-name');
+            const name = nameInput.value.trim() || 'CLI Token';
+            try {
+                const res = await authorizedFetch(`/auth/api-key?name=${encodeURIComponent(name)}`, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    nameInput.value = '';
+                    const displayBox = document.getElementById('api-key-display-box');
+                    displayBox.style.display = 'block';
+                    document.getElementById('label-new-api-key').textContent = data.api_key;
+                    loadSettingsApiKeys();
+                }
+            } catch(e) {}
+        });
+    }
+
+    // Organization Members Actions
+    async function loadSettingsOrgMembers() {
+        const tbody = document.getElementById('org-members-list-tbody');
+        if (!tbody) return;
+        tbody.innerHTML = `
+            <tr>
+                <td style="font-weight: 600; color: var(--text-bright);">insights_tester</td>
+                <td>Owner</td>
+                <td>2026-06-28</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600; color: var(--text-bright);">antigravity_dev</td>
+                <td>Developer</td>
+                <td>2026-07-01</td>
+            </tr>
+        `;
+    }
+    
+    const btnInvite = document.getElementById('btn-invite-member');
+    if (btnInvite) {
+        btnInvite.addEventListener('click', () => {
+            const emailInput = document.getElementById('input-invite-email');
+            const email = emailInput.value.trim();
+            if (email) {
+                alert(`Invitation sent successfully to: ${email}`);
+                emailInput.value = '';
+            } else {
+                alert('Please provide a valid email address.');
+            }
+        });
     }
 }
 

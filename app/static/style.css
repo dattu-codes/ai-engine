@@ -2421,3 +2421,48 @@ textarea#code-input {
 }
 
 
+/* Light theme overrides */
+body.light-theme {
+    --bg-dark: #fafafa;
+    --bg-panel: #ffffff;
+    --text-bright: #18181b;
+    --text-main: #3f3f46;
+    --text-muted: #8b8d99;
+    --border-color: rgba(9, 9, 11, 0.08);
+    --glass-bg: rgba(9, 9, 11, 0.01);
+    --glass-border: rgba(9, 9, 11, 0.04);
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+}
+body.light-theme .auth-card,
+body.light-theme .card,
+body.light-theme .node,
+body.light-theme .glass,
+body.light-theme .tab-pane,
+body.light-theme .results-card,
+body.light-theme .sidebar-panel,
+body.light-theme .top-nav,
+body.light-theme .table-container,
+body.light-theme table,
+body.light-theme th,
+body.light-theme td {
+    background: var(--bg-panel);
+    border-color: var(--border-color);
+}
+body.light-theme pre {
+    background: #f4f4f5;
+    border-color: var(--border-color);
+}
+body.light-theme .project-card.active,
+body.light-theme .tab-btn.active {
+    background: rgba(139, 92, 246, 0.06);
+}
+
+/* Skeleton loaders animations */
+@keyframes pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+
+

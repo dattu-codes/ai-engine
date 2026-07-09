@@ -140,7 +140,10 @@
                         <span class="username-display" id="user-display-name">...</span>
                         <span class="user-role-badge" id="user-display-role">...</span>
                     </div>
-                    <button id="btn-logout" class="logout-btn-nav">Logout</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-open-settings" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-bright); padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;">Settings</button>
+                        <button id="btn-logout" class="logout-btn-nav" style="margin: 0; padding: 6px 12px;">Logout</button>
+                    </div>
                 </div>
             </div>
             
@@ -162,9 +165,12 @@
                 </div>
                 
                 <div class="top-nav-right">
-                    <div class="system-status" style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted);">
-                        <span class="status-indicator online" style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); display: inline-block;"></span>
-                        <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+                    <div style="display: flex; align-items: center; gap: 16px;">
+                        <button id="btn-theme-toggle" style="background: transparent; border: none; font-size: 16px; cursor: pointer; color: var(--text-bright); padding: 4px;" title="Toggle Light/Dark Theme">🌓</button>
+                        <div class="system-status" style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted);">
+                            <span class="status-indicator online" style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); display: inline-block;"></span>
+                            <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+                        </div>
                     </div>
                 </div>
             </nav>
@@ -2123,6 +2129,146 @@
                         <button type="submit" class="btn btn-primary" style="flex: 1; margin: 0;">Create</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Settings Modal Dialog -->
+    <div class="auth-overlay hidden" id="settings-modal" style="z-index: 9999;">
+        <div class="auth-card glass" style="max-width: 600px; width: 90%; min-height: 520px; display: flex; flex-direction: column;">
+            <div class="auth-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                <div>
+                    <h2 style="font-size: 18px; margin: 0;">Account Settings</h2>
+                    <p style="margin: 0; font-size: 11px;">Configure subscription plans, developer tokens, and preferences.</p>
+                </div>
+                <button id="btn-settings-close" style="background: transparent; border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; padding: 4px;">✕</button>
+            </div>
+            
+            <!-- Settings Modal Navigation Tabs -->
+            <div style="display: flex; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px; overflow-x: auto;">
+                <button class="auth-tab-btn active" id="settings-tab-billing-btn" style="font-size: 12px;">Billing & Plans</button>
+                <button class="auth-tab-btn" id="settings-tab-notifications-btn" style="font-size: 12px;">Notifications</button>
+                <button class="auth-tab-btn" id="settings-tab-api-btn" style="font-size: 12px;">API Access</button>
+                <button class="auth-tab-btn" id="settings-tab-org-btn" style="font-size: 12px;">Workspace Organization</button>
+            </div>
+            
+            <div style="flex: 1; display: flex; flex-direction: column;">
+                
+                <!-- Tab Pane: Billing & Plans -->
+                <div class="settings-pane" id="settings-pane-billing" style="display: block;">
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Active Billing Plan</span>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3 id="settings-plan-label" style="font-size: 20px; font-weight: 800; color: var(--text-bright);">FREE PLAN</h3>
+                                <span class="pill outline" id="settings-plan-status" style="border-color: var(--accent-green); color: var(--accent-green);">Active</span>
+                            </div>
+                        </div>
+                        <p style="font-size: 12px; color: var(--text-muted);">Upgrade to Pro plan to increase repository limits (up to 5 projects) and increase parsed files limits (up to 20 files per scan).</p>
+                        <div style="display: flex; gap: 12px;">
+                            <button id="btn-billing-subscribe" class="btn btn-primary" style="flex: 1; margin: 0;">Subscribe to Pro ($19/mo)</button>
+                            <button id="btn-billing-portal" class="btn btn-secondary" style="flex: 1; margin: 0; display: none;">Manage Subscription</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tab Pane: Notifications Preferences -->
+                <div class="settings-pane" id="settings-pane-notifications" style="display: none;">
+                    <form id="settings-notifications-form" style="display: flex; flex-direction: column; gap: 14px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 8px;">Email Notification Alerts</span>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
+                                <input type="checkbox" id="pref-analysis" checked style="width: 16px; height: 16px;">
+                                Send email when an AI Review Analysis completes
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
+                                <input type="checkbox" id="pref-fix" checked style="width: 16px; height: 16px;">
+                                Send email when an AI Fix Generation completes
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
+                                <input type="checkbox" id="pref-tests" checked style="width: 16px; height: 16px;">
+                                Send email when Unit Test executions complete
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
+                                <input type="checkbox" id="pref-sync" checked style="width: 16px; height: 16px;">
+                                Send email when Git Repository auto-syncs
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
+                                <input type="checkbox" id="pref-invite" checked style="width: 16px; height: 16px;">
+                                Send email when team membership invites are accepted
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
+                                <input type="checkbox" id="pref-deployment" checked style="width: 16px; height: 16px;">
+                                Send email when deployment checks complete
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Save Preferences</button>
+                    </form>
+                </div>
+                
+                <!-- Tab Pane: Public API keys -->
+                <div class="settings-pane" id="settings-pane-api" style="display: none;">
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Generate Developer API Key</span>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="text" id="input-api-key-name" placeholder="Token name (e.g. CLI key)..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                            <button id="btn-generate-api-key" class="btn btn-primary" style="margin: 0; padding: 8px 16px;">Generate</button>
+                        </div>
+                        
+                        <div id="api-key-display-box" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 12px; word-break: break-all; color: var(--accent-green);">
+                            <span style="font-weight: bold; font-family: var(--font-sans); display: block; margin-bottom: 4px; font-size: 11px;">COPY KEY NOW (IT WILL NOT BE SHOWN AGAIN):</span>
+                            <span id="label-new-api-key">ae_xxxx</span>
+                        </div>
+                        
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Active Access Tokens</span>
+                        <div class="table-container" style="max-height: 160px; overflow-y: auto;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Expires</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="api-keys-list-tbody">
+                                    <tr>
+                                        <td colspan="3" style="text-align: center; color: var(--text-muted);">No active API keys found.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tab Pane: Organization Members -->
+                <div class="settings-pane" id="settings-pane-org" style="display: none;">
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Invite Team Member</span>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <input type="email" id="input-invite-email" placeholder="Enter member email..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                            <button id="btn-invite-member" class="btn btn-primary" style="margin: 0; padding: 8px 16px;">Send Invite</button>
+                        </div>
+                        
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Workspace Team Members</span>
+                        <div class="table-container" style="max-height: 160px; overflow-y: auto;">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Member Username</th>
+                                        <th>Role</th>
+                                        <th>Joined At</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="org-members-list-tbody">
+                                    <tr>
+                                        <td colspan="3" style="text-align: center; color: var(--text-muted);">Select a workspace to view members list.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </div>

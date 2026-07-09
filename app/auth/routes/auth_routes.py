@@ -248,6 +248,55 @@ def get_admin_dashboard(current_user: User = Depends(require_admin_role)):
     }
 
 
+@auth_router.get("/notifications")
+def get_user_notifications(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Gets the notification preferences for the logged-in user."""
+    from app.notifications.services.notification_service import NotificationService
+    prefs = NotificationService.get_or_create_preferences(db, current_user.id)
+    return {
+        "email_analysis_completed": prefs.email_analysis_completed,
+        "email_fix_completed": prefs.email_fix_completed,
+        "email_tests_completed": prefs.email_tests_completed,
+        "email_repo_synced": prefs.email_repo_synced,
+        "email_invitation_accepted": prefs.email_invitation_accepted,
+        "email_deployment_completed": prefs.email_deployment_completed
+    }
+
+
+@auth_router.put("/notifications")
+def update_user_notifications(
+    req_data: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Updates user notification preferences."""
+    from app.notifications.services.notification_service import NotificationService
+    prefs = NotificationService.get_or_create_preferences(db, current_user.id)
+    
+    # Map attributes
+    prefs.email_analysis_completed = req_data.get("email_analysis_completed", prefs.email_analysis_completed)
+    prefs.email_fix_completed = req_data.get("email_fix_completed", prefs.email_fix_completed)
+    prefs.email_tests_completed = req_data.get("email_tests_completed", prefs.email_tests_completed)
+    prefs.email_repo_synced = req_data.get("email_repo_synced", prefs.email_repo_synced)
+    prefs.email_invitation_accepted = req_data.get("email_invitation_accepted", prefs.email_invitation_accepted)
+    prefs.email_deployment_completed = req_data.get("email_deployment_completed", prefs.email_deployment_completed)
+    
+    db.commit()
+    return {"status": "success", "message": "Notification preferences updated."}
+
+
+@auth_router.get("/billing")
+def get_user_billing(current_user: User = Depends(get_current_user)):
+    """Gets the billing plan status details of the current user."""
+    return {
+        "billing_plan": current_user.billing_plan,
+        "billing_status": current_user.billing_status,
+        "github_connected": current_user.github_connected,
+        "github_username": current_user.github_username
+    }
+
+
+
 # --- Preparation Route Stubs (Placeholder logic for future release) ---
 
 @auth_router.post("/verify-email")

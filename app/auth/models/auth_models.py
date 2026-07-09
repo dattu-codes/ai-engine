@@ -21,9 +21,23 @@ class User(Base):
     failed_login_attempts = Column(Integer, default=0, nullable=False)
     locked_until = Column(DateTime, nullable=True)
 
+    # GitHub Integration
+    github_id = Column(String(255), unique=True, index=True, nullable=True)
+    github_username = Column(String(255), nullable=True)
+    github_token = Column(String(512), nullable=True)
+    github_connected = Column(Boolean, default=False, nullable=False)
+
+    # Stripe Billing
+    stripe_customer_id = Column(String(255), unique=True, index=True, nullable=True)
+    stripe_subscription_id = Column(String(255), nullable=True)
+    billing_plan = Column(String(50), default="Free", nullable=False)
+    billing_status = Column(String(50), default="active", nullable=False)
+
     # Relationships
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
+    notification_preferences = relationship("NotificationPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    api_keys = relationship("ApiKey", back_populates="user", cascade="all, delete-orphan")
 
 
 class RefreshToken(Base):
@@ -82,3 +96,33 @@ class PasswordResetToken(Base):
     token_hash = Column(String(255), unique=True, index=True, nullable=False)
     expires_at = Column(DateTime, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    email_analysis_completed = Column(Boolean, default=True, nullable=False)
+    email_fix_completed = Column(Boolean, default=True, nullable=False)
+    email_tests_completed = Column(Boolean, default=True, nullable=False)
+    email_repo_synced = Column(Boolean, default=True, nullable=False)
+    email_invitation_accepted = Column(Boolean, default=True, nullable=False)
+    email_deployment_completed = Column(Boolean, default=True, nullable=False)
+
+    user = relationship("User", back_populates="notification_preferences")
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    key_hash = Column(String(255), unique=True, index=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    user = relationship("User", back_populates="api_keys")
+

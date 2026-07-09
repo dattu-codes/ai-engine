@@ -24,6 +24,26 @@ class Settings(BaseModel):
     STORAGE_REGION: str = Field(default="us-east-1")
     UPLOAD_DIRECTORY: str = Field(default="app/temp_clones")
 
+    # GitHub OAuth & Webhooks
+    GITHUB_CLIENT_ID: str = Field(default="")
+    GITHUB_CLIENT_SECRET: str = Field(default="")
+    GITHUB_APP_ID: str = Field(default="")
+    GITHUB_PRIVATE_KEY: str = Field(default="")
+    GITHUB_WEBHOOK_SECRET: str = Field(default="")
+
+    # Stripe Billing
+    STRIPE_SECRET_KEY: str = Field(default="")
+    STRIPE_WEBHOOK_SECRET: str = Field(default="")
+    STRIPE_PRICE_PRO_ID: str = Field(default="")
+    STRIPE_PRICE_ENT_ID: str = Field(default="")
+
+    # SMTP Notifications
+    SMTP_HOST: str = Field(default="localhost")
+    SMTP_PORT: int = Field(default=1025)
+    SMTP_USER: str = Field(default="")
+    SMTP_PASSWORD: str = Field(default="")
+    SMTP_FROM: str = Field(default="noreply@aiengine.dev")
+
     # System parameters
     LOG_LEVEL: str = Field(default="INFO")
     APP_ENVIRONMENT: str = Field(default="development")  # development, testing, production
@@ -44,6 +64,20 @@ class Settings(BaseModel):
             STORAGE_BUCKET=os.getenv("STORAGE_BUCKET", "ai-engine-uploads"),
             STORAGE_REGION=os.getenv("STORAGE_REGION", "us-east-1"),
             UPLOAD_DIRECTORY=os.getenv("UPLOAD_DIRECTORY", "app/temp_clones"),
+            GITHUB_CLIENT_ID=os.getenv("GITHUB_CLIENT_ID", ""),
+            GITHUB_CLIENT_SECRET=os.getenv("GITHUB_CLIENT_SECRET", ""),
+            GITHUB_APP_ID=os.getenv("GITHUB_APP_ID", ""),
+            GITHUB_PRIVATE_KEY=os.getenv("GITHUB_PRIVATE_KEY", ""),
+            GITHUB_WEBHOOK_SECRET=os.getenv("GITHUB_WEBHOOK_SECRET", ""),
+            STRIPE_SECRET_KEY=os.getenv("STRIPE_SECRET_KEY", ""),
+            STRIPE_WEBHOOK_SECRET=os.getenv("STRIPE_WEBHOOK_SECRET", ""),
+            STRIPE_PRICE_PRO_ID=os.getenv("STRIPE_PRICE_PRO_ID", ""),
+            STRIPE_PRICE_ENT_ID=os.getenv("STRIPE_PRICE_ENT_ID", ""),
+            SMTP_HOST=os.getenv("SMTP_HOST", "localhost"),
+            SMTP_PORT=int(os.getenv("SMTP_PORT", "1025")),
+            SMTP_USER=os.getenv("SMTP_USER", ""),
+            SMTP_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
+            SMTP_FROM=os.getenv("SMTP_FROM", "noreply@aiengine.dev"),
             LOG_LEVEL=os.getenv("LOG_LEVEL", "INFO"),
             APP_ENVIRONMENT=os.getenv("APP_ENVIRONMENT", "development")
         )
