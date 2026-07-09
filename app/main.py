@@ -1,7 +1,9 @@
 import asyncio
 import os
 import mimetypes
+import app.projects.services.logging_service
 from fastapi import FastAPI, HTTPException, Response, Depends
+
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -26,10 +28,22 @@ from app.projects.routes.comment_routes import comment_router
 from app.projects.routes.activity_routes import activity_router
 from app.projects.routes.fix_routes import fix_router
 from app.projects.routes.test_routes import test_router
+from app.projects.routes.health_routes import health_router
 from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, ReviewFinding, SemanticNode, SemanticEdge, Workspace, WorkspaceMember, FindingComment, ActivityLog, FixExecution, TestExecution
+
+
+# Run production diagnostics and environment validation checks on startup
+from app.startup_validator import run_startup_validation
+run_startup_validation()
 
 # Create database tables automatically on startup
 Base.metadata.create_all(bind=engine)
+
+# Start the background job worker daemon thread
+from app.projects.services.worker_service import start_worker
+start_worker()
+
+
 
 # FastAPI app
 app = FastAPI(title="Mini Workflow Engine")
@@ -56,6 +70,8 @@ app.include_router(comment_router)
 app.include_router(activity_router)
 app.include_router(fix_router)
 app.include_router(test_router)
+app.include_router(health_router)
+
 
 # In-memory stores
 graph_store = GraphStore()

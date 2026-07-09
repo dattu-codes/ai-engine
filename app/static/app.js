@@ -776,10 +776,143 @@ function initSidebar() {
                 loadFixCenter(activeProjectId);
             } else if (targetView === 'view-test-center') {
                 loadTestCenter(activeProjectId);
+            } else if (targetView === 'view-deployment') {
+                loadDeploymentMetrics();
+            }
+
+            // Dynamically update breadcrumbs active text
+            const navTextSpan = item.querySelector('.nav-text');
+            if (navTextSpan) {
+                const breadcrumbActive = document.getElementById('nav-breadcrumbs-view');
+                if (breadcrumbActive) {
+                    breadcrumbActive.textContent = navTextSpan.textContent;
+                }
             }
         });
     });
 }
+
+let deploymentPollInterval = null;
+
+async function loadDeploymentMetrics() {
+    await fetchDeploymentMetrics();
+    
+    if (deploymentPollInterval) {
+        clearInterval(deploymentPollInterval);
+    }
+    
+    // Poll metrics every 5 seconds while on this pane
+    deploymentPollInterval = setInterval(async () => {
+        const view = document.getElementById('view-deployment');
+        if (view && view.classList.contains('active')) {
+            await fetchDeploymentMetrics();
+        } else {
+            clearInterval(deploymentPollInterval);
+            deploymentPollInterval = null;
+        }
+    }, 5000);
+}
+
+async function fetchDeploymentMetrics() {
+    try {
+        const token = localStorage.getItem('token');
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        const healthRes = await fetch('/health', { headers });
+        let healthData = { status: 'Unhealthy', database: 'Offline', redis: 'Offline', storage: 'Offline', version: '2.6.0' };
+        if (healthRes.ok) {
+            healthData = await healthRes.json();
+        }
+        
+        const metricsRes = await fetch('/metrics', { headers });
+        let metricsData = {
+            projects: 0, analyses: 0, fixes: 0, tests: 0,
+            queue_size: 0, active_workers: 1, average_processing_time: 4.5,
+            failure_rate: '0.0%', cache_hits: 0, cache_misses: 0
+        };
+        if (metricsRes.ok) {
+            metricsData = await metricsRes.json();
+        }
+
+        const diagRes = await fetch('/diagnostics', { headers });
+        let diagData = { warnings: [], recommendations: [] };
+        if (diagRes.ok) {
+            diagData = await diagRes.json();
+        }
+        
+        const statusBadge = document.getElementById('deployment-status-badge');
+        const envBadge = document.getElementById('deployment-env-badge');
+        
+        const isProd = healthData.environment === 'production';
+        envBadge.textContent = `ENVIRONMENT: ${healthData.environment ? healthData.environment.toUpperCase() : 'DEVELOPMENT'}`;
+        envBadge.className = isProd ? 'badge badge-warning' : 'badge badge-info';
+        
+        statusBadge.textContent = healthData.status === 'Healthy' ? 'SYSTEM READY' : 'SYSTEM DEGRADED';
+        statusBadge.className = healthData.status === 'Healthy' ? 'badge badge-success' : 'badge badge-danger';
+        
+        const dbStatus = document.getElementById('metrics-db-status');
+        const dbType = document.getElementById('metrics-db-type');
+        dbStatus.textContent = healthData.database.includes('Unhealthy') ? 'ERROR' : 'HEALTHY';
+        dbStatus.style.color = healthData.database.includes('Unhealthy') ? 'var(--accent-red)' : 'var(--accent-green)';
+        dbType.textContent = isProd ? 'PostgreSQL Engine' : 'SQLite Engine (Development)';
+        
+        const redisStatus = document.getElementById('metrics-redis-status');
+        const redisInfo = document.getElementById('metrics-redis-info');
+        const isRedisOffline = healthData.redis.includes('Unhealthy');
+        redisStatus.textContent = isRedisOffline ? 'OFFLINE' : 'CONNECTED';
+        redisStatus.style.color = isRedisOffline ? 'var(--accent-red)' : 'var(--accent-green)';
+        redisInfo.textContent = isRedisOffline ? 'Offline Fallback' : 'Active Connection Cache';
+        
+        const storageStatus = document.getElementById('metrics-storage-status');
+        const storageProvider = document.getElementById('metrics-storage-provider');
+        const isStorageOffline = healthData.storage.includes('Unhealthy');
+        storageStatus.textContent = isStorageOffline ? 'ERROR' : 'ONLINE';
+        storageStatus.style.color = isStorageOffline ? 'var(--accent-red)' : 'var(--accent-green)';
+        storageProvider.textContent = isProd ? 'AWS S3 cloud storage' : 'Local Storage filesystem';
+        
+        document.getElementById('metrics-active-workers').textContent = metricsData.active_workers;
+        document.getElementById('queue-pending-count').textContent = metricsData.queue_size;
+        document.getElementById('queue-failure-rate').textContent = metricsData.failure_rate;
+        document.getElementById('queue-avg-latency').textContent = `${metricsData.average_processing_time}s`;
+        
+        document.getElementById('metric-total-projects').textContent = metricsData.projects;
+        document.getElementById('metric-total-analyses').textContent = metricsData.analyses;
+        document.getElementById('metric-total-fixes').textContent = metricsData.fixes;
+        document.getElementById('metric-total-tests').textContent = metricsData.tests;
+        
+        const dockerMode = document.getElementById('diagnostics-docker-mode');
+        dockerMode.textContent = isProd ? 'Active (production compose)' : 'Inactive';
+        dockerMode.style.color = isProd ? 'var(--accent-green)' : 'var(--text-muted)';
+        
+        const logsList = document.getElementById('diagnostics-logs-list');
+        let logsHTML = `
+            <div>[INFO] Platform Version: v${healthData.version || '2.6.0'}</div>
+            <div>[INFO] Database Status check: ${healthData.database}</div>
+            <div>[INFO] Redis Cache pool check: ${healthData.redis}</div>
+            <div>[INFO] Storage Layer write check: ${healthData.storage}</div>
+            <div>[INFO] Active queues: task_queue length = ${metricsData.queue_size}</div>
+        `;
+        if (diagData.warnings && diagData.warnings.length > 0) {
+            diagData.warnings.forEach(w => {
+                logsHTML += `<div style="color: var(--accent-orange);">[WARN] ${w}</div>`;
+            });
+        }
+        if (diagData.recommendations && diagData.recommendations.length > 0) {
+            diagData.recommendations.forEach(r => {
+                logsHTML += `<div style="color: var(--accent-blue);">[RECO] ${r}</div>`;
+            });
+        }
+        logsList.innerHTML = logsHTML;
+
+        
+    } catch (err) {
+        console.error('Error fetching deployment center metrics:', err);
+    }
+}
+
 
 function initProjectsTab() {
     // Project Modal bindings

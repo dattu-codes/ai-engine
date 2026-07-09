@@ -115,7 +115,18 @@
                         </button>
                     </nav>
                 </div>
+
+                <div>
+                    <div class="sidebar-group-title">Operations</div>
+                    <nav class="sidebar-nav">
+                        <button class="nav-item" data-view="view-deployment" id="nav-item-deployment">
+                            <span class="nav-icon">🚀</span>
+                            <span class="nav-text">Deployment Center</span>
+                        </button>
+                    </nav>
+                </div>
             </div>
+
 
             <!-- Sidebar User Profile Footer Section -->
             <div class="sidebar-footer">
@@ -157,8 +168,131 @@
             <!-- Scrollable View Contents Wrapper -->
             <div style="padding: 24px; flex: 1; overflow-y: auto;">
                 
+                <!-- View: Deployment Readiness Center -->
+                <div class="view-pane" id="view-deployment">
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+                        
+                        <!-- Header with version and status -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+                            <div>
+                                <h1 style="font-size: 24px; font-weight: 700; color: var(--text-bright); letter-spacing: -0.02em;">Deployment Center</h1>
+                                <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Real-time infrastructure health and operational metrics telemetry.</p>
+                            </div>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <div class="badge badge-info" id="deployment-env-badge" style="padding: 6px 12px; font-size: 12px;">ENVIRONMENT: DEVELOPMENT</div>
+                                <div class="badge badge-success" id="deployment-status-badge" style="padding: 6px 12px; font-size: 12px;">SYSTEM READY</div>
+                            </div>
+                        </div>
+
+                        <!-- Telemetry Grid -->
+                        <div class="metrics-grid">
+                            <div class="metric-card">
+                                <div class="metric-card-title">Database Integration</div>
+                                <div class="metric-card-value" id="metrics-db-status" style="color: var(--accent-green); font-size: 20px;">HEALTHY</div>
+                                <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;" id="metrics-db-type">SQLite Engine</p>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-card-title">Redis Cache Pool</div>
+                                <div class="metric-card-value" id="metrics-redis-status" style="color: var(--accent-green); font-size: 20px;">CONNECTED</div>
+                                <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;" id="metrics-redis-info">Mock Fallback</p>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-card-title">Object Storage Layer</div>
+                                <div class="metric-card-value" id="metrics-storage-status" style="color: var(--accent-green); font-size: 20px;">ONLINE</div>
+                                <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;" id="metrics-storage-provider">Local Storage filesystem</p>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-card-title">Active Workers</div>
+                                <div class="metric-card-value" id="metrics-active-workers">1</div>
+                                <p style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">Daemon thread pool listener</p>
+                            </div>
+                        </div>
+
+                        <!-- System Telemetry details -->
+                        <div style="display: flex; gap: 24px; align-items: start;">
+                            <!-- Left: Queue and Workers status -->
+                            <div class="card glass" style="flex: 1.2; padding: 20px;">
+                                <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                                    <h2 style="font-size: 16px; font-weight: 600; color: var(--text-bright);">Active Job Processing Queue</h2>
+                                </div>
+                                <div class="card-body">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                                        <div>
+                                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Pending Tasks in Queue</span>
+                                            <h3 style="font-size: 32px; font-weight: 700; color: var(--text-bright);" id="queue-pending-count">0</h3>
+                                        </div>
+                                        <div>
+                                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Job Failure Rate</span>
+                                            <h3 style="font-size: 32px; font-weight: 700; color: var(--accent-red);" id="queue-failure-rate">0.0%</h3>
+                                        </div>
+                                        <div>
+                                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Average AI Latency</span>
+                                            <h3 style="font-size: 32px; font-weight: 700; color: var(--accent-blue);" id="queue-avg-latency">4.5s</h3>
+                                        </div>
+                                    </div>
+                                    <div class="table-container">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Operational Metric</th>
+                                                    <th>Value</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr>
+                                                    <td>Total Projects Uploaded</td>
+                                                    <td id="metric-total-projects">0</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Total AI Code Analyses</td>
+                                                    <td id="metric-total-analyses">0</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Total AI Fixes Proposed</td>
+                                                    <td id="metric-total-fixes">0</td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Total Unit Test Suites Executed</td>
+                                                    <td id="metric-total-tests">0</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: Build & Diagnostics -->
+                            <div class="card glass" style="flex: 0.8; padding: 20px;">
+                                <div class="card-header" style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+                                    <h2 style="font-size: 16px; font-weight: 600; color: var(--text-bright);">Production Diagnostics</h2>
+                                </div>
+                                <div class="card-body" style="display: flex; flex-direction: column; gap: 16px;">
+                                    <div>
+                                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Uptime & Build</span>
+                                        <div style="font-family: var(--font-mono); font-size: 13px; color: var(--text-main); line-height: 1.6;">
+                                            <div>Platform Version: <span style="color: var(--accent-purple);">v2.6.0-release</span></div>
+                                            <div>Docker Compose: <span id="diagnostics-docker-mode" style="color: var(--text-muted);">Inactive</span></div>
+                                            <div>API Gateway Status: <span style="color: var(--accent-green);">Listening</span></div>
+                                        </div>
+                                    </div>
+                                    <div style="border-top: 1px solid var(--border-color); padding-top: 16px;">
+                                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 6px;">Deployment Insights</span>
+                                        <div id="diagnostics-logs-list" style="max-height: 160px; overflow-y: auto; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 6px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; border: 1px solid rgba(255,255,255,0.03);">
+                                            <div>[INFO] StartupReady check: DATABASE = Healthy</div>
+                                            <div>[INFO] StartupReady check: STORAGE = Writable</div>
+                                            <div>[INFO] System running local fallback pipeline.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
                 <!-- View: Dashboard (The original single code analysis view) -->
                 <div class="view-pane active" id="view-dashboard">
+
                     <div style="display: flex; gap: 20px; align-items: start;">
                         <!-- Left Panel: Configuration & Code Editor -->
                         <section class="panel-left" style="flex: 1; display: flex; flex-direction: column; gap: 20px;">

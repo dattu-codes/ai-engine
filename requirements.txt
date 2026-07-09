@@ -5,3 +5,7 @@ pyjwt
 bcrypt
 sqlalchemy
 python-multipart
+redis
+psycopg2-binary
+boto3
+httpx
