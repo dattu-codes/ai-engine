@@ -778,6 +778,8 @@ function initSidebar() {
                 loadTestCenter(activeProjectId);
             } else if (targetView === 'view-deployment') {
                 loadDeploymentMetrics();
+            } else if (targetView === 'view-insights') {
+                loadRepositoryInsights(activeProjectId);
             }
 
             // Dynamically update breadcrumbs active text
@@ -1391,6 +1393,8 @@ async function selectProject(id) {
         if (testCenterBtn) testCenterBtn.style.display = 'block';
         const workspaceBtn = document.getElementById('nav-item-workspace');
         if (workspaceBtn) workspaceBtn.style.display = 'block';
+        const insightsBtn = document.getElementById('nav-item-insights');
+        if (insightsBtn) insightsBtn.style.display = 'block';
 
         // Load files list
         await loadProjectFiles(id);
@@ -5343,3 +5347,299 @@ function initTestCenterControls() {
 document.addEventListener('DOMContentLoaded', () => {
     initTestCenterControls();
 });
+
+/* ==========================================================================
+   REPOSITORY INSIGHTS CONTROLLER FUNCTIONS
+   ========================================================================== */
+
+async function loadRepositoryInsights(projectId) {
+    if (!projectId) return;
+    
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/repository-insights`);
+        if (!res.ok) {
+            console.error("Failed to fetch repository insights");
+            return;
+        }
+        
+        const insights = await res.json();
+        
+        // Update header badges
+        document.getElementById('insights-score-badge').textContent = `SCORE: ${insights.repository_score}/100`;
+        document.getElementById('insights-maturity-badge').textContent = `MATURITY: ${insights.engineering_maturity.toUpperCase()}`;
+        document.getElementById('insights-debt-badge').textContent = `TECH DEBT: ${insights.technical_debt_score.toUpperCase()}`;
+        
+        // Populate maturity dimensions progress bars
+        const dimGrid = document.getElementById('insights-dimensions-grid');
+        dimGrid.innerHTML = '';
+        
+        const dimensions = [
+            { label: 'Architecture', score: insights.architecture_score, color: 'var(--accent-purple)' },
+            { label: 'Security', score: insights.security_score, color: 'var(--accent-red)' },
+            { label: 'Testing', score: insights.testing_score, color: 'var(--accent-blue)' },
+            { label: 'Deployment', score: insights.deployment_score, color: 'var(--accent-green)' },
+            { label: 'Maintainability', score: insights.maintainability_score, color: 'var(--accent-orange)' },
+            { label: 'Documentation', score: insights.documentation_score, color: 'var(--accent-purple)' }
+        ];
+        
+        dimensions.forEach(d => {
+            const card = document.createElement('div');
+            card.style.background = 'rgba(255, 255, 255, 0.02)';
+            card.style.border = '1px solid var(--border-color)';
+            card.style.borderRadius = '6px';
+            card.style.padding = '12px';
+            card.style.display = 'flex';
+            card.style.flexDirection = 'column';
+            card.style.gap = '8px';
+            
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--text-main);">
+                    <span>${d.label}</span>
+                    <span style="color: ${d.color};">${d.score}%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden;">
+                    <div style="width: ${d.score}%; height: 100%; background: ${d.color}; border-radius: 3px; transition: width 0.8s ease;"></div>
+                </div>
+            `;
+            dimGrid.appendChild(card);
+        });
+        
+        // Draw Radar Chart
+        const scoresMap = {
+            'Architecture': insights.architecture_score,
+            'Security': insights.security_score,
+            'Testing': insights.testing_score,
+            'Deployment': insights.deployment_score,
+            'Maintainability': insights.maintainability_score,
+            'Documentation': insights.documentation_score
+        };
+        drawRadarChart('insights-radar-svg', scoresMap);
+        
+        // Populate Strengths list
+        const strList = document.getElementById('insights-strengths-list');
+        strList.innerHTML = '';
+        insights.strengths.forEach(s => {
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.alignItems = 'center';
+            li.style.gap = '8px';
+            li.style.fontSize = '13px';
+            li.style.color = 'var(--text-bright)';
+            li.innerHTML = `<span style="color: var(--accent-green); font-weight: bold; margin-right: 4px;">✓</span> <span>${escapeHtml(s)}</span>`;
+            strList.appendChild(li);
+        });
+        
+        // Populate Weaknesses list
+        const weakList = document.getElementById('insights-weaknesses-list');
+        weakList.innerHTML = '';
+        insights.weaknesses.forEach(w => {
+            const li = document.createElement('li');
+            li.style.display = 'flex';
+            li.style.alignItems = 'center';
+            li.style.gap = '8px';
+            li.style.fontSize = '13px';
+            li.style.color = 'var(--text-bright)';
+            li.innerHTML = `<span style="color: var(--accent-red); font-weight: bold; margin-right: 4px;">✗</span> <span>${escapeHtml(w)}</span>`;
+            weakList.appendChild(li);
+        });
+        
+        // Populate Roadmap timeline list
+        const roadmapList = document.getElementById('insights-roadmap-list');
+        roadmapList.innerHTML = '';
+        if (insights.roadmap && insights.roadmap.length > 0) {
+            insights.roadmap.sort((a, b) => a.recommended_order - b.recommended_order);
+            insights.roadmap.forEach((r, idx) => {
+                const item = document.createElement('div');
+                item.style.display = 'flex';
+                item.style.gap = '16px';
+                item.style.padding = '16px';
+                item.style.background = 'rgba(255, 255, 255, 0.02)';
+                item.style.border = '1px solid var(--border-color)';
+                item.style.borderRadius = '8px';
+                item.style.alignItems = 'start';
+                
+                const priorityColor = r.priority.toLowerCase() === 'high' ? 'var(--accent-red)' : (r.priority.toLowerCase() === 'medium' ? 'var(--accent-orange)' : 'var(--accent-blue)');
+                
+                item.innerHTML = `
+                    <div style="width: 28px; height: 28px; border-radius: 50%; background: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.2); color: var(--accent-purple); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; flex-shrink: 0;">
+                        ${r.recommended_order}
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <h4 style="font-size: 15px; font-weight: 600; color: var(--text-bright); margin: 0;">${escapeHtml(r.title)}</h4>
+                            <div style="display: flex; gap: 8px; font-size: 11px;">
+                                <span class="pill" style="border: 1px solid ${priorityColor}; color: ${priorityColor}; background: transparent; padding: 2px 6px; border-radius: 4px;">${r.priority.toUpperCase()}</span>
+                                <span class="pill outline" style="padding: 2px 6px; border-radius: 4px;">Effort: ${r.effort}</span>
+                                <span class="pill outline" style="border-color: var(--accent-green); color: var(--accent-green); padding: 2px 6px; border-radius: 4px;">Impact: ${r.business_impact}</span>
+                                <span class="pill outline" style="border-color: var(--accent-blue); color: var(--accent-blue); padding: 2px 6px; border-radius: 4px;">${r.estimated_time}</span>
+                            </div>
+                        </div>
+                        <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px; line-height: 1.5; margin-bottom: 0;">${escapeHtml(r.description)}</p>
+                    </div>
+                `;
+                roadmapList.appendChild(item);
+            });
+        } else {
+            roadmapList.innerHTML = '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 24px;">No roadmap items.</div>';
+        }
+        
+        // Populate History Trend list
+        await loadRepositoryHistoryTrend(projectId);
+        
+    } catch (err) {
+        console.error("Error loading insights:", err);
+    }
+}
+
+async function loadRepositoryHistoryTrend(projectId) {
+    const listEl = document.getElementById('insights-history-list');
+    listEl.innerHTML = '';
+    
+    try {
+        const res = await authorizedFetch(`/projects/${projectId}/repository-history`);
+        if (!res.ok) return;
+        
+        const history = await res.json();
+        if (history.length === 0) {
+            listEl.innerHTML = '<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 12px; width: 100%;">No analysis history runs.</div>';
+            return;
+        }
+        
+        history.forEach((h, idx) => {
+            const node = document.createElement('div');
+            node.style.display = 'flex';
+            node.style.flexDirection = 'column';
+            node.style.alignItems = 'center';
+            node.style.gap = '8px';
+            node.style.padding = '12px 16px';
+            node.style.background = 'rgba(255, 255, 255, 0.02)';
+            node.style.border = '1px solid var(--border-color)';
+            node.style.borderRadius = '8px';
+            node.style.minWidth = '110px';
+            node.style.textAlign = 'center';
+            
+            node.innerHTML = `
+                <div style="font-size: 11px; text-transform: uppercase; font-weight: 700; color: var(--text-muted);">Version ${h.version_number}</div>
+                <div style="font-size: 24px; font-weight: bold; color: var(--accent-purple);">${h.repository_score}</div>
+                <div style="font-size: 10px; color: var(--text-muted);">${new Date(h.created_at).toLocaleDateString()}</div>
+            `;
+            listEl.appendChild(node);
+            
+            // Draw connection arrows between elements
+            if (idx < history.length - 1) {
+                const arrow = document.createElement('div');
+                arrow.style.display = 'flex';
+                arrow.style.alignItems = 'center';
+                arrow.style.fontSize = '18px';
+                arrow.style.color = 'var(--text-muted)';
+                arrow.innerHTML = '➔';
+                listEl.appendChild(arrow);
+            }
+        });
+    } catch (e) {
+        console.error("Error loading history list:", e);
+    }
+}
+
+function drawRadarChart(svgId, scores) {
+    const svg = document.getElementById(svgId);
+    if (!svg) return;
+    
+    // Clear old elements
+    svg.innerHTML = '';
+    
+    const center = 140;
+    const r = 90;
+    const dimensions = ['Architecture', 'Security', 'Testing', 'Deployment', 'Maintainability', 'Documentation'];
+    const count = dimensions.length;
+    
+    // Compute vertex points for outer concentric levels
+    const levels = [0.2, 0.4, 0.6, 0.8, 1.0];
+    levels.forEach(level => {
+        const points = [];
+        for (let i = 0; i < count; i++) {
+            const angle = i * (2 * Math.PI / count) - Math.PI / 2;
+            const x = center + r * level * Math.cos(angle);
+            const y = center + r * level * Math.sin(angle);
+            points.push(`${x},${y}`);
+        }
+        
+        const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+        polygon.setAttribute('points', points.join(' '));
+        polygon.setAttribute('fill', 'none');
+        polygon.setAttribute('stroke', 'rgba(255, 255, 255, 0.06)');
+        polygon.setAttribute('stroke-width', '1');
+        svg.appendChild(polygon);
+    });
+    
+    // Draw axis lines and labels
+    for (let i = 0; i < count; i++) {
+        const angle = i * (2 * Math.PI / count) - Math.PI / 2;
+        const targetX = center + r * Math.cos(angle);
+        const targetY = center + r * Math.sin(angle);
+        
+        // Axis line
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', center);
+        line.setAttribute('y1', center);
+        line.setAttribute('x2', targetX);
+        line.setAttribute('y2', targetY);
+        line.setAttribute('stroke', 'rgba(255, 255, 255, 0.1)');
+        line.setAttribute('stroke-width', '1');
+        svg.appendChild(line);
+        
+        // Label
+        const labelText = dimensions[i];
+        const labelOffset = 18;
+        const lx = center + (r + labelOffset) * Math.cos(angle);
+        const ly = center + (r + labelOffset) * Math.sin(angle);
+        
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', lx);
+        text.setAttribute('y', ly);
+        text.setAttribute('font-size', '10px');
+        text.setAttribute('font-weight', '600');
+        text.setAttribute('fill', 'var(--text-muted)');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.textContent = labelText;
+        svg.appendChild(text);
+    }
+    
+    // Draw scores polygon
+    const points = [];
+    for (let i = 0; i < count; i++) {
+        const name = dimensions[i];
+        const score = scores[name] || 0;
+        const angle = i * (2 * Math.PI / count) - Math.PI / 2;
+        const x = center + r * (score / 100) * Math.cos(angle);
+        const y = center + r * (score / 100) * Math.sin(angle);
+        points.push(`${x},${y}`);
+    }
+    
+    const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    polygon.setAttribute('points', points.join(' '));
+    polygon.setAttribute('fill', 'rgba(139, 92, 246, 0.25)');
+    polygon.setAttribute('stroke', 'var(--accent-purple)');
+    polygon.setAttribute('stroke-width', '2');
+    svg.appendChild(polygon);
+    
+    // Draw dots at vertices of scores polygon
+    for (let i = 0; i < count; i++) {
+        const name = dimensions[i];
+        const score = scores[name] || 0;
+        const angle = i * (2 * Math.PI / count) - Math.PI / 2;
+        const x = center + r * (score / 100) * Math.cos(angle);
+        const y = center + r * (score / 100) * Math.sin(angle);
+        
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', x);
+        circle.setAttribute('cy', y);
+        circle.setAttribute('r', '4');
+        circle.setAttribute('fill', 'var(--accent-purple)');
+        circle.setAttribute('stroke', '#fff');
+        circle.setAttribute('stroke-width', '1');
+        svg.appendChild(circle);
+    }
+}
+

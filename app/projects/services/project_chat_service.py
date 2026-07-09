@@ -116,6 +116,45 @@ class ProjectChatService:
         except Exception as te:
             tests_text = f"Error loading test executions context: {te}"
 
+        # Construct repository insights context
+        insights_text = "No Repository Insights generated yet."
+        try:
+            from app.projects.models.project_models import RepositoryInsight, RepositoryInsightHistory
+            insight = db.query(RepositoryInsight).filter(RepositoryInsight.project_id == project_id).first()
+            if insight:
+                strengths = json.loads(insight.strengths_json)
+                weaknesses = json.loads(insight.weaknesses_json)
+                roadmap = json.loads(insight.roadmap_json)
+                
+                history = db.query(RepositoryInsightHistory).filter(
+                    RepositoryInsightHistory.project_id == project_id
+                ).order_by(RepositoryInsightHistory.version_number.asc()).all()
+                history_text = ", ".join([f"v{h.version_number}: Score {h.repository_score}" for h in history])
+                
+                roadmap_items = "\n".join([
+                    f"  - Order {r.get('recommended_order')}: {r.get('title')} ({r.get('priority')} priority, effort: {r.get('effort')}, impact: {r.get('business_impact')}, time: {r.get('estimated_time')}) - {r.get('description')}"
+                    for r in roadmap
+                ])
+                
+                insights_text = (
+                    f"- Overall Repository Score: {insight.repository_score}/100\n"
+                    f"- Architecture Quality Score: {insight.architecture_score}/100\n"
+                    f"- Security Quality Score: {insight.security_score}/100\n"
+                    f"- Testing Quality Score: {insight.testing_score}/100\n"
+                    f"- Deployment Readiness Score: {insight.deployment_score}/100\n"
+                    f"- Maintainability Score: {insight.maintainability_score}/100\n"
+                    f"- Documentation Score: {insight.documentation_score}/100\n"
+                    f"- Technical Debt Level: {insight.technical_debt_score}\n"
+                    f"- Engineering Maturity Level: {insight.engineering_maturity}\n"
+                    f"- Strengths: {', '.join(strengths)}\n"
+                    f"- Weaknesses: {', '.join(weaknesses)}\n"
+                    f"- Evolution Roadmap:\n{roadmap_items}\n"
+                    f"- Score History Trend: {history_text}\n"
+                    f"- Assessment Summary: {insight.summary}"
+                )
+        except Exception as ie:
+            insights_text = f"Error loading Repository Insights context: {ie}"
+
         # Construct source files text context
         source_files_text = "No relevant source files retrieved for this query context."
         if context["files"]:
@@ -146,6 +185,7 @@ class ProjectChatService:
             f"Latest AI Review Findings:\n{findings_text}\n\n"
             f"AI Fix Center Executions Context:\n{fixes_text}\n\n"
             f"AI Test Center Executions Context:\n{tests_text}\n\n"
+            f"Repository Insights & Evolution Roadmap:\n{insights_text}\n\n"
             f"Relevant Source Files Context:\n{source_files_text}\n"
         )
 

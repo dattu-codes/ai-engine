@@ -2411,3 +2411,13 @@ textarea#code-input {
     font-family: var(--font-mono);
 }
 
+/* Repository Insights Styles */
+#insights-radar-svg text {
+    font-family: var(--font-sans);
+    fill: var(--text-muted);
+}
+.badge-purple {
+    background-color: var(--accent-purple) !important;
+}
+
+

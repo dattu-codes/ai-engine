@@ -96,6 +96,8 @@ class SemanticGraphService:
                 cls._parse_js_ts_nodes(content, file_path, project_id, db, symbol_map)
             elif f.language == "Java":
                 cls._parse_java_nodes(content, file_path, project_id, db, symbol_map)
+            elif f.language == "Go":
+                cls._parse_go_nodes(content, file_path, project_id, db, symbol_map)
             else:
                 # Basic generic fallback parser
                 cls._parse_generic_nodes(content, file_path, project_id, db, symbol_map)
@@ -114,6 +116,8 @@ class SemanticGraphService:
                 cls._parse_js_ts_edges(content, file_path, project_id, db, source_file_node_id, symbol_map, file_map)
             elif f.language == "Java":
                 cls._parse_java_edges(content, file_path, project_id, db, source_file_node_id, symbol_map, file_map)
+            elif f.language == "Go":
+                cls._parse_go_edges(content, file_path, project_id, db, source_file_node_id, symbol_map, file_map)
             else:
                 cls._parse_generic_edges(content, file_path, project_id, db, source_file_node_id, symbol_map, file_map)
 
@@ -417,6 +421,179 @@ class SemanticGraphService:
             if import_match:
                 cls._create_import_edge(db, project_id, source_file_node_id, import_match.group(1), file_map)
 
+    @classmethod
+    def _parse_go_nodes(cls, content: str, file_path: str, project_id: int, db: Session, symbol_map: dict):
+        lines = content.splitlines()
+        current_package = "main"
+        
+        # Discover package
+        for line in lines:
+            m = re.match(r"package\s+(\w+)", line.strip())
+            if m:
+                current_package = m.group(1)
+                break
+                
+        # Discover nodes
+        for idx, line in enumerate(lines, 1):
+            line_str = line.strip()
+            
+            # Struct definition
+            struct_match = re.search(r"type\s+(\w+)\s+struct", line_str)
+            if struct_match:
+                name = struct_match.group(1)
+                db_node = SemanticNode(
+                    project_id=project_id,
+                    node_type="class",
+                    name=name,
+                    file_path=file_path,
+                    start_line=idx,
+                    end_line=idx + 15,
+                    metadata_json=json.dumps({"package": current_package, "kind": "struct"})
+                )
+                db.add(db_node)
+                db.flush()
+                symbol_map[(file_path, name)] = db_node.id
+                continue
+                
+            # Interface definition
+            interface_match = re.search(r"type\s+(\w+)\s+interface", line_str)
+            if interface_match:
+                name = interface_match.group(1)
+                db_node = SemanticNode(
+                    project_id=project_id,
+                    node_type="interface",
+                    name=name,
+                    file_path=file_path,
+                    start_line=idx,
+                    end_line=idx + 10,
+                    metadata_json=json.dumps({"package": current_package, "kind": "interface"})
+                )
+                db.add(db_node)
+                db.flush()
+                symbol_map[(file_path, name)] = db_node.id
+                continue
+                
+            # Method receiver check
+            method_match = re.search(r"func\s*\(\s*(?:\w+\s+)?\*?(\w+)\s*\)\s*(\w+)\s*\(", line_str)
+            if method_match:
+                recv_type = method_match.group(1)
+                method_name = method_match.group(2)
+                db_node = SemanticNode(
+                    project_id=project_id,
+                    node_type="method",
+                    name=f"{recv_type}.{method_name}",
+                    file_path=file_path,
+                    start_line=idx,
+                    end_line=idx + 8,
+                    metadata_json=json.dumps({"package": current_package, "receiver": recv_type})
+                )
+                db.add(db_node)
+                db.flush()
+                symbol_map[(file_path, f"{recv_type}.{method_name}")] = db_node.id
+                continue
+                
+            # Function definition
+            func_match = re.search(r"func\s+(\w+)\s*\(", line_str)
+            if func_match:
+                func_name = func_match.group(1)
+                db_node = SemanticNode(
+                    project_id=project_id,
+                    node_type="function",
+                    name=func_name,
+                    file_path=file_path,
+                    start_line=idx,
+                    end_line=idx + 8,
+                    metadata_json=json.dumps({"package": current_package})
+                )
+                db.add(db_node)
+                db.flush()
+                symbol_map[(file_path, func_name)] = db_node.id
+                continue
+
+    @classmethod
+    def _parse_go_edges(cls, content: str, file_path: str, project_id: int, db: Session, source_file_node_id: int, symbol_map: dict, file_map: dict):
+        lines = content.splitlines()
+        
+        # 1. Parse imports
+        in_import_block = False
+        for idx, line in enumerate(lines, 1):
+            line_str = line.strip()
+            
+            # Single line import
+            single_import = re.match(r"import\s+\"([^\"]+)\"", line_str)
+            if single_import:
+                cls._create_import_edge(db, project_id, source_file_node_id, single_import.group(1), file_map)
+                continue
+                
+            # Block import start
+            if line_str.startswith("import ("):
+                in_import_block = True
+                continue
+            
+            if in_import_block:
+                if line_str == ")":
+                    in_import_block = False
+                    continue
+                path_match = re.search(r"\"([^\"]+)\"", line_str)
+                if path_match:
+                    cls._create_import_edge(db, project_id, source_file_node_id, path_match.group(1), file_map)
+                    
+        # 2. Parse struct embedding
+        struct_name = None
+        for idx, line in enumerate(lines, 1):
+            line_str = line.strip()
+            struct_match = re.search(r"type\s+(\w+)\s+struct", line_str)
+            if struct_match:
+                struct_name = struct_match.group(1)
+                continue
+            if struct_name:
+                if line_str == "}":
+                    struct_name = None
+                    continue
+                # Embedded struct
+                embed_match = re.match(r"^\*?(\w+)(?:\s*;|\s*$)", line_str)
+                if embed_match:
+                    embedded_type = embed_match.group(1)
+                    cls_node_id = symbol_map.get((file_path, struct_name))
+                    target_cls_id = cls._resolve_python_call_target(embedded_type, file_path, symbol_map)
+                    if cls_node_id and target_cls_id:
+                        cls._create_edge(db, project_id, cls_node_id, target_cls_id, "INHERITS")
+                        cls._create_edge(db, project_id, cls_node_id, target_cls_id, "EMBED")
+
+        # 3. Parse function / method calls
+        for idx, line in enumerate(lines, 1):
+            line_str = line.strip()
+            for call_match in re.finditer(r"\b(\w+)\s*\(", line_str):
+                func_name = call_match.group(1)
+                if func_name in ["make", "new", "len", "append", "panic", "recover", "close", "defer", "go", "print", "println"]:
+                    continue
+                target_node_id = cls._resolve_python_call_target(func_name, file_path, symbol_map)
+                if target_node_id:
+                    best_caller = cls._find_closest_enclosing_node(None, idx, file_path, db, project_id)
+                    caller_node_id = best_caller.id if best_caller else source_file_node_id
+                    cls._create_edge(db, project_id, caller_node_id, target_node_id, "CALLS")
+
+        # 4. Resolve Interface implementation (IMPLEMENTS)
+        from app.projects.models.project_models import SemanticNode
+        interfaces = db.query(SemanticNode).filter(
+            SemanticNode.project_id == project_id,
+            SemanticNode.node_type == "interface"
+        ).all()
+        structs = db.query(SemanticNode).filter(
+            SemanticNode.project_id == project_id,
+            SemanticNode.node_type == "class"
+        ).all()
+        methods = db.query(SemanticNode).filter(
+            SemanticNode.project_id == project_id,
+            SemanticNode.node_type == "method"
+        ).all()
+        
+        for struct in structs:
+            struct_methods = {m.name.split(".")[-1] for m in methods if m.name.startswith(f"{struct.name}.")}
+            for interface in interfaces:
+                if struct_methods:
+                    cls._create_edge(db, project_id, struct.id, interface.id, "IMPLEMENTS")
+
     # --- GENERIC FALLBACKS ---
 
     @classmethod
@@ -470,7 +647,7 @@ class SemanticGraphService:
         # Resolve target module name to internal file path candidate
         normalized = target_module.replace(".", "/").strip("/")
         for fpath, fid in file_map.items():
-            if normalized in fpath or fpath.endswith(normalized + ".py") or fpath.endswith(normalized + ".js") or fpath.endswith(normalized + ".java"):
+            if normalized in fpath or fpath.endswith(normalized + ".py") or fpath.endswith(normalized + ".js") or fpath.endswith(normalized + ".java") or fpath.endswith(normalized + ".go"):
                 cls._create_edge(db, project_id, source_file_node_id, fid, "IMPORTS")
                 cls._create_edge(db, project_id, source_file_node_id, fid, "DEPENDS_ON")
                 break
@@ -564,6 +741,8 @@ class SemanticGraphService:
                         cls._parse_js_ts_nodes(content, file_path, base_ver.project_id, db, symbol_map)
                     elif f.language == "Java":
                         cls._parse_java_nodes(content, file_path, base_ver.project_id, db, symbol_map)
+                    elif f.language == "Go":
+                        cls._parse_go_nodes(content, file_path, base_ver.project_id, db, symbol_map)
                     else:
                         cls._parse_generic_nodes(content, file_path, base_ver.project_id, db, symbol_map)
                         
@@ -579,6 +758,8 @@ class SemanticGraphService:
                             cls._parse_js_ts_edges(content, file_path, base_ver.project_id, db, sf_id, symbol_map, file_map)
                         elif f.language == "Java":
                             cls._parse_java_edges(content, file_path, base_ver.project_id, db, sf_id, symbol_map, file_map)
+                        elif f.language == "Go":
+                            cls._parse_go_edges(content, file_path, base_ver.project_id, db, sf_id, symbol_map, file_map)
                         else:
                             cls._parse_generic_edges(content, file_path, base_ver.project_id, db, sf_id, symbol_map, file_map)
                             

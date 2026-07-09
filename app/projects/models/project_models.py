@@ -17,6 +17,7 @@ class Project(Base):
     # Relationships
     analyses = relationship("Analysis", back_populates="project", cascade="all, delete-orphan")
     versions = relationship("ProjectVersion", back_populates="project", cascade="all, delete-orphan")
+    insight = relationship("RepositoryInsight", back_populates="project", uselist=False, cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="project", cascade="all, delete-orphan")
     pull_requests = relationship("PullRequest", back_populates="project", cascade="all, delete-orphan")
     findings = relationship("ReviewFinding", back_populates="project", cascade="all, delete-orphan")
@@ -409,6 +410,45 @@ class TestExecution(Base):
     project = relationship("Project")
     version = relationship("ProjectVersion")
     fix_execution = relationship("FixExecution")
+
+
+class RepositoryInsight(Base):
+    __tablename__ = "repository_insights"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), unique=True, nullable=False)
+    repository_score = Column(Integer, nullable=False)
+    architecture_score = Column(Integer, nullable=False)
+    security_score = Column(Integer, nullable=False)
+    testing_score = Column(Integer, nullable=False)
+    deployment_score = Column(Integer, nullable=False)
+    maintainability_score = Column(Integer, nullable=False)
+    documentation_score = Column(Integer, nullable=False)
+    technical_debt_score = Column(String(50), nullable=False)  # Very Low, Low, Moderate, High, Critical
+    engineering_maturity = Column(String(100), nullable=False)  # Starter, Growing, Intermediate, Production Candidate, Production Ready, Enterprise Ready
+    strengths_json = Column(Text, nullable=False)  # JSON-serialized list of strings
+    weaknesses_json = Column(Text, nullable=False)  # JSON-serialized list of strings
+    roadmap_json = Column(Text, nullable=False)  # JSON-serialized list of dicts
+    summary = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    project = relationship("Project", back_populates="insight")
+
+
+class RepositoryInsightHistory(Base):
+    __tablename__ = "repository_insight_history"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    analysis_id = Column(Integer, ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    repository_score = Column(Integer, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    project = relationship("Project")
+    analysis = relationship("Analysis")
+
 
 
 

@@ -65,6 +65,10 @@
                             <span class="nav-icon">📊</span>
                             <span class="nav-text">Dashboard</span>
                         </button>
+                        <button class="nav-item" data-view="view-insights" id="nav-item-insights" style="display: none;">
+                            <span class="nav-icon">📈</span>
+                            <span class="nav-text">Repository Insights</span>
+                        </button>
                         <button class="nav-item" data-view="view-projects">
                             <span class="nav-icon">📁</span>
                             <span class="nav-text">Projects</span>
@@ -284,6 +288,75 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- View: Repository Insights -->
+                <div class="view-pane" id="view-insights" style="display: none;">
+                    <div style="display: flex; flex-direction: column; gap: 24px;">
+                        
+                        <!-- Header -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
+                            <div>
+                                <h1 style="font-size: 24px; font-weight: 700; color: var(--text-bright); letter-spacing: -0.02em;">Repository Insights</h1>
+                                <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Engineering maturity assessment, technical debt estimation, and prioritized evolution roadmap.</p>
+                            </div>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <div class="badge badge-purple" id="insights-score-badge" style="padding: 6px 12px; font-size: 12px; font-weight: bold; background: var(--accent-purple); color: #fff; border-radius: 4px;">SCORE: --</div>
+                                <div class="badge badge-info" id="insights-maturity-badge" style="padding: 6px 12px; font-size: 12px; font-weight: bold; background: var(--accent-blue); color: #fff; border-radius: 4px;">MATURITY: --</div>
+                                <div class="badge badge-warning" id="insights-debt-badge" style="padding: 6px 12px; font-size: 12px; font-weight: bold; background: var(--accent-orange); color: #fff; border-radius: 4px;">TECH DEBT: --</div>
+                            </div>
+                        </div>
+
+                        <!-- Top Section: Radar Chart & Sub-scores -->
+                        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                            <!-- Radar Chart -->
+                            <div class="card glass" style="flex: 1; min-width: 320px; padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                <h3 style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 16px; align-self: flex-start;">Maturity Vector Analysis</h3>
+                                <div style="position: relative; width: 280px; height: 280px; display: flex; align-items: center; justify-content: center;">
+                                    <svg id="insights-radar-svg" width="280" height="280" style="overflow: visible;"></svg>
+                                </div>
+                            </div>
+
+                            <!-- Scorecards -->
+                            <div class="card glass" style="flex: 1.5; min-width: 400px; padding: 20px;">
+                                <h3 style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 20px;">Maturity Dimensions</h3>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;" id="insights-dimensions-grid">
+                                    <!-- Dynamic elements inserted here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Strengths & Weaknesses -->
+                        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                            <!-- Strengths -->
+                            <div class="card glass" style="flex: 1; padding: 20px; border-left: 4px solid var(--accent-green); background: rgba(52, 211, 153, 0.03);">
+                                <h3 style="font-size: 14px; font-weight: 600; color: var(--accent-green); margin-bottom: 16px;">Key Strengths</h3>
+                                <ul id="insights-strengths-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px;"></ul>
+                            </div>
+                            <!-- Weaknesses -->
+                            <div class="card glass" style="flex: 1; padding: 20px; border-left: 4px solid var(--accent-red); background: rgba(239, 68, 68, 0.03);">
+                                <h3 style="font-size: 14px; font-weight: 600; color: var(--accent-red); margin-bottom: 16px;">Critical Weaknesses</h3>
+                                <ul id="insights-weaknesses-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px;"></ul>
+                            </div>
+                        </div>
+
+                        <!-- Evolution Roadmap -->
+                        <div class="card glass" style="padding: 20px;">
+                            <h3 style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 20px;">Prioritized Evolution Roadmap</h3>
+                            <div style="display: flex; flex-direction: column; gap: 16px;" id="insights-roadmap-list">
+                                <!-- Dynamic roadmap steps -->
+                            </div>
+                        </div>
+
+                        <!-- History / Trends -->
+                        <div class="card glass" style="padding: 20px;">
+                            <h3 style="font-size: 14px; font-weight: 600; color: var(--text-bright); margin-bottom: 16px;">Repository Score History</h3>
+                            <div style="display: flex; gap: 16px; overflow-x: auto; padding-bottom: 8px;" id="insights-history-list">
+                                <!-- Dynamic history bubbles -->
                             </div>
                         </div>
 

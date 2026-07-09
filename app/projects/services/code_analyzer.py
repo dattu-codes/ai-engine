@@ -290,6 +290,96 @@ class CodeAnalyzerService:
         for idx, line in enumerate(lines, 1):
             line_str = line.strip()
 
+            if language == "go":
+                # 1. Ignored error check
+                if ":=" in line_str or "=" in line_str:
+                    parts = line_str.split(":=") if ":=" in line_str else line_str.split("=")
+                    if len(parts) > 1:
+                        lhs, rhs = parts[0], parts[1]
+                        lhs_vars = [v.strip() for v in lhs.split(",")]
+                        if "_" in lhs_vars and "(" in rhs:
+                            vulnerabilities.append({
+                                "severity": "Medium",
+                                "line": idx,
+                                "category": "Bug",
+                                "title": "Ignored error return value",
+                                "description": "Go functions return errors that must be checked. Assigning error returns to blank identifier '_' bypasses safety error handling.",
+                                "recommendation": "Check error explicitly: if err != nil { return err }"
+                            })
+
+                # 2. Mutex deadlock risk
+                if ".Lock()" in line_str:
+                    remaining_content = "\n".join(lines[idx:])
+                    if ".Unlock()" not in remaining_content:
+                        vulnerabilities.append({
+                            "severity": "High",
+                            "line": idx,
+                            "category": "Bug",
+                            "title": "Unreleased Mutex Lock (Deadlock Risk)",
+                            "description": "Calling Mutex.Lock() without a corresponding defer or direct Mutex.Unlock() leaves locks unreleased, leading to deadlocks.",
+                            "recommendation": "Add: defer mu.Unlock() immediately after mu.Lock()."
+                        })
+
+                # 3. Unbuffered channel
+                if "make(chan " in line_str and "," not in line_str:
+                    vulnerabilities.append({
+                        "severity": "Medium",
+                        "line": idx,
+                        "category": "Performance",
+                        "title": "Unbuffered channel creation",
+                        "description": "Unbuffered channels block the sender until a receiver is ready, which can lead to goroutine blockages if not synchronized.",
+                        "recommendation": "Provide a buffer size: make(chan Type, capacity), or ensure an active receiver goroutine is ready."
+                    })
+
+                # 4. Goroutine leak risk
+                if "go " in line_str and "func(" in line_str:
+                    if "ctx" not in line_str and "context" not in line_str:
+                        vulnerabilities.append({
+                            "severity": "Medium",
+                            "line": idx,
+                            "category": "Maintainability",
+                            "title": "Uncontrolled goroutine execution (Leak Risk)",
+                            "description": "Spawning a goroutine without passing a context or cancel channel makes it difficult to signal termination, risking goroutine leaks.",
+                            "recommendation": "Pass a context.Context or cancellation channel to govern the lifecycle of the goroutine."
+                        })
+
+                # 5. HTTP context propagation
+                if "http.Get(" in line_str or "http.Post(" in line_str or "http.PostForm(" in line_str:
+                    vulnerabilities.append({
+                        "severity": "Medium",
+                        "line": idx,
+                        "category": "Maintainability",
+                        "title": "HTTP call without context propagation",
+                        "description": "Making HTTP calls via the package-level http.Get/Post methods does not propagate request context, preventing timeout and cancellation signals.",
+                        "recommendation": "Use http.NewRequestWithContext(ctx, ...) followed by client.Do(req) instead."
+                    })
+
+                # 6. SQL injection
+                line_lower = line_str.lower()
+                is_sql_keyword = any(k in line_lower for k in ["select ", "insert ", "update ", "delete "])
+                if is_sql_keyword and ("+" in line_str or "%" in line_str or "fmt.sprintf" in line_lower):
+                    vulnerabilities.append({
+                        "severity": "High",
+                        "line": idx,
+                        "category": "Security",
+                        "title": "Potential SQL Injection in query",
+                        "description": "Constructing database queries via string concatenation or Sprintf allows raw user input to modify query structure, introducing SQL injection.",
+                        "recommendation": "Use parameterized queries with placeholder arguments, e.g., db.Query('SELECT * FROM users WHERE id = ?', id)."
+                    })
+
+                # 7. Nil pointer risk
+                if " := " in line_str and "nil" not in line_str:
+                    match = re.search(r'\w+\([^)]*\)\.\w+', line_str)
+                    if match:
+                        vulnerabilities.append({
+                            "severity": "Medium",
+                            "line": idx,
+                            "category": "Bug",
+                            "title": "Chained method call/field access on function return (Nil Pointer Risk)",
+                            "description": "Accessing a field or method directly on a function's return value without checking if the return is nil can trigger nil pointer panics.",
+                            "recommendation": "Save the return value to a variable, check for nil, and then access its fields."
+                        })
+
             # 1. Check for eval
             if "eval(" in line_str or "eval (" in line_str:
                 vulnerabilities.append({

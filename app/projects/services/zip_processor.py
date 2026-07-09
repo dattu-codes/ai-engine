@@ -13,7 +13,8 @@ class ZipProcessor:
         ".py": "Python",
         ".java": "Java",
         ".js": "JavaScript",
-        ".ts": "TypeScript"
+        ".ts": "TypeScript",
+        ".go": "Go"
     }
 
     @classmethod

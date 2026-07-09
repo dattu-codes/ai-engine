@@ -29,7 +29,8 @@ from app.projects.routes.activity_routes import activity_router
 from app.projects.routes.fix_routes import fix_router
 from app.projects.routes.test_routes import test_router
 from app.projects.routes.health_routes import health_router
-from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, ReviewFinding, SemanticNode, SemanticEdge, Workspace, WorkspaceMember, FindingComment, ActivityLog, FixExecution, TestExecution
+from app.projects.routes.repository_insights_routes import insights_router
+from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, ReviewFinding, SemanticNode, SemanticEdge, Workspace, WorkspaceMember, FindingComment, ActivityLog, FixExecution, TestExecution, RepositoryInsight, RepositoryInsightHistory
 
 
 # Run production diagnostics and environment validation checks on startup
@@ -71,6 +72,7 @@ app.include_router(activity_router)
 app.include_router(fix_router)
 app.include_router(test_router)
 app.include_router(health_router)
+app.include_router(insights_router)
 
 
 # In-memory stores

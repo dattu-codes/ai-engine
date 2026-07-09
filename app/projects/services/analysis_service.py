@@ -138,6 +138,13 @@ class AnalysisService:
                 api_key=api_key
             )
 
+            # Generate Repository Insights automatically on completion of the analysis pipeline
+            try:
+                from app.projects.services.repository_insights_service import RepositoryInsightsService
+                RepositoryInsightsService.generate_insight(db, analysis.project_id)
+            except Exception as re_err:
+                print(f"Error auto-generating repository insights: {re_err}")
+
             # Log Activity Success
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if analysis:
