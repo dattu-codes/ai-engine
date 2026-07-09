@@ -1,6 +1,6 @@
 # AI Engine – Self-Healing Code Review & Project Management Platform
 
-A premium, production-ready AI Code Review and Project Management platform built on FastAPI. It allows developers to organize source code into multi-tenant Workspaces and Projects, ingest entire codebases via ZIP archives, Git repositories, or copy-pastes, construct a Semantic Code Graph of cross-file dependencies, run asynchronous AI Code Reviews using Gemini, track issues in a Review Quality Center, apply self-healing AI Fixes, and collaborate in real-time.
+A premium, production-ready AI Code Review and Project Management platform built on FastAPI. It allows developers to organize source code into multi-tenant Workspaces and Projects, ingest entire codebases via ZIP archives, Git repositories, or copy-pastes, construct a Semantic Code Graph of cross-file dependencies, run asynchronous AI Code Reviews using Gemini, track issues in a Review Quality Center, apply self-healing AI Fixes, execute sandboxed unit tests, evaluate repository-wide insights, and manage SaaS subscriptions.
 
 ---
 
@@ -19,14 +19,14 @@ The platform follows clean architecture principles and isolates logic across sep
 - **Multi-Tenant Database Design**: Relational SQLAlchemy mappings in SQLite.
 - **Clean Sidebar Layout**: A left glassmorphic navigation sidebar to switch between Dashboard, Projects, Versions, Chat, Pull Requests, Semantic Graph, Workspaces, and Quality Center views.
 - **ZIP & Paste Ingestion Engine**:
-  - In-memory decompressor that extracts ZIP archives, automatically skips trash directories (`.git`, `node_modules`, `venv`, etc.), and filters only supported source code files (`.py`, `.java`, `.js`, `.ts`).
-  - Identifies programming languages, tracks file sizes, and records SHA-256 integrity hashes.
+  - In-memory decompressor that extracts ZIP archives, automatically skips trash directories (`.git`, `node_modules`, `venv`, etc.), and filters only supported source code files (`.py`, `.java`, `.js`, `.ts`, `.go`).
+  - Identifies programming languages, tracks file sizes, and records integrity hashes.
 - **Ownership Security Guards**: Checks ownership before any project CRUD operations.
 
 ### 3. Phase 3 – AI Review Engine & Code Intelligence
 - **Prompt Builder Service**: Standardized prompt generator that feeds Gemini code samples and strict rules to output structured JSON.
 - **Gemini Live Integration**: Targets the `gemini-2.5-flash` model for high-efficiency code analysis.
-- **Offline Mock Simulator**: If a Gemini API Key is not configured, the engine automatically switches to a local mock parser to scan code files for common defects (eval commands, print statements, broad exception silencers, and TODO comments).
+- **Offline Mock Simulator**: If a Gemini API Key is not configured, the engine automatically switches to a local mock parser to scan code files for common defects (broad exceptions, ignored errors, SQL injections, and TODO comments).
 - **Code Intelligence Engine**: Automatically maps codebase topology (project type, frameworks, dependencies, entry points, and file priorities) using deterministic AST parsing.
 
 ### 4. Phase 4 – Pull Request Review Dashboard
@@ -61,10 +61,18 @@ The platform follows clean architecture principles and isolates logic across sep
 - **Pytest Sandboxed Executor**: Runs tests in a isolated runner environment, parsing standard stdout and stderr streams.
 - **Coverage Analytics**: Programmatically parses test coverage metrics and stores execution metadata in `TestExecution` database tables.
 
-### 10. Phase 10 – Complete Premium SaaS Frontend Redesign (v2.6)
-- **Collapsible Side Navigation Cockpit**: Replaced standard top-header margins with a collapsible developer-tools panel layout (`#0F1722`).
-- **SaaS Dark Mode Design System**: Standardized styling variables to match world-class developer tools like Linear, GitHub, and Cursor (base background `#0B0F14`, borders `#2A3441`, and accent badges).
-- **Split-Screen Authentication Gateway**: Clean Clerk/Stripe-style secure login portal featuring feature checklists, uppercase form controls, and an "Authenticate" trigger.
+### 10. Phase 10 – Go Language Support & Repository Insights (v2.7)
+- **Go AST Parsing**: Fully parses packages, imports, structs, methods, interfaces, and function calls inside Go code bases.
+- **Go Static Checks**: Scans for blank identifier error ignores, mutex deadlocks, unbuffered channel locks, context skips, dynamic SQL injections, and nil pointer risks.
+- **Repository Insights Engine**: Scores codebases out of 100 on Architecture, Security, Testing, Deployment, Maintainability, and Documentation. Outputs prioritized evolution roadmaps and renders them as responsive SVG radar charts on the UI.
+
+### 11. Phase 11 – Public SaaS Launch (v3.0)
+- **GitHub OAuth Login**: Allows users to sign in with GitHub credentials and fetches remote repository directories.
+- **Repository Webhook Sync**: Registers webhooks to automatically trigger incremental scans on codebase updates.
+- **Stripe Subscriptions**: Exposes checkout and pricing management portals, gating projects and scanned files based on plan tiers (Free, Pro, Enterprise).
+- **Email Notifications**: Formats and transmits email notifications (completed analyses, fix executions, synced repositories) based on user preference settings.
+- **Operational Admin Portal**: Admin-only panel exposing CPU diagnostic lists, worker task queue loops, and user active status toggle switches.
+- **Public REST API v1**: Standardized versioned endpoints authenticated via generated `X-API-KEY` tokens.
 
 ---
 
@@ -74,25 +82,33 @@ The platform follows clean architecture principles and isolates logic across sep
 ai-engine/
 │
 ├── app/
+│   ├── admin/             # Operational Dashboard router and controls
+│   ├── analytics/         # Statistics aggregator routes
+│   ├── api/v1/            # Public REST API v1 endpoint services
 │   ├── auth/              # Authentication System (Clean Architecture)
 │   │   ├── config/        # JWT / DB configuration & settings
 │   │   ├── database/      # SQLite DB connection details
-│   │   ├── models/        # SQLAlchemy tables (User, RefreshToken, Session)
+│   │   ├── models/        # SQLAlchemy tables (User, RefreshToken, Session, ApiKey, etc.)
 │   │   ├── schemas/       # Input validation schemas (Signup, Login, etc.)
 │   │   ├── services/      # Password hashing, JWT generation, & rate-limiting
 │   │   └── routes/        # Router endpoints (/auth/signup, /auth/login)
 │   │
+│   ├── billing/           # Stripe subscription checkers and checkouts
+│   ├── notifications/     # Notification service engines
 │   ├── projects/          # Project & Workspace System (Clean Architecture)
-│   │   ├── models/        # Tables (Project, Workspace, WorkspaceMember, ReviewFinding, Comment, ActivityLog, etc.)
+│   │   ├── models/        # Tables (Project, Workspace, ReviewFinding, Insight, etc.)
 │   │   ├── repositories/  # Database session queries (Repository Pattern)
 │   │   ├── schemas/       # Input validators and output serializers
-│   │   ├── services/      # Code Graph, AI Fix, Quality, Permissions, Workspaces, and Comments services
-│   │   └── routes/        # Endpoints for projects, workspaces, findings, comments, and activities
+│   │   ├── services/      # Code Graph, AI Fix, Insights, Permissions, and Comments services
+│   │   └── routes/        # Endpoints for projects, workspaces, findings, comments, and insights
 │   │
 │   ├── static/            # Static Web Assets
+│   │   ├── landing.html   # Main marketing and features showcase landing page
+│   │   ├── docs.html      # Developer REST API v1 documentation hub
+│   │   ├── admin.html     # Administrative control panel
 │   │   ├── index.html     # Main Glassmorphic SPA Dashboard layout
-│   │   ├── style.css      # Custom styling rules and variables
-│   │   └── app.js         # Event listeners, API fetches, and UI rendering logic
+│   │   ├── style.css      # Custom styling rules and light/dark theme overrides
+│   │   └── app.js         # Event listeners, SVG charts, and settings tabs
 │   │
 │   └── main.py            # FastAPI entry point & custom file endpoints
 │
@@ -101,6 +117,8 @@ ai-engine/
 ├── verify_review_pipeline.py# Automated AI review engine and report test script
 ├── verify_versioning.py   # Automated versioning and AI Fix engine test script
 ├── verify_team_collaboration.py# Automated workspace collaboration and audit log test script
+├── verify_repository_insights.py# Automated repository insights and roadmap verification
+├── verify_public_saas.py  # Automated SaaS limits, webhooks, and REST API test suite
 ├── requirements.txt
 └── README.md
 ```
@@ -132,8 +150,10 @@ uvicorn app.main:app --port 8000
 ```
 
 ### 4. Access the App
-- Open your browser and navigate to: **`http://127.0.0.1:8000/`**
-- Interactive API Documentation: **`http://127.0.0.1:8000/docs`**
+- Landing & Marketing: **`http://127.0.0.1:8000/`**
+- Main Cockpit Dashboard: **`http://127.0.0.1:8000/dashboard`**
+- API Documentation Center: **`http://127.0.0.1:8000/docs`**
+- Operational Administration: **`http://127.0.0.1:8000/admin`**
 
 ---
 
@@ -159,6 +179,12 @@ python verify_team_collaboration.py
 
 # 6. Verify Automated Test Generation & Code Coverage validation
 python verify_test_generation.py
+
+# 7. Verify Go language parsing & Repository Insights scoring
+python verify_repository_insights.py
+
+# 8. Verify SaaS webhooks, Stripe gates, preferences, and Public API tokens
+python verify_public_saas.py
 ```
 
 ---
