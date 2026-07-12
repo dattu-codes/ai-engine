@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Administrative Dashboard - AI Engine</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-dark: #09090b;
-            --bg-panel: #18181b;
+            --bg-panel: #121214;
+            --bg-card: #18181b;
             --text-bright: #fafafa;
             --text-main: #d4d4d8;
             --text-muted: #71717a;
@@ -17,8 +18,8 @@
             --accent-green: #10b981;
             --accent-red: #ef4444;
             --border-color: rgba(255, 255, 255, 0.08);
-            --font-sans: 'Outfit', -apple-system, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
+            --font-sans: 'Inter', -apple-system, sans-serif;
+            --font-mono: 'Geist Mono', monospace;
         }
 
         * {
@@ -32,6 +33,7 @@
             color: var(--text-main);
             font-family: var(--font-sans);
             padding: 40px;
+            letter-spacing: -0.01em;
         }
 
         .header {
@@ -45,7 +47,7 @@
         }
 
         .header h1 {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 800;
             color: var(--text-bright);
             letter-spacing: -0.03em;
@@ -60,8 +62,8 @@
         .back-link {
             color: var(--accent-purple);
             text-decoration: none;
-            font-weight: 600;
-            font-size: 14px;
+            font-weight: 500;
+            font-size: 13px;
         }
 
         .stats-grid {
@@ -75,24 +77,26 @@
         .card {
             background: var(--bg-panel);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 20px;
+            border-radius: 8px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
         }
 
         .card-label {
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
             color: var(--text-muted);
             font-weight: 700;
             letter-spacing: 0.05em;
-            margin-bottom: 6px;
         }
 
         .card-value {
             font-size: 28px;
-            font-weight: 800;
+            font-weight: 700;
             color: var(--text-bright);
-            font-family: var(--font-mono);
+            letter-spacing: -0.03em;
         }
 
         .layout-main {
@@ -103,11 +107,18 @@
             align-items: start;
         }
 
+        @media (max-width: 1024px) {
+            .layout-main {
+                flex-direction: column;
+            }
+        }
+
         .section-left {
             flex: 1.5;
             display: flex;
             flex-direction: column;
             gap: 32px;
+            width: 100%;
         }
 
         .section-right {
@@ -115,11 +126,12 @@
             display: flex;
             flex-direction: column;
             gap: 32px;
+            width: 100%;
         }
 
         h2 {
-            font-size: 18px;
-            font-weight: 700;
+            font-size: 15px;
+            font-weight: 600;
             color: var(--text-bright);
             margin-bottom: 16px;
         }
@@ -141,15 +153,17 @@
         }
 
         th {
-            background: rgba(255,255,255,0.02);
             color: var(--text-muted);
-            font-weight: 600;
+            font-weight: 500;
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-color);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         td {
-            padding: 14px 16px;
+            padding: 12px 16px;
             border-bottom: 1px solid var(--border-color);
         }
 
@@ -158,15 +172,15 @@
         }
 
         .action-btn {
-            background: rgba(239, 68, 68, 0.1);
+            background: var(--accent-red-glow);
             color: var(--accent-red);
             border: 1px solid rgba(239, 68, 68, 0.2);
             padding: 4px 10px;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
-            transition: all 0.2s ease;
+            font-size: 11px;
+            font-weight: 500;
+            transition: all 0.15s ease;
         }
 
         .action-btn:hover {
@@ -186,12 +200,13 @@
         }
 
         .pill {
-            display: inline-block;
-            font-size: 10px;
+            display: inline-flex;
+            font-size: 9px;
             font-weight: 700;
-            padding: 2px 8px;
-            border-radius: 99px;
+            padding: 2px 6px;
+            border-radius: 4px;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .pill.free { background: rgba(113, 113, 122, 0.1); color: var(--text-muted); border: 1px solid rgba(113,113,122,0.2); }
@@ -200,9 +215,9 @@
 
         /* Error Log Listing */
         .logs-box {
-            background: #0f0f11;
+            background: #000;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 6px;
             padding: 16px;
             max-height: 300px;
             overflow-y: auto;
@@ -244,34 +259,34 @@
             <div class="card-value" style="font-size: 20px; padding-top: 8px;" id="stats-plans">-- / -- / --</div>
         </div>
         <div class="card">
-            <div class="card-label">Active Worker threads</div>
+            <div class="card-label">Active Worker Threads</div>
             <div class="card-value" id="stats-active-workers">--</div>
         </div>
         <div class="card">
-            <div class="card-label">Task Queue Length</div>
+            <div class="card-label">Worker Queue Size</div>
             <div class="card-value" id="stats-queue-size">--</div>
         </div>
     </div>
 
     <div class="layout-main">
         <div class="section-left">
-            <div class="card">
-                <h2>User Subscriptions & Accounts</h2>
-                <div class="table-container">
+            <div class="card" style="padding: 0;">
+                <div class="card-label" style="padding: 20px 24px 0 24px;">Active Workspace Members</div>
+                <div class="table-container" style="border: none;">
                     <table>
                         <thead>
                             <tr>
                                 <th>Username</th>
                                 <th>Role</th>
-                                <th>Billing Tier</th>
-                                <th>Integrations</th>
-                                <th>Status</th>
+                                <th>Active Plan</th>
+                                <th>Git Provider</th>
+                                <th>Suspended</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="admin-users-tbody">
                             <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted);">Fetching users database...</td>
+                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px 0;">Loading active SaaS users database...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -281,29 +296,29 @@
 
         <div class="section-right">
             <div class="card">
-                <h2>System Health Telemetry</h2>
-                <div style="display: flex; flex-direction: column; gap: 14px; font-size: 13px;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Database Server Pool</span>
-                        <span id="health-db" style="color: var(--accent-green); font-weight: bold;">--</span>
+                <h2>Integration Health Checks</h2>
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <span style="font-size: 13px; font-weight: 500; color: var(--text-main);">Database Status</span>
+                        <span id="health-db" style="font-weight: 700; color: var(--accent-green); font-size: 13px;">--</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Redis In-Memory Queue</span>
-                        <span id="health-redis" style="color: var(--accent-green); font-weight: bold;">--</span>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <span style="font-size: 13px; font-weight: 500; color: var(--text-main);">Redis Caching</span>
+                        <span id="health-redis" style="font-weight: 700; color: var(--accent-green); font-size: 13px;">--</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Total Parsed Code Files</span>
-                        <span id="health-total-files" style="font-family: var(--font-mono);">--</span>
+                    <div style="display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-color); padding-bottom: 10px;">
+                        <span style="font-size: 13px; font-weight: 500; color: var(--text-main);">Total Tracked Files</span>
+                        <span id="health-total-files" style="font-weight: 700; color: var(--text-bright); font-size: 13px;">--</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Storage pool utilized</span>
-                        <span id="health-storage" style="font-family: var(--font-mono);">--</span>
+                    <div style="display: flex; justify-content: space-between; padding-bottom: 4px;">
+                        <span style="font-size: 13px; font-weight: 500; color: var(--text-main);">Storage Utilized</span>
+                        <span id="health-storage" style="font-weight: 700; color: var(--text-bright); font-size: 13px;">--</span>
                     </div>
                 </div>
             </div>
 
             <div class="card">
-                <h2>Background worker diagnostics</h2>
+                <h2>Background Worker Diagnostics</h2>
                 <div class="logs-box" id="admin-logs-box">
                     <div style="color: var(--text-muted);">Loading diagnostics...</div>
                 </div>

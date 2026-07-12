@@ -4,23 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Engine - Production-Grade Code Intelligence Platform</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-dark: #09090b;
+            --bg-panel: #121214;
+            --bg-card: #18181b;
             --text-bright: #fafafa;
             --text-main: #d4d4d8;
             --text-muted: #71717a;
             --accent-purple: #8b5cf6;
-            --accent-purple-glow: rgba(139, 92, 246, 0.15);
+            --accent-purple-glow: rgba(139, 92, 246, 0.1);
             --accent-blue: #3b82f6;
             --accent-green: #10b981;
-            --accent-orange: #f59e0b;
             --border-color: rgba(255, 255, 255, 0.08);
-            --glass-bg: rgba(255, 255, 255, 0.02);
-            --glass-border: rgba(255, 255, 255, 0.04);
-            --font-sans: 'Outfit', -apple-system, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
+            --font-sans: 'Inter', -apple-system, sans-serif;
+            --font-mono: 'Geist Mono', monospace;
         }
 
         * {
@@ -33,21 +32,9 @@
             background-color: var(--bg-dark);
             color: var(--text-main);
             font-family: var(--font-sans);
-            line-height: 1.6;
+            line-height: 1.5;
             overflow-x: hidden;
-        }
-
-        /* Hero Wrapper Glows */
-        .glow-sphere {
-            position: absolute;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, var(--accent-purple-glow) 0%, transparent 70%);
-            top: -100px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 0;
-            pointer-events: none;
+            letter-spacing: -0.01em;
         }
 
         .landing-header {
@@ -58,14 +45,12 @@
             justify-content: space-between;
             align-items: center;
             padding: 24px;
-            position: relative;
-            z-index: 10;
             border-bottom: 1px solid var(--border-color);
         }
 
         .logo {
-            font-size: 22px;
-            font-weight: 800;
+            font-size: 16px;
+            font-weight: 700;
             color: var(--text-bright);
             letter-spacing: -0.03em;
             display: flex;
@@ -74,16 +59,16 @@
         }
 
         .logo-symbol {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            color: #fff;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
+            background: var(--text-bright);
+            color: var(--bg-dark);
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
-            font-weight: bold;
+            font-size: 12px;
+            font-weight: 800;
         }
 
         .header-nav {
@@ -96,8 +81,8 @@
             color: var(--text-muted);
             text-decoration: none;
             font-weight: 500;
-            font-size: 14px;
-            transition: color 0.2s ease;
+            font-size: 13px;
+            transition: color 0.15s ease;
         }
 
         .header-nav a:hover {
@@ -105,40 +90,42 @@
         }
 
         .cta-btn {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            color: #fff;
-            border: none;
-            padding: 8px 18px;
-            font-weight: 600;
+            background-color: var(--text-bright);
+            color: var(--bg-dark);
+            border: 1px solid var(--text-bright);
+            padding: 6px 14px;
+            font-weight: 500;
             border-radius: 6px;
-            font-size: 14px;
+            font-size: 13px;
             cursor: pointer;
             text-decoration: none;
-            transition: opacity 0.2s ease;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .cta-btn:hover {
-            opacity: 0.9;
+            background-color: transparent;
+            color: var(--text-bright);
         }
 
-        /* Hero section */
+        /* Hero Section */
         .hero {
-            max-width: 1000px;
+            max-width: 800px;
             margin: 0 auto;
-            padding: 80px 24px 60px 24px;
+            padding: 100px 24px 80px 24px;
             text-align: center;
-            position: relative;
-            z-index: 10;
         }
 
         .badge {
-            background: rgba(139, 92, 246, 0.1);
+            background: var(--accent-purple-glow);
             border: 1px solid rgba(139, 92, 246, 0.2);
-            color: #c084fc;
-            padding: 6px 14px;
-            font-size: 12px;
+            color: var(--accent-purple);
+            padding: 4px 12px;
+            font-size: 11px;
             font-weight: 600;
-            border-radius: 9999px;
+            border-radius: 999px;
             display: inline-block;
             margin-bottom: 24px;
             text-transform: uppercase;
@@ -146,43 +133,39 @@
         }
 
         .hero h1 {
-            font-size: 52px;
+            font-size: 48px;
             font-weight: 800;
             color: var(--text-bright);
             line-height: 1.1;
             letter-spacing: -0.03em;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
 
         .hero h1 span {
-            background: linear-gradient(135deg, #c084fc, #60a5fa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            color: var(--accent-purple);
         }
 
         .hero p {
-            font-size: 18px;
+            font-size: 16px;
             color: var(--text-muted);
-            max-width: 650px;
+            max-width: 600px;
             margin: 0 auto 36px auto;
         }
 
-        /* Features Section */
+        /* Section structure */
         .section-container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 60px 24px;
-            position: relative;
-            z-index: 10;
+            padding: 80px 24px;
         }
 
         .section-title {
             text-align: center;
-            margin-bottom: 48px;
+            margin-bottom: 56px;
         }
 
         .section-title h2 {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 700;
             color: var(--text-bright);
             letter-spacing: -0.02em;
@@ -190,7 +173,7 @@
 
         .section-title p {
             color: var(--text-muted);
-            font-size: 15px;
+            font-size: 14px;
             margin-top: 8px;
         }
 
@@ -201,29 +184,28 @@
         }
 
         .feature-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 12px;
-            padding: 24px;
-            transition: all 0.2s ease;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 32px;
+            transition: border-color 0.15s ease;
         }
 
         .feature-card:hover {
-            transform: translateY(-2px);
-            border-color: rgba(255, 255, 255, 0.1);
-            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--border-color-hover);
         }
 
         .feature-icon {
-            font-size: 24px;
+            font-size: 20px;
             margin-bottom: 16px;
+            color: var(--accent-purple);
         }
 
         .feature-card h3 {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: var(--text-bright);
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .feature-card p {
@@ -232,7 +214,7 @@
             line-height: 1.5;
         }
 
-        /* Pricing section */
+        /* Pricing Section */
         .pricing-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -242,66 +224,68 @@
         }
 
         .pricing-card {
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 32px;
-            text-align: center;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 40px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            min-height: 400px;
-            transition: all 0.2s ease;
+            min-height: 420px;
+            transition: border-color 0.15s ease;
+        }
+
+        .pricing-card:hover {
+            border-color: var(--border-color-hover);
         }
 
         .pricing-card.premium {
             border-color: var(--accent-purple);
-            background: rgba(139, 92, 246, 0.03);
-            box-shadow: 0 0 20px rgba(139, 92, 246, 0.08);
+            background: linear-gradient(180deg, var(--bg-panel) 0%, rgba(139, 92, 246, 0.02) 100%);
             position: relative;
         }
 
         .pricing-card.premium::after {
             content: 'POPULAR';
             position: absolute;
-            top: -12px;
+            top: -10px;
             left: 50%;
             transform: translateX(-50%);
             background: var(--accent-purple);
             color: #fff;
             font-size: 9px;
-            font-weight: 800;
-            padding: 3px 10px;
-            border-radius: 99px;
-            letter-spacing: 0.1em;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
         }
 
         .plan-name {
-            font-size: 14px;
+            font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            margin-bottom: 12px;
         }
 
         .plan-price {
-            font-size: 40px;
+            font-size: 36px;
             font-weight: 800;
             color: var(--text-bright);
+            letter-spacing: -0.02em;
             margin-bottom: 24px;
         }
 
         .plan-price span {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             color: var(--text-muted);
         }
 
         .plan-features {
             list-style: none;
-            margin-bottom: 32px;
-            text-align: left;
+            margin-bottom: 36px;
             display: flex;
             flex-direction: column;
             gap: 12px;
@@ -312,6 +296,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            color: var(--text-main);
         }
 
         .plan-features li::before {
@@ -321,39 +306,47 @@
         }
 
         .pricing-btn {
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-bright);
-            border: none;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
             padding: 10px;
-            font-weight: 600;
-            border-radius: 8px;
+            font-weight: 500;
+            border-radius: 6px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease;
             text-decoration: none;
             display: block;
+            text-align: center;
+            font-size: 13px;
         }
 
         .pricing-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--border-color-hover);
+            color: var(--text-bright);
+            background-color: var(--bg-secondary);
         }
 
         .pricing-card.premium .pricing-btn {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            background-color: var(--text-bright);
+            color: var(--bg-dark);
+            border: 1px solid var(--text-bright);
+        }
+        .pricing-card.premium .pricing-btn:hover {
+            background-color: transparent;
+            color: var(--text-bright);
         }
 
         .footer {
             border-top: 1px solid var(--border-color);
-            padding: 40px 24px;
+            padding: 48px 24px;
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-muted);
             margin-top: 80px;
         }
     </style>
 </head>
 <body>
-    <div class="glow-sphere"></div>
-    
     <header class="landing-header">
         <div class="logo">
             <div class="logo-symbol">Æ</div>
@@ -370,7 +363,7 @@
         <h1>The Production-Grade <span>Code Intelligence</span> Platform</h1>
         <p>Connect your GitHub repository and automatically analyze code quality, evaluate semantic graphs, run unit tests, and secure deployment pathways in one unified SaaS cockpit.</p>
         <div>
-            <a href="/dashboard" class="cta-btn" style="padding: 12px 28px; font-size: 16px;">Get Started for Free</a>
+            <a href="/dashboard" class="cta-btn" style="padding: 12px 28px; font-size: 14px;">Get Started for Free</a>
         </div>
     </section>
 
@@ -387,7 +380,7 @@
             </div>
             <div class="feature-card">
                 <div class="feature-icon">🛡</div>
-                <h3>Security Code reviews</h3>
+                <h3>Security Code Reviews</h3>
                 <p>Identifies SQL injection risks, concurrency deadlocks, unbuffered channel locks, and context propagation skips.</p>
             </div>
             <div class="feature-card">
@@ -398,75 +391,78 @@
             <div class="feature-card">
                 <div class="feature-icon">🧪</div>
                 <h3>Test Center</h3>
-                <p>Autogenerates unit tests, mocks endpoints, executes test runners, and reports coverage rates instantly.</p>
+                <p>Runs automatically generated unit test cases inside isolated executors to compute code coverage metrics.</p>
             </div>
             <div class="feature-card">
-                <div class="feature-icon">📊</div>
+                <div class="feature-icon">📈</div>
                 <h3>Repository Insights</h3>
-                <p>Scores architecture, testing, security, maintainability, and provides a prioritized roadmap timeline to evolve code.</p>
+                <p>Computes engineering score roadmaps, analyzes structural technical debt, and renders visual maturity metrics.</p>
             </div>
             <div class="feature-card">
                 <div class="feature-icon">🚀</div>
-                <h3>Deployment readiness</h3>
-                <p>Audits database health, Redis pools, worker daemon statuses, and memory telemetries automatically.</p>
+                <h3>Deployment Center</h3>
+                <p>Validates pipeline health, tracks storage layers status, and monitors redis background queue performance.</p>
             </div>
         </div>
     </section>
 
     <section class="section-container" id="pricing">
         <div class="section-title">
-            <h2>Flexible Subscription Pricing</h2>
-            <p>Start free, scale subscription tiers as your engineering team grows.</p>
+            <h2>Transparent Pricing Plans</h2>
+            <p>Scale your code analysis operations without complex tier structures.</p>
         </div>
         <div class="pricing-grid">
+            <!-- Free Plan -->
             <div class="pricing-card">
                 <div>
                     <div class="plan-name">Free</div>
-                    <div class="plan-price">$0</div>
+                    <div class="plan-price">$0<span>/month</span></div>
                     <ul class="plan-features">
-                        <li>1 Project Repository limit</li>
-                        <li>Max 3 source files per review</li>
-                        <li>Standard Code analysis</li>
-                        <li>Basic Repository Insights</li>
+                        <li>1 Registered Project</li>
+                        <li>Max 3 Files Per Analysis</li>
+                        <li>Standard Review Pipeline</li>
+                        <li>Offline Simulator Fallback</li>
                     </ul>
                 </div>
-                <a href="/dashboard" class="pricing-btn">Get Started</a>
+                <a href="/dashboard" class="pricing-btn">Activate Free Tier</a>
             </div>
 
+            <!-- Pro Plan -->
             <div class="pricing-card premium">
                 <div>
                     <div class="plan-name">Pro</div>
-                    <div class="plan-price">$19<span>/mo</span></div>
+                    <div class="plan-price">$29<span>/month</span></div>
                     <ul class="plan-features">
-                        <li>Up to 5 Project Repositories</li>
-                        <li>Max 20 source files per review</li>
-                        <li>Full AI Code reviews & Refactoring</li>
-                        <li>Detailed Evolution Roadmap</li>
-                        <li>Public API (v1) access tokens</li>
+                        <li>5 Registered Projects</li>
+                        <li>Max 20 Files Per Analysis</li>
+                        <li>Priority Queue Priority</li>
+                        <li>Semantic Graph Visualizer</li>
+                        <li>Email Notification Alerts</li>
                     </ul>
                 </div>
-                <a href="/dashboard" class="pricing-btn">Upgrade Plan</a>
+                <a href="/dashboard" class="pricing-btn">Upgrade to Pro</a>
             </div>
 
+            <!-- Enterprise Plan -->
             <div class="pricing-card">
                 <div>
                     <div class="plan-name">Enterprise</div>
-                    <div class="plan-price">Custom</div>
+                    <div class="plan-price">Custom<span>/negotiated</span></div>
                     <ul class="plan-features">
-                        <li>Unlimited Project Repositories</li>
-                        <li>Unlimited files parsing</li>
-                        <li>SLA Uptime guarantees</li>
-                        <li>Custom AI model fine-tunings</li>
-                        <li>Admin portal dashboard console</li>
+                        <li>Unlimited Projects</li>
+                        <li>Unlimited Files Review</li>
+                        <li>Dedicated Worker Thread</li>
+                        <li>SLA Support & Uptime</li>
+                        <li>Advanced Admin Portal</li>
                     </ul>
                 </div>
-                <a href="/dashboard" class="pricing-btn">Contact Sales</a>
+                <a href="mailto:support@aiengine.com" class="pricing-btn">Contact Sales</a>
             </div>
         </div>
     </section>
 
     <footer class="footer">
-        <p>&copy; 2026 AI Engine Inc. All rights reserved. Made by Google DeepMind team.</p>
+        &copy; 2026 AI Engine Inc. All rights reserved. Built for professional developers.
     </footer>
 </body>
 </html>
