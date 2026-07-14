@@ -1,10 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap');
 
 /* ==========================================================================
-   1. DESIGN SYSTEM VARIABLES
+   1. DESIGN SYSTEM VARIABLES (v2.0)
    ========================================================================== */
 :root {
-    /* Main Theme Colors - Vercel / Linear inspired */
     --bg-primary: #09090B;
     --bg-secondary: #111113;
     --bg-panel: #18181B;
@@ -15,15 +14,15 @@
     --border-focus: #7C3AED;
 
     --accent-purple: #7C3AED;
-    --accent-purple-glow: rgba(124, 58, 237, 0.15);
+    --accent-purple-glow: rgba(124, 58, 237, 0.1);
     --accent-blue: #3b82f6;
-    --accent-blue-glow: rgba(59, 130, 246, 0.15);
+    --accent-blue-glow: rgba(59, 130, 246, 0.1);
     --accent-green: #22C55E;
-    --accent-green-glow: rgba(34, 197, 94, 0.15);
+    --accent-green-glow: rgba(34, 197, 94, 0.1);
     --accent-orange: #F59E0B;
-    --accent-orange-glow: rgba(245, 158, 11, 0.15);
+    --accent-orange-glow: rgba(245, 158, 11, 0.1);
     --accent-red: #EF4444;
-    --accent-red-glow: rgba(239, 68, 68, 0.15);
+    --accent-red-glow: rgba(239, 68, 68, 0.1);
 
     --text-bright: #FAFAFA;
     --text-main: #FAFAFA;
@@ -76,15 +75,15 @@ body.light-theme {
     --border-focus: #6D28D9;
 
     --accent-purple: #6D28D9;
-    --accent-purple-glow: rgba(109, 40, 217, 0.1);
+    --accent-purple-glow: rgba(109, 40, 217, 0.08);
     --accent-blue: #2563eb;
-    --accent-blue-glow: rgba(37, 99, 235, 0.1);
+    --accent-blue-glow: rgba(37, 99, 235, 0.08);
     --accent-green: #16A34A;
-    --accent-green-glow: rgba(22, 163, 74, 0.1);
+    --accent-green-glow: rgba(22, 163, 74, 0.08);
     --accent-orange: #D97706;
-    --accent-orange-glow: rgba(217, 119, 6, 0.1);
+    --accent-orange-glow: rgba(217, 119, 6, 0.08);
     --accent-red: #DC2626;
-    --accent-red-glow: rgba(220, 38, 38, 0.1);
+    --accent-red-glow: rgba(220, 38, 38, 0.08);
 
     --text-bright: #18181B;
     --text-main: #18181B;
@@ -594,6 +593,9 @@ tr:hover td {
     border: 1px solid rgba(59, 130, 246, 0.2);
 }
 
+/* ==========================================================================
+   6. METRIC TIMELINE SUMMARY CARDS
+   ========================================================================== */
 .metrics-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

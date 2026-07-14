@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Engine - Production-Grade Code Intelligence Platform</title>
+    <title>AI Engine — Premium Repository Intelligence Platform</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -111,7 +111,7 @@
             color: var(--text-bright);
         }
 
-        /* Hero section */
+        /* Hero Section */
         .hero {
             max-width: 800px;
             margin: 0 auto;
@@ -152,6 +152,42 @@
             color: var(--text-muted);
             max-width: 600px;
             margin: 0 auto 36px auto;
+        }
+
+        /* Architecture Panel */
+        .preview-panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 1000px;
+            margin: 0 auto 80px auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .preview-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 12px;
+        }
+
+        .preview-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--border-color);
+        }
+
+        .preview-content {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.6;
+            text-align: left;
+            overflow-x: auto;
         }
 
         /* Section structure */
@@ -214,6 +250,34 @@
             font-size: 13px;
             color: var(--text-muted);
             line-height: 1.5;
+        }
+
+        /* FAQ block */
+        .faq-section {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .faq-item {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+        }
+
+        .faq-item h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 8px;
+        }
+
+        .faq-item p {
+            font-size: 13px;
+            color: var(--text-muted);
         }
 
         /* Pricing section */
@@ -369,6 +433,28 @@
         </div>
     </section>
 
+    <!-- Architecture preview block -->
+    <div class="preview-panel">
+        <div class="preview-header">
+            <div class="preview-dot" style="background-color: #ef4444;"></div>
+            <div class="preview-dot" style="background-color: #f59e0b;"></div>
+            <div class="preview-dot" style="background-color: #22c55e;"></div>
+            <span style="font-size: 11px; margin-left: 8px; color: var(--text-muted);">architecture_pipeline.json</span>
+        </div>
+        <div class="preview-content">
+            <pre><code>{
+  "platform": "AI Engine Core v3.0",
+  "pipeline": {
+    "ingestion": "Incremental GIT Diff Analyzer & Semantic Graph Parser",
+    "evaluation": "Gemini-2.5-Flash Parallel Code Reviews Pipeline",
+    "validation": "Sandboxed Execution Harness & Tests Coverage Generator",
+    "operations": "Operational Telemetry & Railway-grade Deployment Watchers"
+  },
+  "integrations": ["GitHub Webhooks", "Stripe Subscription plan-gating check", "SMTP Notification Logs"]
+}</code></pre>
+        </div>
+    </div>
+
     <section class="section-container" id="features">
         <div class="section-title">
             <h2>Platform Core Capabilities</h2>
@@ -459,6 +545,27 @@
                     </ul>
                 </div>
                 <a href="mailto:support@aiengine.com" class="pricing-btn">Contact Sales</a>
+            </div>
+        </div>
+    </section>
+
+    <section class="section-container" id="faq" style="border-top: 1px solid var(--border-color);">
+        <div class="section-title">
+            <h2>Frequently Asked Questions</h2>
+            <p>Answers to common architecture and subscription questions.</p>
+        </div>
+        <div class="faq-section">
+            <div class="faq-item">
+                <h3>How does the incremental GIT diff ingestion work?</h3>
+                <p>AI Engine parses git diff outputs to locate modified files, targeting code reviews exclusively to modified lines, keeping analysis fast and efficient.</p>
+            </div>
+            <div class="faq-item">
+                <h3>Can I host the execution workers in our private cloud?</h3>
+                <p>Yes. The Enterprise package includes support for hosting the background worker pools and parser engines inside your AWS or GCP virtual private cloud.</p>
+            </div>
+            <div class="faq-item">
+                <h3>What language AST structures are currently supported?</h3>
+                <p>We provide full AST parsers and definitions maps for Go, Python, and TypeScript/JavaScript codebases.</p>
             </div>
         </div>
     </section>
