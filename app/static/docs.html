@@ -4,20 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Documentation Center - AI Engine</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #09090b;
-            --bg-panel: #18181b;
-            --text-bright: #fafafa;
-            --text-main: #d4d4d8;
-            --text-muted: #71717a;
-            --accent-purple: #8b5cf6;
+            --bg-dark: #09090B;
+            --bg-panel: #111113;
+            --bg-card: #18181B;
+            --text-bright: #FAFAFA;
+            --text-main: #FAFAFA;
+            --text-muted: #A1A1AA;
+            --accent-purple: #7C3AED;
+            --accent-purple-glow: rgba(124, 58, 237, 0.1);
             --accent-blue: #3b82f6;
-            --accent-green: #10b981;
-            --border-color: rgba(255, 255, 255, 0.08);
-            --font-sans: 'Outfit', -apple-system, sans-serif;
-            --font-mono: 'JetBrains Mono', monospace;
+            --accent-green: #22C55E;
+            --border-color: rgba(255, 255, 255, 0.06);
+            --font-sans: 'Inter', -apple-system, sans-serif;
+            --font-mono: 'Geist Mono', monospace;
         }
 
         * {
@@ -33,11 +35,12 @@
             display: flex;
             height: 100vh;
             overflow: hidden;
+            letter-spacing: -0.01em;
         }
 
         /* Sidebar */
         .docs-sidebar {
-            width: 280px;
+            width: 250px;
             background: var(--bg-panel);
             border-right: 1px solid var(--border-color);
             padding: 24px;
@@ -45,11 +48,12 @@
             display: flex;
             flex-direction: column;
             gap: 24px;
+            flex-shrink: 0;
         }
 
         .logo {
-            font-size: 20px;
-            font-weight: 800;
+            font-size: 16px;
+            font-weight: 700;
             color: var(--text-bright);
             letter-spacing: -0.03em;
             text-decoration: none;
@@ -60,48 +64,57 @@
         }
 
         .logo-symbol {
-            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
-            color: #fff;
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
+            background: var(--text-bright);
+            color: var(--bg-dark);
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            font-weight: bold;
+            font-size: 12px;
+            font-weight: 800;
         }
 
         .nav-group-title {
-            font-size: 11px;
+            font-size: 10px;
             text-transform: uppercase;
             font-weight: 700;
             color: var(--text-muted);
             letter-spacing: 0.05em;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
+            padding-left: 8px;
         }
 
         .nav-links {
             list-style: none;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 2px;
         }
 
         .nav-links a {
-            color: var(--text-main);
+            color: var(--text-muted);
             text-decoration: none;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 500;
             display: block;
-            padding: 6px 10px;
+            padding: 6px 12px;
             border-radius: 6px;
-            transition: all 0.2s ease;
+            transition: all 0.15s ease;
         }
 
-        .nav-links a:hover, .nav-links a.active {
-            background: rgba(255, 255, 255, 0.04);
+        .nav-links a:hover {
+            background: var(--border-color);
             color: var(--text-bright);
+        }
+
+        .nav-links a.active {
+            background: var(--accent-purple-glow);
+            color: var(--text-bright);
+            font-weight: 600;
+            border-left: 2px solid var(--accent-purple);
+            border-radius: 0 6px 6px 0;
         }
 
         /* Main Content */
@@ -110,10 +123,11 @@
             padding: 40px 60px;
             overflow-y: auto;
             height: 100%;
+            background-color: var(--bg-dark);
         }
 
         .docs-section {
-            max-width: 800px;
+            max-width: 760px;
             margin-bottom: 60px;
             display: none;
         }
@@ -123,42 +137,44 @@
         }
 
         h1 {
-            font-size: 36px;
+            font-size: 32px;
             font-weight: 800;
             color: var(--text-bright);
             margin-bottom: 16px;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.03em;
         }
 
         h2 {
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 18px;
+            font-weight: 600;
             color: var(--text-bright);
-            margin: 32px 0 16px 0;
+            margin: 36px 0 16px 0;
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 8px;
+            letter-spacing: -0.02em;
         }
 
         p {
-            font-size: 15px;
+            font-size: 14px;
             line-height: 1.6;
             margin-bottom: 16px;
-            color: var(--text-main);
+            color: var(--text-muted);
         }
 
         code {
             font-family: var(--font-mono);
-            background: rgba(255, 255, 255, 0.04);
-            padding: 3px 6px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            padding: 2px 6px;
             border-radius: 4px;
-            font-size: 13px;
+            font-size: 12px;
             color: #f472b6;
         }
 
         pre {
-            background: #0f0f11;
+            background: var(--bg-panel);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 6px;
             padding: 16px;
             overflow-x: auto;
             margin-bottom: 20px;
@@ -166,16 +182,17 @@
 
         pre code {
             background: transparent;
+            border: none;
             padding: 0;
-            color: #a78bfa;
-            font-size: 13px;
+            color: var(--text-bright);
+            font-size: 12px;
         }
 
         .api-method {
             display: inline-block;
-            font-size: 11px;
-            font-weight: 800;
-            padding: 3px 8px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
             border-radius: 4px;
             color: #fff;
             margin-right: 8px;
@@ -187,9 +204,23 @@
 
         .api-endpoint {
             font-family: var(--font-mono);
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text-bright);
             font-weight: 600;
+        }
+
+        .api-block {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .api-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 12px;
         }
     </style>
     <script>
@@ -267,8 +298,8 @@
                                                 [Background daemon Workers]
                                                            |
                                                            v
-                                            [LLM / Ingestion Parser engines]</code></pre>
-            <h2>Infrastructure layers</h2>
+                                             [LLM / Ingestion Parser engines]</code></pre>
+            <h2>Infrastructure Layers</h2>
             <p>The backend routes write raw code payloads to an abstracted Storage Service (storing files either locally or in Amazon S3/Cloudflare R2 buckets). Jobs are enqueued into a thread-safe Redis-based FIFO list, where background daemon listener threads pop tasks and run checks sequentially.</p>
         </section>
 
@@ -285,23 +316,45 @@
         <section class="docs-section" id="api-endpoints">
             <h1>REST API v1 Endpoints</h1>
             
-            <h2>Projects</h2>
-            <p><span class="api-method get">GET</span> <span class="api-endpoint">/api/v1/projects</span></p>
-            <p>Retrieves all projects owned by the authenticated account.</p>
+            <div class="api-block">
+                <div class="api-header">
+                    <span class="api-method get">GET</span>
+                    <span class="api-endpoint">/api/v1/projects</span>
+                </div>
+                <p>Retrieves all projects owned by the authenticated account.</p>
+            </div>
             
-            <p><span class="api-method post">POST</span> <span class="api-endpoint">/api/v1/projects?name=MyProject&repo_url=https://github.com/org/repo</span></p>
-            <p>Registers a new project workspace. Subject to plan gating limits.</p>
+            <div class="api-block">
+                <div class="api-header">
+                    <span class="api-method post">POST</span>
+                    <span class="api-endpoint">/api/v1/projects?name=MyProject&repo_url=https://github.com/org/repo</span>
+                </div>
+                <p>Registers a new project workspace. Subject to plan gating limits.</p>
+            </div>
 
-            <h2>Analyses</h2>
-            <p><span class="api-method post">POST</span> <span class="api-endpoint">/api/v1/projects/{id}/analyses</span></p>
-            <p>Triggers an asynchronous code review analysis for a project.</p>
+            <div class="api-block">
+                <div class="api-header">
+                    <span class="api-method post">POST</span>
+                    <span class="api-endpoint">/api/v1/projects/{id}/analyses</span>
+                </div>
+                <p>Triggers an asynchronous code review analysis for a project.</p>
+            </div>
 
-            <h2>Findings & Insights</h2>
-            <p><span class="api-method get">GET</span> <span class="api-endpoint">/api/v1/projects/{id}/findings</span></p>
-            <p>Returns the detailed list of bugs, issues, and maintainability concerns detected during scans.</p>
+            <div class="api-block">
+                <div class="api-header">
+                    <span class="api-method get">GET</span>
+                    <span class="api-endpoint">/api/v1/projects/{id}/findings</span>
+                </div>
+                <p>Returns the detailed list of bugs, issues, and maintainability concerns detected during scans.</p>
+            </div>
 
-            <p><span class="api-method get">GET</span> <span class="api-endpoint">/api/v1/projects/{id}/insights</span></p>
-            <p>Returns computed architecture scores, tech debt ratings, and engineering maturity levels.</p>
+            <div class="api-block">
+                <div class="api-header">
+                    <span class="api-method get">GET</span>
+                    <span class="api-endpoint">/api/v1/projects/{id}/insights</span>
+                </div>
+                <p>Returns computed architecture scores, tech debt ratings, and engineering maturity levels.</p>
+            </div>
         </section>
 
         <!-- Section: Deployment -->
