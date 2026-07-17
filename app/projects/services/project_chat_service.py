@@ -17,7 +17,8 @@ class ProjectChatService:
         project_id: int,
         user_query: str,
         api_key: Optional[str] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        model: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         Retrieves context, constructs prompt, calls LLM, yields streaming tokens,
@@ -232,54 +233,76 @@ class ProjectChatService:
         generated_text = ""
         
         if api_key:
-            # LIVE MODE: streamGenerateContent call
-            model_name = "models/gemini-2.5-flash"
-            url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:streamGenerateContent?key={api_key}"
-            headers = {"Content-Type": "application/json"}
-            
-            data = {
-                "contents": [{
-                    "parts": [{"text": full_prompt}]
-                }]
-            }
-            req_body = json.dumps(data).encode("utf-8")
-            req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
-
-            def _get_stream():
-                return urllib.request.urlopen(req, timeout=30)
-
-            try:
-                response = await asyncio.to_thread(_get_stream)
-                buffer = ""
-                yielded_len = 0
-                
-                # Yield tokens incrementally reading from the thread-bound stream
-                while True:
-                    chunk = await asyncio.to_thread(response.readline)
-                    if not chunk:
-                        break
+            model_val = model or "gemini-2.5-flash"
+            if model_val.startswith("gpt-") or model_val.startswith("claude-") or "openai" in model_val or "anthropic" in model_val:
+                # Non-Gemini model connection -> generate completion and yield tokens incrementally
+                try:
+                    from app.services.ai import LLMRouter
+                    res = await LLMRouter.generate(full_prompt, api_key, model_val)
+                    output_text = res.get("output", "")
                     
-                    buffer += chunk.decode("utf-8")
-                    matches = re.findall(r'"text":\s*"((?:[^"\\]|\\.)*)"', buffer)
-                    if matches:
-                        parts = []
-                        for m in matches:
-                            try:
-                                parts.append(json.loads(f'"{m}"'))
-                            except Exception:
-                                parts.append(m)
-                        cumulative_text = "".join(parts)
-                        if len(cumulative_text) > yielded_len:
-                            delta = cumulative_text[yielded_len:]
-                            yielded_len = len(cumulative_text)
-                            generated_text += delta
-                            # SSE format output
-                            yield f"data: {json.dumps({'text': delta})}\n\n"
-                            
-            except Exception as e:
-                err_msg = f"Gemini stream failure: {str(e)}"
-                yield f"data: {json.dumps({'text': err_msg})}\n\n"
-                generated_text += err_msg
+                    # Yield words or small chunks with a minor delay to look like an active stream
+                    chunk_size = 8
+                    for i in range(0, len(output_text), chunk_size):
+                        delta = output_text[i:i+chunk_size]
+                        generated_text += delta
+                        yield f"data: {json.dumps({'text': delta})}\n\n"
+                        await asyncio.sleep(0.02)
+                except Exception as e:
+                    err_msg = f"API stream failure: {str(e)}"
+                    yield f"data: {json.dumps({'text': err_msg})}\n\n"
+                    generated_text += err_msg
+            else:
+                # LIVE MODE: streamGenerateContent call for Gemini
+                model_name = model_val
+                if not model_name.startswith("models/"):
+                    model_name = f"models/{model_name}"
+                url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:streamGenerateContent?key={api_key}"
+                headers = {"Content-Type": "application/json"}
+                
+                data = {
+                    "contents": [{
+                        "parts": [{"text": full_prompt}]
+                    }]
+                }
+                req_body = json.dumps(data).encode("utf-8")
+                req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
+
+                def _get_stream():
+                    return urllib.request.urlopen(req, timeout=30)
+
+                try:
+                    response = await asyncio.to_thread(_get_stream)
+                    buffer = ""
+                    yielded_len = 0
+                    
+                    # Yield tokens incrementally reading from the thread-bound stream
+                    while True:
+                        chunk = await asyncio.to_thread(response.readline)
+                        if not chunk:
+                            break
+                        
+                        buffer += chunk.decode("utf-8")
+                        matches = re.findall(r'"text":\s*"((?:[^"\\]|\\.)*)"', buffer)
+                        if matches:
+                            parts = []
+                            for m in matches:
+                                try:
+                                    parts.append(json.loads(f'"{m}"'))
+                                except Exception:
+                                    parts.append(m)
+                            cumulative_text = "".join(parts)
+                            if len(cumulative_text) > yielded_len:
+                                delta = cumulative_text[yielded_len:]
+                                yielded_len = len(cumulative_text)
+                                generated_text += delta
+                                # SSE format output
+                                yield f"data: {json.dumps({'text': delta})}\n\n"
+                                
+                except Exception as e:
+                    err_msg = f"Gemini stream failure: {str(e)}"
+                    yield f"data: {json.dumps({'text': err_msg})}\n\n"
+                    generated_text += err_msg
         else:
             # OFFLINE MOCK SIMULATOR MODE
             await asyncio.sleep(0.5)

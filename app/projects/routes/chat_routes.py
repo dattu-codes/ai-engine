@@ -42,7 +42,8 @@ async def run_chat(
         project_id=project_id,
         user_query=request.message,
         api_key=request.api_key,
-        user_id=current_user.id
+        user_id=current_user.id,
+        model=request.model
     )
 
     return StreamingResponse(generator, media_type="text/event-stream")

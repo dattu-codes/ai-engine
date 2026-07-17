@@ -146,6 +146,7 @@ class ApplyFixRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     api_key: Optional[str] = None
+    model: Optional[str] = "gemini-2.5-flash"
 
 
 class ChatMessageResponse(BaseModel):

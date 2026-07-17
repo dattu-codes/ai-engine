@@ -324,3 +324,16 @@ def reset_password(req: ResetPasswordRequest):
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="Reset password system not fully set up yet. Token and password accepted."
     )
+
+
+@auth_router.post("/test-connection")
+async def test_connection_endpoint(req_data: dict, current_user: User = Depends(get_current_user)):
+    """Validates connectivity to an LLM provider using the supplied API key."""
+    provider = req_data.get("provider")
+    api_key = req_data.get("api_key")
+    if not provider or not api_key:
+        raise HTTPException(status_code=400, detail="Missing provider or api_key parameter")
+    
+    from app.services.ai import LLMRouter
+    res = await LLMRouter.test_connection(provider, api_key)
+    return res

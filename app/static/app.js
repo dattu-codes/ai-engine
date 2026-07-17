@@ -184,10 +184,21 @@ function updateGraphState(activeNodeIndex, completedNodesSet) {
 // Main execution flow
 async  function executeWorkflow() {
     const code = document.getElementById('code-input').value;
-    const apiKey = document.getElementById('api-key').value;
+    let apiKey = document.getElementById('api-key').value;
     const threshold = document.getElementById('threshold').value;
     const model = document.getElementById('model').value;
     const runBtn = document.getElementById('btn-run');
+    
+    // Auto-fill from settings if playground key is empty
+    if (!apiKey) {
+        if (model.startsWith('gpt-')) {
+            apiKey = localStorage.getItem('openai_api_key') || '';
+        } else if (model.startsWith('claude-')) {
+            apiKey = localStorage.getItem('anthropic_api_key') || '';
+        } else {
+            apiKey = localStorage.getItem('gemini_api_key') || '';
+        }
+    }
     
     if (!code.trim()) {
         alert('Please provide some Python code to analyze.');
@@ -2537,14 +2548,24 @@ async function handleChatSubmit(e) {
     if (typing) typing.style.display = 'flex';
     
     try {
-        const apiKey = localStorage.getItem('gemini_api_key') || '';
+        const chatModelSelect = document.getElementById('chat-model-select');
+        const selectedModel = chatModelSelect ? chatModelSelect.value : 'gemini-2.5-flash';
+        let apiKey = '';
+        if (selectedModel.startsWith('gpt-')) {
+            apiKey = localStorage.getItem('openai_api_key') || '';
+        } else if (selectedModel.startsWith('claude-')) {
+            apiKey = localStorage.getItem('anthropic_api_key') || '';
+        } else {
+            apiKey = localStorage.getItem('gemini_api_key') || '';
+        }
+
         const res = await fetch(`/projects/${activeProjectId}/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('access_token')}`
             },
-            body: JSON.stringify({ message: text, api_key: apiKey })
+            body: JSON.stringify({ message: text, api_key: apiKey, model: selectedModel })
         });
         
         if (!res.ok) {
@@ -5683,6 +5704,7 @@ function initSassSettings() {
             loadSettingsNotifications();
             loadSettingsApiKeys();
             loadSettingsOrgMembers();
+            loadLLMKeys();
         });
     }
     if (closeSettingsBtn && settingsModal) {
@@ -5696,6 +5718,7 @@ function initSassSettings() {
         { btn: 'settings-tab-billing-btn', pane: 'settings-pane-billing' },
         { btn: 'settings-tab-notifications-btn', pane: 'settings-pane-notifications' },
         { btn: 'settings-tab-api-btn', pane: 'settings-pane-api' },
+        { btn: 'settings-tab-llm-btn', pane: 'settings-pane-llm' },
         { btn: 'settings-tab-org-btn', pane: 'settings-pane-org' }
     ];
     settingsTabs.forEach(t => {
@@ -5711,9 +5734,101 @@ function initSassSettings() {
                 btn.classList.add('active');
                 const pane = document.getElementById(t.pane);
                 if (pane) pane.style.display = 'block';
+                if (t.btn === 'settings-tab-llm-btn') {
+                    loadLLMKeys();
+                }
             });
         }
     });
+
+    // Load LLM keys into inputs
+    function loadLLMKeys() {
+        const geminiKey = localStorage.getItem('gemini_api_key') || '';
+        const openaiKey = localStorage.getItem('openai_api_key') || '';
+        const anthropicKey = localStorage.getItem('anthropic_api_key') || '';
+        
+        const geminiInput = document.getElementById('settings-gemini-key');
+        const openaiInput = document.getElementById('settings-openai-key');
+        const anthropicInput = document.getElementById('settings-anthropic-key');
+        
+        if (geminiInput) geminiInput.value = geminiKey;
+        if (openaiInput) openaiInput.value = openaiKey;
+        if (anthropicInput) anthropicInput.value = anthropicKey;
+        
+        // Update connection status
+        document.getElementById('status-gemini-connection').textContent = geminiKey ? 'Saved ✓' : 'Not Connected';
+        document.getElementById('status-openai-connection').textContent = openaiKey ? 'Saved ✓' : 'Not Connected';
+        document.getElementById('status-anthropic-connection').textContent = anthropicKey ? 'Saved ✓' : 'Not Connected';
+    }
+
+    async function testAndSaveLLMKey(provider, keyInputId, statusSpanId, storageKeyName) {
+        const keyVal = document.getElementById(keyInputId).value.trim();
+        const statusSpan = document.getElementById(statusSpanId);
+        
+        if (!keyVal) {
+            alert('Please enter a valid API key.');
+            return;
+        }
+        
+        statusSpan.textContent = 'Testing connection...';
+        
+        try {
+            const res = await fetch('/auth/test-connection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: JSON.stringify({ provider: provider, api_key: keyVal })
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === 'connected') {
+                    localStorage.setItem(storageKeyName, keyVal);
+                    statusSpan.textContent = 'Connected ✓';
+                    statusSpan.style.color = 'var(--accent-green)';
+                    alert(`${provider.toUpperCase()} connection test succeeded! Key saved.`);
+                } else {
+                    statusSpan.textContent = 'Invalid Key ✗';
+                    statusSpan.style.color = 'var(--accent-red)';
+                    alert('Connection failed: ' + (data.error || 'Invalid API key.'));
+                }
+            } else {
+                statusSpan.textContent = 'Error ✗';
+                statusSpan.style.color = 'var(--accent-red)';
+                const err = await res.json();
+                alert('Connection test endpoint error: ' + (err.detail || 'Failed to validate.'));
+            }
+        } catch (e) {
+            statusSpan.textContent = 'Error ✗';
+            statusSpan.style.color = 'var(--accent-red)';
+            alert('Network error testing connection: ' + e.message);
+        }
+    }
+
+    // Wire buttons
+    const testGeminiBtn = document.getElementById('btn-test-gemini');
+    if (testGeminiBtn) {
+        testGeminiBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            testAndSaveLLMKey('google', 'settings-gemini-key', 'status-gemini-connection', 'gemini_api_key');
+        });
+    }
+    const testOpenAIBtn = document.getElementById('btn-test-openai');
+    if (testOpenAIBtn) {
+        testOpenAIBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            testAndSaveLLMKey('openai', 'settings-openai-key', 'status-openai-connection', 'openai_api_key');
+        });
+    }
+    const testAnthropicBtn = document.getElementById('btn-test-anthropic');
+    if (testAnthropicBtn) {
+        testAnthropicBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            testAndSaveLLMKey('anthropic', 'settings-anthropic-key', 'status-anthropic-connection', 'anthropic_api_key');
+        });
+    }
 
     // Subscriptions Billing Actions
     async function loadSettingsBilling() {

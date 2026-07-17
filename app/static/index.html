@@ -403,6 +403,8 @@
                                             <select id="model">
                                                  <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
                                                  <option value="gemini-2.5-pro">Gemini 2.5 Pro (In-depth)</option>
+                                                 <option value="gpt-4o">GPT-4o (OpenAI ChatGPT)</option>
+                                                 <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Anthropic)</option>
                                                  <option value="gemini-3.5-flash">Gemini 3.5 Flash (Latest)</option>
                                                  <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
                                              </select>
@@ -1210,7 +1212,14 @@
                                         <p style="margin: 0; font-size: 12px; color: var(--text-muted);">Grounded in local project source files and reports</p>
                                     </div>
                                 </div>
-                                <button class="btn btn-secondary" id="btn-clear-chat" style="padding: 6px 12px; font-size: 12px; margin: 0;">Clear Conversation</button>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <select id="chat-model-select" style="padding: 6px 12px; font-size: 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright); border-radius: 6px; width: 140px; margin: 0; outline: none; cursor: pointer;">
+                                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                        <option value="gpt-4o">GPT-4o (ChatGPT)</option>
+                                        <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                                    </select>
+                                    <button class="btn btn-secondary" id="btn-clear-chat" style="padding: 6px 12px; font-size: 12px; margin: 0;">Clear Conversation</button>
+                                </div>
                             </div>
                             
                             <!-- Messages Area -->
@@ -2149,11 +2158,49 @@
                 <button class="auth-tab-btn active" id="settings-tab-billing-btn" style="font-size: 12px;">Billing & Plans</button>
                 <button class="auth-tab-btn" id="settings-tab-notifications-btn" style="font-size: 12px;">Notifications</button>
                 <button class="auth-tab-btn" id="settings-tab-api-btn" style="font-size: 12px;">API Access</button>
+                <button class="auth-tab-btn" id="settings-tab-llm-btn" style="font-size: 12px;">LLM Providers</button>
                 <button class="auth-tab-btn" id="settings-tab-org-btn" style="font-size: 12px;">Workspace Organization</button>
             </div>
             
             <div style="flex: 1; display: flex; flex-direction: column;">
                 
+                <!-- Tab Pane: LLM Providers (v3.1) -->
+                <div class="settings-pane" id="settings-pane-llm" style="display: none;">
+                    <div style="display: flex; flex-direction: column; gap: 16px;">
+                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Configure AI Providers</span>
+                        
+                        <!-- Gemini connection -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h4 style="font-size: 13px; color: var(--text-bright); font-weight: 600;">Google Gemini</h4>
+                                <span id="status-gemini-connection" style="font-size: 11px; color: var(--text-muted);">Not Connected</span>
+                            </div>
+                            <input type="password" id="settings-gemini-key" placeholder="Enter Gemini API key..." style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                            <button id="btn-test-gemini" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
+                        </div>
+                        
+                        <!-- OpenAI connection -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h4 style="font-size: 13px; color: var(--text-bright); font-weight: 600;">OpenAI (ChatGPT)</h4>
+                                <span id="status-openai-connection" style="font-size: 11px; color: var(--text-muted);">Not Connected</span>
+                            </div>
+                            <input type="password" id="settings-openai-key" placeholder="Enter OpenAI API key..." style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                            <button id="btn-test-openai" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
+                        </div>
+                        
+                        <!-- Anthropic connection -->
+                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <h4 style="font-size: 13px; color: var(--text-bright); font-weight: 600;">Anthropic (Claude)</h4>
+                                <span id="status-anthropic-connection" style="font-size: 11px; color: var(--text-muted);">Not Connected</span>
+                            </div>
+                            <input type="password" id="settings-anthropic-key" placeholder="Enter Anthropic API key..." style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                            <button id="btn-test-anthropic" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Tab Pane: Billing & Plans -->
                 <div class="settings-pane" id="settings-pane-billing" style="display: block;">
                     <div style="display: flex; flex-direction: column; gap: 16px;">

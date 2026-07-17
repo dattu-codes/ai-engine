@@ -4,14 +4,20 @@ import json
 import asyncio
 import urllib.request
 import urllib.error
+import time
 
-class GeminiClient:
-    """
-    Standard library-based HTTP client to interact with the Gemini API.
-    Runs HTTP requests in a separate thread pool to prevent blocking the async loop.
-    """
+class BaseLLMClient:
+    async def call(self, prompt: str, api_key: str, model: str, json_mode: bool = False) -> dict:
+        raise NotImplementedError()
+
+class GeminiClient(BaseLLMClient):
     @staticmethod
     async def call_gemini(prompt: str, api_key: str, model: str = "gemini-2.5-flash", json_mode: bool = False) -> str:
+        # Legacy backward compatible endpoint
+        res = await LLMRouter.generate(prompt, api_key, model, json_mode)
+        return res["output"]
+
+    async def call(self, prompt: str, api_key: str, model: str, json_mode: bool = False) -> dict:
         model_name = model
         if not model_name.startswith("models/"):
             model_name = f"models/{model_name}"
@@ -32,6 +38,7 @@ class GeminiClient:
         req_body = json.dumps(data).encode("utf-8")
         req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
         
+        start_time = time.time()
         def _execute():
             try:
                 with urllib.request.urlopen(req, timeout=30) as response:
@@ -48,13 +55,191 @@ class GeminiClient:
                 raise RuntimeError(f"Network error calling Gemini: {str(e)}")
                 
         response_text = await asyncio.to_thread(_execute)
+        execution_time = time.time() - start_time
         
         try:
             res_json = json.loads(response_text)
             text_out = res_json["candidates"][0]["content"]["parts"][0]["text"]
-            return text_out.strip()
+            
+            # Simple token estimation
+            p_tokens = len(prompt) // 4
+            c_tokens = len(text_out) // 4
+            # Cost: Gemini 2.5 Flash input: $0.075/1M, output: $0.30/1M
+            cost = ((p_tokens * 0.075) + (c_tokens * 0.30)) / 1000000
+            
+            return {
+                "provider": "google",
+                "model": model,
+                "output": text_out.strip(),
+                "prompt_tokens": p_tokens,
+                "completion_tokens": c_tokens,
+                "total_tokens": p_tokens + c_tokens,
+                "cost_estimate": round(cost, 6),
+                "execution_time": round(execution_time, 2),
+                "finish_reason": "stop"
+            }
         except (KeyError, IndexError, json.JSONDecodeError) as e:
             raise RuntimeError(f"Failed to parse response from Gemini: {str(e)}. Response was: {response_text[:200]}")
+
+class OpenAIClient(BaseLLMClient):
+    async def call(self, prompt: str, api_key: str, model: str, json_mode: bool = False) -> dict:
+        url = "https://api.openai.com/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        
+        data = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2
+        }
+        
+        if json_mode:
+            data["response_format"] = {"type": "json_object"}
+            
+        req_body = json.dumps(data).encode("utf-8")
+        req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
+        
+        start_time = time.time()
+        def _execute():
+            try:
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    return response.read().decode("utf-8")
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode("utf-8")
+                try:
+                    error_json = json.loads(error_body)
+                    error_msg = error_json.get("error", {}).get("message", str(e))
+                except Exception:
+                    error_msg = error_body or str(e)
+                raise RuntimeError(f"OpenAI API Error: {error_msg}")
+            except Exception as e:
+                raise RuntimeError(f"Network error calling OpenAI: {str(e)}")
+                
+        response_text = await asyncio.to_thread(_execute)
+        execution_time = time.time() - start_time
+        
+        try:
+            res_json = json.loads(response_text)
+            text_out = res_json["choices"][0]["message"]["content"]
+            
+            p_tokens = res_json.get("usage", {}).get("prompt_tokens", len(prompt) // 4)
+            c_tokens = res_json.get("usage", {}).get("completion_tokens", len(text_out) // 4)
+            # Cost: GPT-4o input: $5.00/1M, output: $15.00/1M
+            cost = ((p_tokens * 5.0) + (c_tokens * 15.0)) / 1000000
+            
+            return {
+                "provider": "openai",
+                "model": model,
+                "output": text_out.strip(),
+                "prompt_tokens": p_tokens,
+                "completion_tokens": c_tokens,
+                "total_tokens": p_tokens + c_tokens,
+                "cost_estimate": round(cost, 6),
+                "execution_time": round(execution_time, 2),
+                "finish_reason": res_json["choices"][0].get("finish_reason", "stop")
+            }
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            raise RuntimeError(f"Failed to parse response from OpenAI: {str(e)}. Response was: {response_text[:200]}")
+
+class AnthropicClient(BaseLLMClient):
+    async def call(self, prompt: str, api_key: str, model: str, json_mode: bool = False) -> dict:
+        url = "https://api.anthropic.com/v1/messages"
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01"
+        }
+        
+        data = {
+            "model": model,
+            "max_tokens": 4000,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2
+        }
+        
+        req_body = json.dumps(data).encode("utf-8")
+        req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
+        
+        start_time = time.time()
+        def _execute():
+            try:
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    return response.read().decode("utf-8")
+            except urllib.error.HTTPError as e:
+                error_body = e.read().decode("utf-8")
+                try:
+                    error_json = json.loads(error_body)
+                    error_msg = error_json.get("error", {}).get("message", str(e))
+                except Exception:
+                    error_msg = error_body or str(e)
+                raise RuntimeError(f"Anthropic API Error: {error_msg}")
+            except Exception as e:
+                raise RuntimeError(f"Network error calling Anthropic: {str(e)}")
+                
+        response_text = await asyncio.to_thread(_execute)
+        execution_time = time.time() - start_time
+        
+        try:
+            res_json = json.loads(response_text)
+            text_out = res_json["content"][0]["text"]
+            
+            p_tokens = res_json.get("usage", {}).get("input_tokens", len(prompt) // 4)
+            c_tokens = res_json.get("usage", {}).get("output_tokens", len(text_out) // 4)
+            # Cost: Claude 3.5 Sonnet input: $3.00/1M, output: $15.00/1M
+            cost = ((p_tokens * 3.0) + (c_tokens * 15.0)) / 1000000
+            
+            return {
+                "provider": "anthropic",
+                "model": model,
+                "output": text_out.strip(),
+                "prompt_tokens": p_tokens,
+                "completion_tokens": c_tokens,
+                "total_tokens": p_tokens + c_tokens,
+                "cost_estimate": round(cost, 6),
+                "execution_time": round(execution_time, 2),
+                "finish_reason": res_json.get("stop_reason", "stop")
+            }
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            raise RuntimeError(f"Failed to parse response from Anthropic: {str(e)}. Response was: {response_text[:200]}")
+
+class LLMRouter:
+    @staticmethod
+    async def generate(prompt: str, api_key: str, model: str, json_mode: bool = False) -> dict:
+        # Route based on model prefix
+        model_lower = model.lower()
+        if model_lower.startswith("gpt-") or "openai" in model_lower:
+            client = OpenAIClient()
+        elif model_lower.startswith("claude-") or "anthropic" in model_lower:
+            client = AnthropicClient()
+        else:
+            client = GeminiClient()
+            
+        return await client.call(prompt, api_key, model, json_mode)
+
+    @staticmethod
+    async def test_connection(provider: str, api_key: str) -> dict:
+        test_prompt = "Hello"
+        try:
+            if provider == "google":
+                res = await GeminiClient().call(test_prompt, api_key, model="gemini-2.5-flash")
+            elif provider == "openai":
+                res = await OpenAIClient().call(test_prompt, api_key, model="gpt-4o")
+            elif provider == "anthropic":
+                res = await AnthropicClient().call(test_prompt, api_key, model="claude-3-5-sonnet")
+            else:
+                return {"status": "invalid_provider", "error": "Unknown model provider"}
+            
+            if res.get("output"):
+                return {"status": "connected"}
+            return {"status": "error", "error": "Empty response received"}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
 
 
 class MockAISimulator:
