@@ -55,11 +55,41 @@ function initFormControls() {
     // Toggle API Key visibility
     const apiKeyInput = document.getElementById('api-key');
     const toggleKeyBtn = document.getElementById('toggle-key-visibility');
-    toggleKeyBtn.addEventListener('click', () => {
-        const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
-        apiKeyInput.setAttribute('type', type);
-        toggleKeyBtn.textContent = type === 'password' ? '👁️' : '🔒';
-    });
+    if (toggleKeyBtn && apiKeyInput) {
+        toggleKeyBtn.addEventListener('click', () => {
+            const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            apiKeyInput.setAttribute('type', type);
+            toggleKeyBtn.textContent = type === 'password' ? '👁️' : '🔒';
+        });
+    }
+
+    // Dynamic API key label and loading based on selected model engine (v3.1 UX refinement)
+    const modelEngineSelect = document.getElementById('model');
+    const apiKeyLabel = document.getElementById('api-key-label');
+    
+    function updatePlaygroundKeyLabelAndValue() {
+        if (!modelEngineSelect || !apiKeyLabel || !apiKeyInput) return;
+        const selectedModel = modelEngineSelect.value;
+        if (selectedModel.startsWith('gpt-')) {
+            apiKeyLabel.textContent = 'OpenAI API Key';
+            apiKeyInput.placeholder = 'Enter OpenAI API Key to enable Live Mode...';
+            apiKeyInput.value = localStorage.getItem('openai_api_key') || '';
+        } else if (selectedModel.startsWith('claude-')) {
+            apiKeyLabel.textContent = 'Anthropic API Key';
+            apiKeyInput.placeholder = 'Enter Anthropic API Key to enable Live Mode...';
+            apiKeyInput.value = localStorage.getItem('anthropic_api_key') || '';
+        } else {
+            apiKeyLabel.textContent = 'Gemini API Key';
+            apiKeyInput.placeholder = 'Enter API Key to enable Live Mode...';
+            apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+        }
+    }
+    
+    if (modelEngineSelect) {
+        modelEngineSelect.addEventListener('change', updatePlaygroundKeyLabelAndValue);
+        // Run once on load to initialize correct state
+        updatePlaygroundKeyLabelAndValue();
+    }
 
     // Execute Button
     const runBtn = document.getElementById('btn-run');
