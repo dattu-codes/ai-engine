@@ -28,8 +28,9 @@ class ProjectChatService:
         context = RetrievalService.retrieve_context(db, project_id, user_query)
         recent_messages = ConversationService.get_context_history(db, project_id, limit=8)
 
-        # 2. Get project intelligence parameters
-        project = context["files"][0].version.project if context["files"] else None
+        # 2. Get project intelligence parameters (v3.1)
+        from app.projects.models.project_models import Project
+        project = db.query(Project).filter(Project.id == project_id).first()
         framework = getattr(project, "framework", None) or "Unknown"
         architecture = getattr(project, "architecture", None) or "Unknown"
         dependencies = getattr(project, "dependencies_json", None) or "[]"

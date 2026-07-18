@@ -3,7 +3,7 @@ import json
 from typing import List, Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
 
-from app.projects.models.project_models import Project, ProjectVersion, ProjectVersionFile, Report, Analysis
+from app.projects.models.project_models import Project, ProjectVersion, ProjectVersionFile, Report, Analysis, AnalysisFile
 
 class RetrievalService:
     @staticmethod
@@ -17,18 +17,23 @@ class RetrievalService:
             ProjectVersion.project_id == project_id
         ).order_by(ProjectVersion.version_number.desc()).first()
 
-        if not latest_version:
-            return {
-                "files": [],
-                "report": None,
-                "version_history": [],
-                "version_number": 0
-            }
-
-        # Retrieve all snapshot files at this version
-        files = db.query(ProjectVersionFile).filter(
-            ProjectVersionFile.version_id == latest_version.id
-        ).all()
+        files = []
+        version_num = 0
+        if latest_version:
+            files = db.query(ProjectVersionFile).filter(
+                ProjectVersionFile.version_id == latest_version.id
+            ).all()
+            version_num = latest_version.version_number
+        else:
+            # Fallback to the latest completed analysis run that contains files (v3.1)
+            all_analyses = db.query(Analysis).filter(Analysis.project_id == project_id).all()
+            # Sort by ID descending
+            all_analyses.sort(key=lambda x: x.id, reverse=True)
+            for anal in all_analyses:
+                if anal.status == "completed":
+                    files = db.query(AnalysisFile).filter(AnalysisFile.analysis_id == anal.id).all()
+                    if files:
+                        break
 
         # 2. Score and rank files based on query keywords
         tokens = re.findall(r'\b\w+\b', query.lower())
@@ -110,5 +115,5 @@ class RetrievalService:
             "files": retrieved_files,
             "report": report,
             "version_history": versions,
-            "version_number": latest_version.version_number
+            "version_number": version_num
         }

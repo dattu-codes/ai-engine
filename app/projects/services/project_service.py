@@ -164,17 +164,29 @@ class ProjectService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
         latest_analysis = ProjectRepository.get_latest_analysis(db, project_id)
-        
-        total_files = 0
-        languages = set()
-        
-        if latest_analysis:
-            files = ProjectRepository.get_analysis_files(db, latest_analysis.id)
-            total_files = len(files)
-            for f in files:
-                languages.add(f.language)
 
-            if not project.has_intelligence and files:
+        # Retrieve codebase files to calculate correct metrics (v3.1)
+        files = []
+        from app.projects.models.project_models import ProjectVersion, ProjectVersionFile, Analysis
+        current_version = db.query(ProjectVersion).filter(
+            ProjectVersion.project_id == project_id
+        ).order_by(ProjectVersion.version_number.desc()).first()
+
+        if current_version:
+            files = db.query(ProjectVersionFile).filter(ProjectVersionFile.version_id == current_version.id).all()
+
+        if not files:
+            all_analyses = ProjectRepository.get_project_analyses(db, project_id)
+            for anal in all_analyses:
+                if anal.status == "completed":
+                    files = ProjectRepository.get_analysis_files(db, anal.id)
+                    if files:
+                        break
+
+        total_files = len(files)
+        languages = set(f.language for f in files)
+
+        if latest_analysis:
                 from app.projects.services.code_intelligence import CodeIntelligenceEngine
                 intel = CodeIntelligenceEngine.analyze_project(files)
                 ProjectRepository.update_project_intelligence(
