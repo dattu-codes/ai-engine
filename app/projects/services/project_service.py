@@ -83,6 +83,21 @@ class ProjectService:
                 details_json=json.dumps(report_details)
             )
 
+            # Generate initial baseline version snapshot and semantic graph (v3.1)
+            from app.projects.services.version_service import VersionService
+            VersionService.record_ingestion_version(
+                db, 
+                project.id, 
+                analysis.id, 
+                summary="Linked public Git repository baseline."
+            )
+            
+            try:
+                from app.projects.services.semantic_graph_service import SemanticGraphService
+                SemanticGraphService.generate_graph(db, project.id)
+            except Exception as ge:
+                print(f"Error generating semantic graph on project creation: {ge}")
+
             # Log Repository Linked and Git Sync
             ActivityService.log_activity(
                 db=db,
