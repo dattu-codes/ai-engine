@@ -300,7 +300,8 @@ class ReviewOrchestrator:
         db: Session,
         analysis_id: int,
         files: List[AnalysisFile],
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        model: Optional[str] = None
     ) -> Report:
         """
         Coordinates the 7-stage review pipeline sequentially and concurrently.
@@ -439,7 +440,8 @@ class ReviewOrchestrator:
                 entry_points=[project.entry_point] if project.entry_point else [],
                 module_name=mod_name,
                 files=mod_files,
-                api_key=api_key
+                api_key=api_key,
+                model=model
             )
             module_reports.append(report_result)
             ai_calls_counter += 1
@@ -468,7 +470,8 @@ class ReviewOrchestrator:
                     entry_points=[project.entry_point] if project.entry_point else [],
                     module_name=mod_name,
                     files=mod_files,
-                    api_key=api_key
+                    api_key=api_key,
+                    model=model
                 )
                 ai_calls_counter += 1
                 analysis.ai_calls = ai_calls_counter
@@ -585,7 +588,7 @@ class ReviewOrchestrator:
         analysis.status = "completed"
         analysis.completed_at = datetime.utcnow()
         analysis.duration = time.time() - start_time
-        analysis.model_used = "gemini-1.5-pro" if api_key else "mock-simulator"
+        analysis.model_used = model if (api_key and model) else "gemini-1.5-pro" if api_key else "mock-simulator"
         db.commit()
         
         cls.update_timeline(db, analysis, "Generate Report", "completed", duration=time.time() - t_stage, details="Report compiled successfully.")
@@ -603,7 +606,8 @@ class ReviewOrchestrator:
         entry_points: List[str],
         module_name: str,
         files: List[Dict[str, Any]],
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        model: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Executes review for a single module. Calls Gemini if API key is provided,
@@ -664,14 +668,18 @@ class ReviewOrchestrator:
             )
             # Inject semantic graph context to prompt
             prompt += f"\n\n{semantic_graph_context}"
-            # 2. Call Gemini
+            # 2. Call Multi-LLM Router (v3.1)
             try:
-                response = GeminiService.call_gemini(prompt, api_key)
+                from app.services.ai import LLMRouter
+                model_name = model or "gemini-2.5-flash"
+                res_dict = await LLMRouter.generate(prompt, api_key, model_name, json_mode=True)
+                response = res_dict.get("output", "{}")
                 # Parse structured JSON from response
                 report_data = json.loads(response.strip())
                 return report_data
             except Exception as e:
-                # If Gemini fails, log or gracefully fallback to mock simulation
+                # If LLM routing fails, log or gracefully fallback to mock simulation
+                print(f"LLM routing review failed: {e}")
                 pass
                 
         # In Mock Mode (Offline Simulator):

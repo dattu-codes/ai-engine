@@ -644,12 +644,22 @@
                                             <span class="stat-value" id="detail-project-status">--</span>
                                         </div>
                                     </div>
-                                    <div class="card-footer" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
-                                        <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
-                                            <label for="project-analysis-key" style="font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap;">Gemini API Key</label>
-                                            <input type="password" id="project-analysis-key" placeholder="Enter key (leave empty for offline)..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                                    <div class="card-footer" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.06); display: flex; flex-direction: column; gap: 12px;">
+                                        <div style="display: flex; gap: 12px; align-items: center; width: 100%; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 250px;">
+                                                <label for="project-analysis-key" id="project-analysis-key-label" style="font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap;">Gemini API Key</label>
+                                                <input type="password" id="project-analysis-key" placeholder="Enter key (leave empty for offline)..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 12px; width: 220px;">
+                                                <label for="project-model" style="font-size: 13px; color: var(--text-muted); font-weight: 500; white-space: nowrap;">Model</label>
+                                                <select id="project-model" style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright); outline: none; cursor: pointer;">
+                                                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                                    <option value="gpt-4o">GPT-4o</option>
+                                                    <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                                                </select>
+                                            </div>
+                                            <button class="btn btn-primary" id="btn-start-project-analysis" style="margin: 0; padding: 8px 16px;">Run AI Review</button>
                                         </div>
-                                        <button class="btn btn-primary" id="btn-start-project-analysis" style="margin: 0; padding: 8px 16px;">Run AI Review</button>
                                     </div>
                                     <div id="analysis-progress-container" style="display: none; margin-top: 16px; width: 100%; padding: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;">
                                         <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--accent-purple); font-weight: 600; margin-bottom: 12px;">

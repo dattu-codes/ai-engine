@@ -17,7 +17,7 @@ from app.projects.services.activity_service import ActivityService
 
 class AnalysisService:
     @staticmethod
-    def start_analysis(db: Session, project_id: int, user_id: int, api_key: str = None) -> Analysis:
+    def start_analysis(db: Session, project_id: int, user_id: int, api_key: str = None, model: str = None) -> Analysis:
         """
         Validates ownership and project files, then schedules the async AI analysis workflow in the background.
         """
@@ -94,14 +94,15 @@ class AnalysisService:
                 analysis.id, 
                 project.name, 
                 files_list, 
-                api_key
+                api_key,
+                model
             )
         )
 
         return analysis
 
     @staticmethod
-    async def _execute_analysis_task(analysis_id: int, project_name: str, files_list: list, api_key: str = None):
+    async def _execute_analysis_task(analysis_id: int, project_name: str, files_list: list, api_key: str = None, model: str = None):
         """
         Background task delegating to ReviewOrchestrator.
         """
@@ -135,7 +136,8 @@ class AnalysisService:
                 db=db,
                 analysis_id=analysis_id,
                 files=db_files,
-                api_key=api_key
+                api_key=api_key,
+                model=model
             )
 
             # Generate Repository Insights automatically on completion of the analysis pipeline

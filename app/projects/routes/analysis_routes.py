@@ -16,7 +16,8 @@ analysis_router = APIRouter(prefix="/analysis", tags=["AI Review Analysis"])
 
 
 class RunAnalysisRequest(BaseModel):
-    api_key: Optional[str] = Field(None, description="Optional Gemini API Key. If empty, local simulator is run.")
+    api_key: Optional[str] = Field(None, description="Optional API Key. If empty, local simulator is run.")
+    model: Optional[str] = Field(None, description="Optional Model engine name (e.g. gpt-4o, claude-3-5-sonnet).")
 
 
 class AnalysisStatusResponse(BaseModel):
@@ -73,7 +74,8 @@ async def run_project_analysis(
         db, 
         project_id=project_id, 
         user_id=current_user.id, 
-        api_key=req.api_key
+        api_key=req.api_key,
+        model=req.model
     )
     return analysis
 

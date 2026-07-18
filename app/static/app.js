@@ -1070,6 +1070,35 @@ function initProjectsTab() {
     // Run AI Review click binding
     document.getElementById('btn-start-project-analysis').addEventListener('click', startProjectAnalysis);
 
+    // Dynamic project key label and value loading (v3.1)
+    const projectModelSelect = document.getElementById('project-model');
+    const projectAnalysisKeyLabel = document.getElementById('project-analysis-key-label');
+    const projectAnalysisKeyInput = document.getElementById('project-analysis-key');
+
+    function updateProjectAnalysisKeyLabelAndValue() {
+        if (!projectModelSelect || !projectAnalysisKeyLabel || !projectAnalysisKeyInput) return;
+        const selectedModel = projectModelSelect.value;
+        if (selectedModel.startsWith('gpt-')) {
+            projectAnalysisKeyLabel.textContent = 'OpenAI API Key';
+            projectAnalysisKeyInput.placeholder = 'Enter OpenAI API Key (leave empty for offline)...';
+            projectAnalysisKeyInput.value = localStorage.getItem('openai_api_key') || '';
+        } else if (selectedModel.startsWith('claude-')) {
+            projectAnalysisKeyLabel.textContent = 'Anthropic API Key';
+            projectAnalysisKeyInput.placeholder = 'Enter Anthropic API Key (leave empty for offline)...';
+            projectAnalysisKeyInput.value = localStorage.getItem('anthropic_api_key') || '';
+        } else {
+            projectAnalysisKeyLabel.textContent = 'Gemini API Key';
+            projectAnalysisKeyInput.placeholder = 'Enter key (leave empty for offline)...';
+            projectAnalysisKeyInput.value = localStorage.getItem('gemini_api_key') || '';
+        }
+    }
+
+    if (projectModelSelect) {
+        projectModelSelect.addEventListener('change', updateProjectAnalysisKeyLabelAndValue);
+        // Initialize once
+        updateProjectAnalysisKeyLabelAndValue();
+    }
+
     // Ingest Paste Code Form
     document.getElementById('form-ingest-paste').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1452,6 +1481,11 @@ async function selectProject(id) {
 
         // Load files list
         await loadProjectFiles(id);
+        
+        // Auto-load project key label and values based on selected model (v3.1)
+        if (typeof updateProjectAnalysisKeyLabelAndValue === 'function') {
+            updateProjectAnalysisKeyLabelAndValue();
+        }
     } catch (err) {
         console.error('Failed to select project details:', err);
     }
@@ -1657,6 +1691,8 @@ async function startProjectAnalysis() {
     if (!activeProjectId) return;
 
     const apiKey = document.getElementById('project-analysis-key').value;
+    const projectModelSelect = document.getElementById('project-model');
+    const selectedModel = projectModelSelect ? projectModelSelect.value : 'gemini-2.5-flash';
     const btn = document.getElementById('btn-start-project-analysis');
     const progressContainer = document.getElementById('analysis-progress-container');
 
@@ -1667,7 +1703,7 @@ async function startProjectAnalysis() {
         const res = await authorizedFetch(`/analysis/${activeProjectId}/run`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ api_key: apiKey || null })
+            body: JSON.stringify({ api_key: apiKey || null, model: selectedModel })
         });
 
         if (!res.ok) {
