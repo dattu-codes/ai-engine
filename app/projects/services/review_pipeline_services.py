@@ -424,13 +424,6 @@ class ReviewOrchestrator:
                 
         # 1. Review High-priority modules sequentially
         for mod_name, mod_files in high_modules.items():
-            cls.update_timeline(
-                db, 
-                analysis, 
-                "Module Reviews", 
-                "running", 
-                details=f"Reviewing high-priority module '{mod_name}' sequentially..."
-            )
             report_result = await cls.review_single_module_async(
                 project_name=project.name,
                 project_type=project.project_type,
@@ -445,8 +438,6 @@ class ReviewOrchestrator:
             )
             module_reports.append(report_result)
             ai_calls_counter += 1
-            analysis.ai_calls = ai_calls_counter
-            db.commit()
             
         # 2. Review Medium-priority modules concurrently (limit to max 2 concurrent reviews)
         sem = asyncio.Semaphore(2)
@@ -454,13 +445,6 @@ class ReviewOrchestrator:
         async def sem_review(mod_name, mod_files):
             nonlocal ai_calls_counter
             async with sem:
-                cls.update_timeline(
-                    db, 
-                    analysis, 
-                    "Module Reviews", 
-                    "running", 
-                    details=f"Reviewing medium-priority module '{mod_name}' concurrently..."
-                )
                 report_res = await cls.review_single_module_async(
                     project_name=project.name,
                     project_type=project.project_type,
@@ -474,14 +458,16 @@ class ReviewOrchestrator:
                     model=model
                 )
                 ai_calls_counter += 1
-                analysis.ai_calls = ai_calls_counter
-                db.commit()
                 return report_res
 
         if medium_modules:
             tasks = [sem_review(name, m_files) for name, m_files in medium_modules.items()]
             concurrent_reports = await asyncio.gather(*tasks)
             module_reports.extend(concurrent_reports)
+            
+        # Update metrics and commit once safely (v3.1)
+        analysis.ai_calls = ai_calls_counter
+        db.commit()
             
         cls.update_timeline(
             db, 
