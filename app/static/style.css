@@ -2047,33 +2047,38 @@ textarea#code-input {
     border-top: 1px solid var(--border-color);
     display: flex;
     align-items: center;
-    gap: 12px;
     overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.app-sidebar.collapsed .sidebar-footer {
+    padding: 16px 8px;
+    justify-content: center;
 }
 
 .user-avatar {
     width: 32px;
     height: 32px;
     border-radius: 50%;
-    background-color: var(--border-color);
+    background-color: rgba(255, 255, 255, 0.08);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     color: var(--text-bright);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     flex-shrink: 0;
 }
 
 .user-meta {
     display: flex;
     flex-direction: column;
-    transition: opacity 0.2s ease;
 }
 
-.app-sidebar.collapsed .user-meta {
-    opacity: 0;
-    pointer-events: none;
+.app-sidebar.collapsed .user-meta,
+.app-sidebar.collapsed .user-profile-actions {
+    display: none !important;
 }
 
 .username-display {

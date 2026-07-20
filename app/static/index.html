@@ -134,15 +134,17 @@
 
             <!-- Sidebar User Profile Footer Section -->
             <div class="sidebar-footer">
-                <div class="header-auth" id="header-auth" style="display: none; align-items: center; gap: 12px; width: 100%;">
-                    <div class="user-avatar">U</div>
-                    <div class="user-meta" style="flex: 1; min-width: 0;">
-                        <span class="username-display" id="user-display-name">...</span>
-                        <span class="user-role-badge" id="user-display-role">...</span>
+                <div class="header-auth" id="header-auth" style="display: none; flex-direction: column; gap: 10px; width: 100%;">
+                    <div class="user-profile-info" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+                        <div class="user-avatar">U</div>
+                        <div class="user-meta" style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+                            <span class="username-display" id="user-display-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; font-weight: 600; color: var(--text-bright);">...</span>
+                            <span class="user-role-badge" id="user-display-role" style="font-size: 10px; color: var(--text-muted);">...</span>
+                        </div>
                     </div>
-                    <div style="display: flex; gap: 8px;">
-                        <button id="btn-open-settings" style="background: rgba(255,255,255,0.05); border: 1px solid var(--border-color); color: var(--text-bright); padding: 6px 12px; border-radius: 4px; font-size: 11px; cursor: pointer; font-weight: 600;">Settings</button>
-                        <button id="btn-logout" class="logout-btn-nav" style="margin: 0; padding: 6px 12px;">Logout</button>
+                    <div class="user-profile-actions" style="display: flex; gap: 8px; width: 100%;">
+                        <button id="btn-open-settings" style="flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-bright); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; text-align: center; transition: all 0.2s;">Settings</button>
+                        <button id="btn-logout" class="logout-btn-nav" style="flex: 1; margin: 0; padding: 6px 12px; font-size: 11px; border-radius: 6px; text-align: center;">Logout</button>
                     </div>
                 </div>
             </div>
