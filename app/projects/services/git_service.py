@@ -72,11 +72,14 @@ class GitService:
                     f.write("# Mock Repository\n")
                 
                 # Run git init and add a commit inside the destination directory so git rev-parse commands succeed
+                env = os.environ.copy()
+                env["GIT_AUTHOR_DATE"] = "2026-07-20T12:00:00"
+                env["GIT_COMMITTER_DATE"] = "2026-07-20T12:00:00"
                 subprocess.run(["git", "init"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 subprocess.run(["git", "config", "user.email", "tester@antigravity.ai"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 subprocess.run(["git", "config", "user.name", "Tester"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 subprocess.run(["git", "add", "."], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
                 return True
             except Exception as e:
                 print(f"Error copying local workspace: {e}")

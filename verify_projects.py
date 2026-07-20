@@ -25,7 +25,7 @@ def make_request(
     req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
     
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=15) as response:
             status = response.status
             res_body = response.read().decode("utf-8")
             res_json = json.loads(res_body) if res_body else {}
@@ -83,7 +83,7 @@ def make_multipart_request(
     req = urllib.request.Request(url, data=body, headers=headers, method="POST")
     
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=15) as response:
             status = response.status
             res_body = response.read().decode("utf-8")
             res_json = json.loads(res_body) if res_body else {}

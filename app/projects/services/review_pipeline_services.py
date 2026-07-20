@@ -201,7 +201,8 @@ class ReportGenerator:
         total_files: int,
         reviewed_files: int,
         skipped_files: int,
-        skipped_reasons: Dict[str, str]
+        skipped_reasons: Dict[str, str],
+        files: List[Any] = None
     ) -> Dict[str, Any]:
         """
         Computes overall project score and compiled review coverage percentage.
@@ -239,6 +240,10 @@ class ReportGenerator:
         else:
             summary += " Critical security or structural issues were detected. Immediate refactoring is highly recommended."
             
+        # Run static code analysis metrics
+        from app.projects.services.code_analyzer import CodeAnalyzerService
+        static_analysis = CodeAnalyzerService.analyze_codebase(files) if files else {}
+
         return {
             "score": score,
             "summary": summary,
@@ -252,7 +257,8 @@ class ReportGenerator:
                 "skipped_files": skipped_files,
                 "coverage_percentage": coverage_pct,
                 "skipped_reasons": skipped_reasons
-            }
+            },
+            "analyzers": static_analysis
         }
 
 
@@ -518,7 +524,8 @@ class ReviewOrchestrator:
             total_files=total_files_count,
             reviewed_files=reviewed_files_count,
             skipped_files=skipped_files_count,
-            skipped_reasons=skipped_reasons
+            skipped_reasons=skipped_reasons,
+            files=files
         )
         
         # Calculate coverage percentage & overall confidence
@@ -741,6 +748,26 @@ class ReviewOrchestrator:
             strengths.append(f"Highly reusable utility services mapped inside the {module_name} group.")
             recommendations.append("Ensure utility functions are fully type-annotated.")
             
+        # Also run the MockAnalysisSimulator to scan for real issue patterns in the module files
+        from app.projects.services.analysis_simulator import MockAnalysisSimulator
+        file_scan = MockAnalysisSimulator.simulate_review(project_name, files)
+        scan_issues = file_scan.get("issues", [])
+        if scan_issues:
+            # Add scan issues and avoid duplicates
+            for si in scan_issues:
+                if not any(si["file"] == x.get("file") and si["line"] == x.get("line") and si["evidence"] == x.get("evidence") for x in simulated_issues):
+                    simulated_issues.append(si)
+            score = min(score, file_scan.get("score", 100))
+            for st in file_scan.get("strengths", []):
+                if st not in strengths:
+                    strengths.append(st)
+            for wk in file_scan.get("weaknesses", []):
+                if wk not in weaknesses:
+                    weaknesses.append(wk)
+            for rec in file_scan.get("recommendations", []):
+                if rec not in recommendations:
+                    recommendations.append(rec)
+
         return {
             "score": score,
             "summary": f"Completed review of module '{module_name}'. Core structures look standard with minor warnings.",
