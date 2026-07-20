@@ -372,52 +372,56 @@
                 <!-- View: Dashboard (The original single code analysis view) -->
                 <div class="view-pane active" id="view-dashboard">
 
-                    <div style="display: flex; gap: 20px; align-items: start;">
-                        <!-- Left Panel: Configuration & Code Editor -->
-                        <section class="panel-left" style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
-                            <!-- API Settings Card -->
-                            <div class="card glass">
-                                <div class="card-header">
-                                    <h2>Engine Configuration</h2>
-                                    <span class="step-num">01</span>
-                                </div>
-                                <div class="card-body">
-                                    <div class="form-group">
-                                        <label for="api-key" id="api-key-label">Gemini API Key</label>
-                                        <div class="api-key-container">
-                                            <input type="password" id="api-key" placeholder="Enter API Key to enable Live Mode..." autocomplete="new-password">
-                                            <button type="button" id="toggle-key-visibility" class="btn-icon">👁️</button>
-                                        </div>
-                                        <span class="input-hint">Leave blank to use AST-based Offline Simulator (No key required)</span>
-                                    </div>
-                                    <div class="form-row">
-                                        <div class="form-group half">
-                                            <label for="threshold">Quality Threshold (%)</label>
-                                            <div class="slider-container">
-                                                <input type="range" id="threshold" min="50" max="95" value="80">
-                                                <span id="threshold-val">80%</span>
-                                            </div>
-                                        </div>
-                                        <div class="form-group half">
-                                            <label for="model">Model Engine</label>
-                                            <select id="model">
-                                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
-                                                 <option value="gemini-2.5-pro">Gemini 2.5 Pro (In-depth)</option>
-                                                 <option value="gpt-4o">GPT-4o (OpenAI ChatGPT)</option>
-                                                 <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Anthropic)</option>
-                                                 <option value="gemini-3.5-flash">Gemini 3.5 Flash (Latest)</option>
-                                                 <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
-                                             </select>
-                                        </div>
-                                    </div>
-                                </div>
+                    <!-- Dashboard Top Bar: Repository, Branch, Key, Model, Status & Trigger -->
+                    <div class="dashboard-top-bar card glass">
+                        <div class="top-bar-item">
+                            <span class="top-bar-label">Repository</span>
+                            <div class="top-bar-val">dattu-codes/ai-engine</div>
+                        </div>
+                        <div class="top-bar-item">
+                            <span class="top-bar-label">Branch</span>
+                            <div class="top-bar-val">main</div>
+                        </div>
+                        <div class="top-bar-item">
+                            <span class="top-bar-label" id="api-key-label">Gemini API Key</span>
+                            <div class="api-key-container">
+                                <input type="password" id="api-key" placeholder="Enter API Key to enable Live Mode..." autocomplete="new-password">
+                                <button type="button" id="toggle-key-visibility" class="btn-icon">👁️</button>
                             </div>
+                        </div>
+                        <div class="top-bar-item">
+                            <span class="top-bar-label">Threshold</span>
+                            <div class="slider-container">
+                                <input type="range" id="threshold" min="50" max="95" value="80">
+                                <span id="threshold-val">80%</span>
+                            </div>
+                        </div>
+                        <div class="top-bar-item">
+                            <span class="top-bar-label">Model Engine</span>
+                            <select id="model">
+                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
+                                 <option value="gemini-2.5-pro">Gemini 2.5 Pro (In-depth)</option>
+                                 <option value="gpt-4o">GPT-4o (OpenAI ChatGPT)</option>
+                                 <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Anthropic)</option>
+                                 <option value="gemini-3.5-flash">Gemini 3.5 Flash (Latest)</option>
+                                 <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                             </select>
+                        </div>
+                        <button id="btn-run" class="btn btn-primary pulse-btn">
+                            <span class="btn-text">Run Review</span>
+                            <div class="btn-glow"></div>
+                        </button>
+                    </div>
 
-                            <!-- Code Editor Card -->
+                    <!-- Dashboard Main Grid: Left Editor (70%) & Right Summary (30%) -->
+                    <div class="dashboard-main-grid">
+                        
+                        <!-- Left Panel: Monaco-style Code Editor -->
+                        <div class="editor-column">
                             <div class="card glass editor-card">
                                 <div class="card-header">
-                                    <h2>Source Code Input (Python)</h2>
-                                    <span class="step-num">02</span>
+                                    <h2>Source Code Editor</h2>
+                                    <span class="step-num">01</span>
                                 </div>
                                 <div class="card-body editor-body">
                                     <div class="editor-container">
@@ -435,166 +439,170 @@
     return user
 </textarea>
                                     </div>
-                                    <button id="btn-run" class="btn btn-primary pulse-btn">
-                                        <span class="btn-text">Execute Workflow</span>
-                                        <div class="btn-glow"></div>
-                                    </button>
                                 </div>
                             </div>
-                        </section>
+                        </div>
 
-                        <!-- Right Panel: Execution Visualizer & Results -->
-                        <section class="panel-right" style="flex: 1.2; display: flex; flex-direction: column; gap: 20px;">
-                            <!-- Visual Pipeline Card -->
-                            <div class="card glass visualizer-card">
+                        <!-- Right Panel: AI Review Summary Panel -->
+                        <div class="summary-column">
+                            <div class="card glass summary-panel-card">
                                 <div class="card-header">
-                                    <h2>Active Workflow Pipeline Graph</h2>
-                                    <span class="step-num">03</span>
+                                    <h2>Review Summary</h2>
+                                    <span class="step-num">02</span>
                                 </div>
                                 <div class="card-body">
-                                    <div class="pipeline-graph">
-                                        <!-- Node 1: Extract -->
-                                        <div class="node-container" id="node-extract">
-                                            <div class="node">
-                                                <div class="node-icon">🔍</div>
-                                                <div class="node-title">Extract Functions</div>
-                                                <div class="node-status-badge">Idle</div>
+                                    <div class="metric-row">
+                                        <div class="metric-box">
+                                            <span class="metric-label">Quality Score</span>
+                                            <span class="metric-value" id="val-quality">--</span>
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar" id="bar-quality" style="width: 0%"></div>
                                             </div>
                                         </div>
-                                        
-                                        <div class="pipeline-arrow" id="arrow-1"></div>
-
-                                        <!-- Node 2: Complexity -->
-                                        <div class="node-container" id="node-complexity">
-                                            <div class="node">
-                                                <div class="node-icon">📊</div>
-                                                <div class="node-title">Complexity Analysis</div>
-                                                <div class="node-status-badge">Idle</div>
-                                            </div>
+                                        <div class="metric-box">
+                                            <span class="metric-label">Complexity</span>
+                                            <span class="metric-value" id="val-complexity">--</span>
                                         </div>
-                                        
-                                        <div class="pipeline-arrow" id="arrow-2"></div>
-
-                                        <!-- Node 3: Detect -->
-                                        <div class="node-container" id="node-detect">
-                                            <div class="node">
-                                                <div class="node-icon">🛡️</div>
-                                                <div class="node-title">Issue Detection</div>
-                                                <div class="node-status-badge">Idle</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="pipeline-arrow" id="arrow-3"></div>
-
-                                        <!-- Node 4: Suggest -->
-                                        <div class="node-container" id="node-suggest_improvements">
-                                            <div class="node">
-                                                <div class="node-icon">🔧</div>
-                                                <div class="node-title">Refactor & Suggest</div>
-                                                <div class="node-status-badge">Idle</div>
-                                            </div>
+                                        <div class="metric-box">
+                                            <span class="metric-label">Functions</span>
+                                            <span class="metric-value" id="val-funcs">--</span>
                                         </div>
                                     </div>
-
-                                    <!-- Loop Tracker -->
-                                    <div class="loop-indicator-bar" id="loop-indicator" style="display: none;">
-                                        <span class="loop-icon">🔄</span> Self-Healing Loop Triggered: Refining Code for Quality Check...
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Tabbed Results Card -->
-                            <div class="card glass results-card">
-                                <div class="tabs-header">
-                                    <button class="tab-btn active" data-tab="tab-summary">Review Summary</button>
-                                    <button class="tab-btn" data-tab="tab-bugs">Bugs & Security <span class="badge" id="badge-bugs">0</span></button>
-                                    <button class="tab-btn" data-tab="tab-code">Refactored Code</button>
-                                    <button class="tab-btn" data-tab="tab-logs">Execution Logs</button>
-                                </div>
-                                <div class="tabs-content">
-                                    <!-- Tab: Summary -->
-                                    <div class="tab-pane active" id="tab-summary">
-                                        <div class="summary-dashboard">
-                                            <div class="metric-row">
-                                                <div class="metric-box">
-                                                    <span class="metric-label">Quality Score</span>
-                                                    <span class="metric-value" id="val-quality">--</span>
-                                                    <div class="progress-bar-container">
-                                                        <div class="progress-bar" id="bar-quality" style="width: 0%"></div>
-                                                    </div>
-                                                </div>
-                                                <div class="metric-box">
-                                                    <span class="metric-label">Complexity Score</span>
-                                                    <span class="metric-value" id="val-complexity">--</span>
-                                                </div>
-                                                <div class="metric-box">
-                                                    <span class="metric-label">Functions Found</span>
-                                                    <span class="metric-value" id="val-funcs">--</span>
-                                                </div>
-                                            </div>
-                                            <div class="summary-details">
-                                                <h3>Project Summary</h3>
-                                                <p id="summary-text" class="placeholder-text">Run the workflow execution to generate an AI project review report...</p>
-                                                <div id="functions-list-container" style="display: none;">
-                                                    <h4>Detected Functions:</h4>
-                                                    <ul id="functions-list" class="function-pills"></ul>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Tab: Bugs -->
-                                    <div class="tab-pane" id="tab-bugs">
-                                        <div class="table-container">
-                                            <table class="bugs-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Type</th>
-                                                        <th>Severity</th>
-                                                        <th>Description</th>
-                                                        <th>Location</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="bugs-tbody">
-                                                    <tr class="empty-row">
-                                                        <td colspan="4">No issues scanned yet. Click "Execute Workflow" to start analysis.</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-
-                                    <!-- Tab: Refactored Code -->
-                                    <div class="tab-pane" id="tab-code">
-                                        <div class="refactor-layout">
-                                            <div class="refactor-meta">
-                                                <h3>Optimized Implementation</h3>
-                                                <button class="btn btn-secondary btn-sm" id="btn-copy">Copy Code</button>
-                                            </div>
-                                            <div class="refactor-improvements">
-                                                <h4>Key Improvements Applied:</h4>
-                                                <ul id="improvements-list">
-                                                    <li class="placeholder-li">Execute workflow to generate suggested improvements.</li>
-                                                </ul>
-                                            </div>
-                                            <div class="code-views">
-                                                <div class="code-view-container">
-                                                    <div class="code-view-header">Refactored Code</div>
-                                                    <pre><code class="language-python" id="refactored-code-block"># Refactored output will appear here...</code></pre>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Tab: Logs -->
-                                    <div class="tab-pane" id="tab-logs">
-                                        <div class="console-log" id="console-logs">
-                                            <div class="console-line system">> System initialized. Waiting for input...</div>
+                                    <div class="summary-details">
+                                        <h3>Executive Summary</h3>
+                                        <p id="summary-text" class="placeholder-text">Run the review execution to generate an AI codebase report...</p>
+                                        <div id="functions-list-container" style="display: none;">
+                                            <h4>Detected Functions:</h4>
+                                            <ul id="functions-list" class="function-pills"></ul>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                        </section>
+                        </div>
+
+                    </div>
+
+                    <!-- Dashboard Bottom Area: Execution Timeline & Tabbed Pane results -->
+                    <div class="dashboard-bottom-area">
+                        
+                        <!-- Visual Pipeline Graph Card -->
+                        <div class="card glass visualizer-card">
+                            <div class="card-header">
+                                <h2>Active Workflow Pipeline Graph</h2>
+                                <span class="step-num">03</span>
+                            </div>
+                            <div class="card-body">
+                                <div class="pipeline-graph">
+                                    <!-- Node 1: Extract -->
+                                    <div class="node-container" id="node-extract">
+                                        <div class="node">
+                                            <div class="node-icon">🔍</div>
+                                            <div class="node-title">Extract Functions</div>
+                                            <div class="node-status-badge">Idle</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="pipeline-arrow" id="arrow-1"></div>
+
+                                    <!-- Node 2: Complexity -->
+                                    <div class="node-container" id="node-complexity">
+                                        <div class="node">
+                                            <div class="node-icon">📊</div>
+                                            <div class="node-title">Complexity Analysis</div>
+                                            <div class="node-status-badge">Idle</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="pipeline-arrow" id="arrow-2"></div>
+
+                                    <!-- Node 3: Detect -->
+                                    <div class="node-container" id="node-detect">
+                                        <div class="node">
+                                            <div class="node-icon">🛡️</div>
+                                            <div class="node-title">Issue Detection</div>
+                                            <div class="node-status-badge">Idle</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="pipeline-arrow" id="arrow-3"></div>
+
+                                    <!-- Node 4: Suggest -->
+                                    <div class="node-container" id="node-suggest_improvements">
+                                        <div class="node">
+                                            <div class="node-icon">🔧</div>
+                                            <div class="node-title">Refactor & Suggest</div>
+                                            <div class="node-status-badge">Idle</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Loop Tracker -->
+                                <div class="loop-indicator-bar" id="loop-indicator" style="display: none;">
+                                    <span class="loop-icon">🔄</span> Self-Healing Loop Triggered: Refining Code for Quality Check...
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Results Card: Findings, AI Fixes & logs -->
+                        <div class="card glass results-card">
+                            <div class="tabs-header">
+                                <button class="tab-btn active" data-tab="tab-bugs">Findings <span class="badge" id="badge-bugs">0</span></button>
+                                <button class="tab-btn" data-tab="tab-code">AI Fixes</button>
+                                <button class="tab-btn" data-tab="tab-logs">Execution Logs</button>
+                            </div>
+                            <div class="tabs-content">
+                                <!-- Tab: Findings (Bugs) -->
+                                <div class="tab-pane active" id="tab-bugs">
+                                    <div class="table-container">
+                                        <table class="bugs-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Type</th>
+                                                    <th>Severity</th>
+                                                    <th>Description</th>
+                                                    <th>Location</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="bugs-tbody">
+                                                <tr class="empty-row">
+                                                    <td colspan="4">No issues scanned yet. Click "Run Review" to start analysis.</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+
+                                <!-- Tab: Refactored Code -->
+                                <div class="tab-pane" id="tab-code">
+                                    <div class="refactor-layout">
+                                        <div class="refactor-meta">
+                                            <h3>Optimized Implementation</h3>
+                                            <button class="btn btn-secondary btn-sm" id="btn-copy">Copy Code</button>
+                                        </div>
+                                        <div class="refactor-improvements">
+                                            <h4>Key Improvements Applied:</h4>
+                                            <ul id="improvements-list">
+                                                <li class="placeholder-li">Execute workflow to generate suggested improvements.</li>
+                                            </ul>
+                                        </div>
+                                        <div class="code-views">
+                                            <div class="code-view-container">
+                                                <div class="code-view-header">Refactored Code</div>
+                                                <pre><code class="language-python" id="refactored-code-block"># Refactored output will appear here...</code></pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Tab: Logs -->
+                                <div class="tab-pane" id="tab-logs">
+                                    <div class="console-log" id="console-logs">
+                                        <div class="console-line system">> System initialized. Waiting for input...</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
 
