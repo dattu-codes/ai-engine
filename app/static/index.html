@@ -53,82 +53,95 @@
         <!-- Sidebar Navigation -->
         <aside class="app-sidebar" id="sidebar-panel">
             <div class="sidebar-header">
-                <div class="sidebar-logo">Æ</div>
+                <div class="sidebar-logo" aria-label="AI Engine logo"><img src="/static/ae-logo.svg" alt="" /></div>
                 <div class="sidebar-brand-name">AI Engine</div>
             </div>
             
             <div class="sidebar-content">
                 <div>
-                    <div class="sidebar-group-title">Platform</div>
-                    <nav class="sidebar-nav">
-                        <button class="nav-item active" data-view="view-dashboard">
-                            <span class="nav-icon">📊</span>
-                            <span class="nav-text">Dashboard</span>
-                        </button>
-                        <button class="nav-item" data-view="view-insights" id="nav-item-insights" style="display: none;">
-                            <span class="nav-icon">📈</span>
-                            <span class="nav-text">Repository Insights</span>
-                        </button>
-                        <button class="nav-item" data-view="view-projects">
-                            <span class="nav-icon">📁</span>
-                            <span class="nav-text">Projects</span>
-                        </button>
-                        <button class="nav-item" data-view="view-workspace" id="nav-item-workspace" style="display: none;">
-                            <span class="nav-icon">🏢</span>
-                            <span class="nav-text">Workspaces</span>
-                        </button>
-                    </nav>
-                </div>
-                
-                <div>
-                    <div class="sidebar-group-title">Analysis</div>
-                    <nav class="sidebar-nav">
-                        <button class="nav-item" data-view="view-findings" id="nav-item-findings" style="display: none;">
-                            <span class="nav-icon">📝</span>
-                            <span class="nav-text">Review Findings</span>
-                        </button>
-                        <button class="nav-item" data-view="view-pull-requests" id="nav-item-pull-requests" style="display: none;">
-                            <span class="nav-icon">💻</span>
-                            <span class="nav-text">Pull Requests</span>
-                        </button>
-                        <button class="nav-item" data-view="view-semantic" id="nav-item-semantic" style="display: none;">
-                            <span class="nav-icon">🕸</span>
-                            <span class="nav-text">Semantic Explorer</span>
-                        </button>
-                    </nav>
-                </div>
+    <div class="sidebar-group-title">Platform</div>
+    <nav class="sidebar-nav">
 
-                <div>
-                    <div class="sidebar-group-title">Heal & Validate</div>
-                    <nav class="sidebar-nav">
-                        <button class="nav-item" data-view="view-fix-center" id="nav-item-fix-center" style="display: none;">
-                            <span class="nav-icon">🤖</span>
-                            <span class="nav-text">AI Fix Center</span>
-                        </button>
-                        <button class="nav-item" data-view="view-test-center" id="nav-item-test-center" style="display: none;">
-                            <span class="nav-icon">🧪</span>
-                            <span class="nav-text">Test Center</span>
-                        </button>
-                        <button class="nav-item" data-view="view-versions" id="nav-item-versions" style="display: none;">
-                            <span class="nav-icon">📜</span>
-                            <span class="nav-text">Versions</span>
-                        </button>
-                        <button class="nav-item" data-view="view-chat" id="nav-item-chat" style="display: none;">
-                            <span class="nav-icon">💬</span>
-                            <span class="nav-text">Project Chat</span>
-                        </button>
-                    </nav>
-                </div>
+        <button class="nav-item active" data-view="view-dashboard">
+            <span class="nav-icon nav-icon-mark">01</span>
+            <span class="nav-text">Dashboard</span>
+        </button>
 
-                <div>
-                    <div class="sidebar-group-title">Operations</div>
-                    <nav class="sidebar-nav">
-                        <button class="nav-item" data-view="view-deployment" id="nav-item-deployment">
-                            <span class="nav-icon">🚀</span>
-                            <span class="nav-text">Deployment Center</span>
-                        </button>
-                    </nav>
-                </div>
+        
+
+        <button class="nav-item" data-view="view-projects">
+            <span class="nav-icon nav-icon-mark">02</span>
+            <span class="nav-text">Projects</span>
+        </button>
+
+        <button class="nav-item" data-view="view-workspace" id="nav-item-workspace" style="display: none;">
+            <span class="nav-icon nav-icon-mark">03</span>
+            <span class="nav-text">Workspaces</span>
+        </button>
+        <button class="nav-item" data-view="view-deployment" id="nav-item-deployment">
+    <span class="nav-icon nav-icon-mark">04</span>
+    <span class="nav-text">Deployment Center</span>
+</button>
+
+    </nav>
+</div>
+
+<div>
+    <div class="sidebar-section" id="sidebar-analysis">
+    <div class="sidebar-group-title">Analysis</div>
+    <nav class="sidebar-nav">
+        <button class="nav-item" data-view="view-insights" id="nav-item-insights" style="display: none;">
+            <span class="nav-icon nav-icon-mark">05</span>
+            <span class="nav-text">Repository Insights</span>
+        </button>
+
+        
+
+
+        <button class="nav-item" data-view="view-findings" id="nav-item-findings" style="display: none;">
+            <span class="nav-icon nav-icon-mark">05</span>
+            <span class="nav-text">Review Findings</span>
+        </button>
+
+        <button class="nav-item" data-view="view-pull-requests" id="nav-item-pull-requests" style="display: none;">
+            <span class="nav-icon nav-icon-mark">06</span>
+            <span class="nav-text">Pull Requests</span>
+        </button>
+
+        <button class="nav-item" data-view="view-semantic" id="nav-item-semantic" style="display: none;">
+            <span class="nav-icon nav-icon-mark">07</span>
+            <span class="nav-text">Semantic Explorer</span>
+        </button>
+
+    </nav>
+</div>
+
+<div class="sidebar-section" id="sidebar-heal">
+    <div class="sidebar-group-title">Heal &amp; Validate</div>
+    <nav class="sidebar-nav">
+
+        <button class="nav-item" data-view="view-fix-center" id="nav-item-fix-center" style="display: none;">
+            <span class="nav-icon nav-icon-mark">09</span>
+            <span class="nav-text">AI Fix Center</span>
+        </button>
+
+        <button class="nav-item" data-view="view-test-center" id="nav-item-test-center" style="display: none;">
+            <span class="nav-icon nav-icon-mark">10</span>
+            <span class="nav-text">Test Center</span>
+        </button>
+
+        <button class="nav-item" data-view="view-versions" id="nav-item-versions" style="display: none;">
+            <span class="nav-icon nav-icon-mark">11</span>
+            <span class="nav-text">Versions</span>
+        </button>
+
+        <button class="nav-item" data-view="view-chat" id="nav-item-chat" style="display: none;">
+            <span class="nav-icon nav-icon-mark">12</span>
+            <span class="nav-text">Project Chat</span>
+        </button>
+
+    </nav>
+</div>
             </div>
 
 
@@ -378,11 +391,11 @@
                     <div class="dashboard-top-bar card glass">
                         <div class="top-bar-item">
                             <span class="top-bar-label">Repository</span>
-                            <div class="top-bar-val">dattu-codes/ai-engine</div>
+                            <div class="top-bar-val" id="dashboard-repository">No repository selected</div>
                         </div>
                         <div class="top-bar-item">
                             <span class="top-bar-label">Branch</span>
-                            <div class="top-bar-val">main</div>
+                            <div class="top-bar-val" id="dashboard-branch">—</div>
                         </div>
                         <div class="top-bar-item">
                             <span class="top-bar-label" id="api-key-label">Gemini API Key</span>
@@ -401,12 +414,9 @@
                         <div class="top-bar-item">
                             <span class="top-bar-label">Model Engine</span>
                             <select id="model">
-                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
-                                 <option value="gemini-2.5-pro">Gemini 2.5 Pro (In-depth)</option>
-                                 <option value="gpt-4o">GPT-4o (OpenAI ChatGPT)</option>
-                                 <option value="claude-3-5-sonnet">Claude 3.5 Sonnet (Anthropic)</option>
-                                 <option value="gemini-3.5-flash">Gemini 3.5 Flash (Latest)</option>
-                                 <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                                 <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+<option value="gpt-4o">GPT-4o</option>
+<option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
                              </select>
                         </div>
                         <button id="btn-run" class="btn btn-primary pulse-btn">
@@ -491,7 +501,7 @@
                         <div class="card glass visualizer-card">
                             <div class="card-header">
                                 <h2>Active Workflow Pipeline Graph</h2>
-                                <span class="step-num">03</span>
+                                
                             </div>
                             <div class="card-body">
                                 <div class="pipeline-graph">
@@ -1226,7 +1236,7 @@
                         <div style="flex: 2; display: flex; flex-direction: column; height: 100%; min-width: 0;" class="card glass">
                             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 12px; margin-bottom: 10px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <span style="font-size: 20px;">🤖</span>
+                                    
                                     <div>
                                         <h2 style="margin: 0; font-size: 16px; color: var(--text-bright);">AI Project Assistant</h2>
                                         <p style="margin: 0; font-size: 12px; color: var(--text-muted);">Grounded in local project source files and reports</p>
@@ -1337,7 +1347,7 @@
                             <!-- List of PRs -->
                             <div style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;" id="pr-list-container">
                                 <div class="empty-state" style="padding: 20px 10px;">
-                                    <span style="font-size: 24px;">💻</span>
+                                    
                                     <p style="margin-top: 10px; font-size: 13px;">No Pull Requests reviewed yet</p>
                                 </div>
                             </div>
@@ -1568,9 +1578,9 @@
             <!-- Right Panel: Selected Workspace Details -->
             <div style="display: flex; flex-direction: column; gap: 20px;">
                 <!-- Placeholder when no workspace is selected -->
-                <div class="card glass" id="workspace-detail-placeholder" style="padding: 40px; text-align: center; color: var(--text-muted);">
-                    <span style="font-size: 40px; display: block; margin-bottom: 10px;">🏢</span>
-                    <h3 style="color: var(--text-bright); font-size: 16px; margin: 0 0 8px 0;">Select a Workspace</h3>
+                <div class="card glass" id="workspace-detail-placeholder" style="padding: 28px; text-align: center; color: var(--text-muted);">
+                    
+                    <h3 style="color: var(--text-bright); font-size: 15px; margin: 0 0 6px 0;">Select a Workspace</h3>
                     <p style="font-size: 13px; margin: 0;">Choose a workspace from the left panel to manage members, assign roles, and view activities.</p>
                 </div>
 
@@ -1769,7 +1779,7 @@
                         <!-- Right Column: Finding Detail View -->
                         <div style="flex: 1.2; display: flex; flex-direction: column;" class="card glass" id="finding-detail-pane">
                             <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center; color: var(--text-muted); padding: 40px;" id="finding-detail-placeholder">
-                                <span style="font-size: 40px; margin-bottom: 10px;">📝</span>
+                                
                                 <h3>Select a Finding</h3>
                                 <p>Click on any item in the left findings list to inspect details and take actions</p>
                             </div>
@@ -1907,7 +1917,7 @@
                         <!-- Right Panel: Active Fix & Preview Panel -->
                         <div style="flex: 1; display: flex; flex-direction: column; gap: 20px;" id="active-fix-details-panel">
                             <div class="card glass" style="padding: 20px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; min-height: 400px; justify-content: center; align-items: center;" id="fix-details-empty">
-                                <span style="font-size: 40px; margin-bottom: 12px;">🤖</span>
+                                
                                 <h4 style="font-size: 15px; margin: 0 0 6px 0; color: var(--text-bright);">No Fix Run Selected</h4>
                                 <p style="color: var(--text-muted); font-size: 13px; margin: 0; text-align: center;">Select a fix attempt from the left panel list or trigger "Apply AI Fix" on a Review Finding card to configure repair patches.</p>
                             </div>
@@ -2016,7 +2026,7 @@
                 <div class="glass" style="flex: 1; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); padding: 20px; overflow-y: auto; background: rgba(0,0,0,0.15);">
                     <!-- Empty State -->
                     <div id="test-details-empty" style="display: flex; height: 100%; flex-direction: column; justify-content: center; align-items: center; text-align: center; color: var(--text-muted);">
-                        <span style="font-size: 40px; margin-bottom: 10px;">🧪</span>
+                        
                         <p style="font-size: 13px; margin: 0;">Select a test execution run from the left panel to inspect stubs and outputs.</p>
                     </div>
 
@@ -2057,31 +2067,37 @@
     <div class="auth-overlay" id="auth-overlay">
         <div class="auth-split-left">
             <div class="auth-info-header">
-                <div class="auth-logo">Æ</div>
+                <div class="auth-logo" aria-label="AI Engine logo"><img src="/static/ae-logo.svg" alt="" /></div>
                 <span class="auth-brand-name">AI Engine Platform</span>
             </div>
             
             <div class="auth-info-content">
-                <h1 class="auth-hero-title">The Self-Healing<br>Engineering Workflow.</h1>
-                <p class="auth-hero-desc">Automated codebase analysis, vulnerability detection, dynamic test suite orchestration, and patch fixes.</p>
+                <h1 class="auth-hero-title">
+    Ship better code.<br>
+    Fix issues before production.
+</h1>
+                <p class="auth-hero-desc">
+    AI-powered code intelligence for analyzing repositories,
+    detecting vulnerabilities, generating fixes, and validating changes.
+</p>
                 
                 <div class="auth-features-list">
                     <div class="auth-feature-item">
-                        <span class="auth-feature-icon">🛡</span>
+                        <span class="auth-feature-icon">01</span>
                         <div class="auth-feature-text">
                             <h3>AST-Backed Security Scans</h3>
                             <p>Matches real-time vulnerability traces.</p>
                         </div>
                     </div>
                     <div class="auth-feature-item">
-                        <span class="auth-feature-icon">🤖</span>
+                        <span class="auth-feature-icon">02</span>  
                         <div class="auth-feature-text">
                             <h3>AI-Driven Patch Generation</h3>
                             <p>Cursor AI-style code repair diffs.</p>
                         </div>
                     </div>
                     <div class="auth-feature-item">
-                        <span class="auth-feature-icon">🧪</span>
+                        <span class="auth-feature-icon">03</span>
                         <div class="auth-feature-text">
                             <h3>CI/CD Test Generation</h3>
                             <p>Runs dynamic pytest checks automatically.</p>
@@ -2123,7 +2139,7 @@
                             </select>
                         </div>
                         <div id="auth-error-msg" class="auth-error" style="display: none;"></div>
-                        <button type="submit" id="btn-auth-submit" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Authenticate</button>
+                        <button type="submit" id="btn-auth-submit" class="btn btn-primary">Sign in</button>
                     </form>
                 </div>
             </div>

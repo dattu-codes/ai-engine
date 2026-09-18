@@ -536,7 +536,7 @@ function initAuth() {
         tabLogin.classList.add('active');
         tabSignup.classList.remove('active');
         signupRoleGroup.style.display = 'none';
-        authSubmitBtn.textContent = 'Login';
+        authSubmitBtn.textContent = 'Sign in';
         clearAuthError();
     });
 
@@ -545,7 +545,7 @@ function initAuth() {
         tabSignup.classList.add('active');
         tabLogin.classList.remove('active');
         signupRoleGroup.style.display = 'block';
-        authSubmitBtn.textContent = 'Sign Up';
+        authSubmitBtn.textContent = 'Create account';
         clearAuthError();
     });
 
@@ -6065,4 +6065,63 @@ function initSassSettings() {
         });
     }
 }
+function updateSidebarSections() {
+    const sections = [
+        {
+            section: document.getElementById('sidebar-analysis'),
+            items: ['nav-item-findings', 'nav-item-pull-requests', 'nav-item-semantic']
+        },
+        {
+            section: document.getElementById('sidebar-heal'),
+            items: ['nav-item-fix-center', 'nav-item-test-center', 'nav-item-versions', 'nav-item-chat']
+        }
+    ];
 
+    sections.forEach(({ section, items }) => {
+        if (!section) return;
+
+        const hasVisibleItem = items.some(id => {
+            const item = document.getElementById(id);
+            return item && item.style.display !== 'none';
+        });
+
+        section.style.display = hasVisibleItem ? '' : 'none';
+    });
+}
+
+updateSidebarSections();
+function updateSidebarSections() {
+    const sections = [
+        {
+            section: document.getElementById('sidebar-analysis'),
+            items: [
+                'nav-item-insights',
+                'nav-item-findings',
+                'nav-item-pull-requests',
+                'nav-item-semantic'
+            ]
+        },
+        {
+            section: document.getElementById('sidebar-heal'),
+            items: [
+                'nav-item-fix-center',
+                'nav-item-test-center',
+                'nav-item-versions',
+                'nav-item-chat'
+            ]
+        }
+    ];
+
+    sections.forEach(({ section, items }) => {
+        if (!section) return;
+
+        const hasVisibleItem = items.some(id => {
+            const item = document.getElementById(id);
+            return item && getComputedStyle(item).display !== 'none';
+        });
+
+        section.style.display = hasVisibleItem ? '' : 'none';
+    });
+}
+
+updateSidebarSections();

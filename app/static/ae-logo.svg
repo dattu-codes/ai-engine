@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 728 459" fill="none" aria-hidden="true">
+  <g fill="#ffffff">
+    <!-- A: diagonal and shared crossbar -->
+    <path d="M0 459L308 0H395L97 459H0Z"/>
+    <rect x="213" y="211" width="499" height="75"/>
+    <!-- E: top, spine and bottom bars -->
+    <rect x="308" y="0" width="420" height="75"/>
+    <rect x="395" y="0" width="93" height="459"/>
+    <rect x="395" y="381" width="333" height="78"/>
+  </g>
+</svg>

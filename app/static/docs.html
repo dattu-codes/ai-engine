@@ -72,6 +72,8 @@
             font-weight: bold;
         }
 
+        .logo-symbol img { width: 100%; height: 100%; display: block; object-fit: contain; }
+
         .nav-group-title {
             font-size: 11px;
             text-transform: uppercase;
@@ -210,11 +212,26 @@
             });
         }
     </script>
+
+    <style>
+      :root{--bg-dark:#08090b;--bg-panel:#0d0f12;--text-bright:#f4f5f7;--text-main:#b5bac4;--text-muted:#737985;--accent-purple:#7c6cff;--accent-blue:#5b8cff;--border-color:rgba(255,255,255,.075)}
+      body{background:#08090b;color:var(--text-main)}
+      .docs-sidebar{width:248px;background:#0b0c0f;border-right:1px solid var(--border-color);padding:18px;gap:22px}
+      .logo{font-size:17px}.logo-symbol{width:30px;height:30px;padding:6px;border-radius:8px;background:linear-gradient(135deg,#6d5dfc,#4d86ff)}
+      .nav-group-title{font-size:9px;letter-spacing:.1em;color:#606672;margin-bottom:6px}
+      .nav-links{gap:2px}.nav-links a{padding:8px 10px;border-radius:7px;font-size:12px;color:#858b97}
+      .nav-links a:hover,.nav-links a.active{background:rgba(124,108,255,.10);color:#eeeefe}
+      .docs-content{padding:46px 64px;background:#08090b}
+      .docs-section{max-width:860px;margin-bottom:72px}
+      .docs-section h1,.docs-section h2{letter-spacing:-.035em;color:#f4f5f7}
+      code,pre{border-radius:8px!important;border-color:rgba(255,255,255,.08)!important}
+      @media(max-width:800px){.docs-sidebar{width:210px}.docs-content{padding:32px 24px}}
+    </style>
 </head>
 <body>
     <aside class="docs-sidebar">
         <a href="/landing" class="logo">
-            <div class="logo-symbol">Æ</div>
+            <div class="logo-symbol" aria-label="AI Engine logo"><img src="/static/ae-logo.svg" alt="" /></div>
             AI Engine
         </a>
         
