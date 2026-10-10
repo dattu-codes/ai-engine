@@ -20,9 +20,7 @@ def create_checkout_session(
     price_id = settings.STRIPE_PRICE_PRO_ID if plan_type.lower() == "pro" else settings.STRIPE_PRICE_ENT_ID
     
     if not settings.STRIPE_SECRET_KEY:
-        # Return mock checkout redirect URL
-        mock_session_url = f"/billing/mock-activate?plan={plan_type}&token=mock_session_token"
-        return {"checkout_url": mock_session_url}
+        raise HTTPException(status_code=503, detail="Billing is not configured")
         
     import stripe
     stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -72,13 +70,10 @@ async def stripe_webhook(
     payload = await request.body()
     
     if not settings.STRIPE_SECRET_KEY or not settings.STRIPE_WEBHOOK_SECRET:
-        # Mock callback
-        try:
-            event = json.loads(payload.decode("utf-8"))
-        except Exception:
-            return {"status": "ignored"}
+        raise HTTPException(status_code=503, detail="Billing webhook is not configured")
     else:
         import stripe
+        
         try:
             event = stripe.Webhook.construct_event(
                 payload, stripe_signature, settings.STRIPE_WEBHOOK_SECRET
@@ -125,6 +120,7 @@ def mock_activate_plan(
     db: Session = Depends(get_db)
 ):
     """Convenience endpoint to mock toggle user billing plans for testing."""
+    raise HTTPException(status_code=404, detail="Not found")
     current_user.billing_plan = plan.capitalize()
     current_user.billing_status = "active"
     db.commit()
