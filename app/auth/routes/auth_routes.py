@@ -32,7 +32,7 @@ def signup(req: UserSignupRequest, db: Session = Depends(get_db)):
     user = User(
         username=req.username,
         hashed_password=hashed,
-        role=req.role or "user"
+        role="user"
     )
     db.add(user)
     db.commit()
