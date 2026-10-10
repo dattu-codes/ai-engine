@@ -49,7 +49,7 @@ def github_callback(code: str, state: Optional[str] = None, db: Session = Depend
     
     if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
         raise HTTPException(status_code=503, detail="GitHub login is not configured")
-        is_mock = False
+    is_mock = False
     
     if not is_mock:
         try:
