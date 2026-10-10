@@ -34,8 +34,8 @@ class TestRunnerService:
         vfs = db.query(ProjectVersionFile).filter(ProjectVersionFile.version_id == test_exec.version_id).all()
         language = test_exec.language or "Python"
 
-        # Python real execution sandbox
-        if language.lower() == "python":
+        # Python test execution (off unless ENABLE_CODE_EXECUTION=true)
+        if language.lower() == "python" and os.getenv("ENABLE_CODE_EXECUTION") == "true":
             temp_dir = os.path.abspath(os.path.join(os.getcwd(), f"temp_run_{test_execution_id}"))
             os.makedirs(temp_dir, exist_ok=True)
             
