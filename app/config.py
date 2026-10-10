@@ -14,6 +14,12 @@ if os.path.exists(env_path):
                 key, val = line.split("=", 1)
                 os.environ[key.strip()] = val.strip()
 
+import secrets
+
+def _fallback_secret():
+    print("WARNING: JWT_SECRET is not set. Using a temporary random secret.")
+    return secrets.token_hex(32)
+
 class Settings(BaseModel):
     # Database configurations
     DATABASE_URL: str = Field(default="sqlite:///./auth.db")
@@ -22,7 +28,7 @@ class Settings(BaseModel):
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
     # Security & Auth configurations
-    JWT_SECRET: str = Field(default="47a329ef3118cf94a0d923bc650630ba5239a04a5cf2b07e5cba4839de848aef")
+    JWT_SECRET: str = Field(default="")
     JWT_ALGORITHM: str = Field(default="HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
@@ -67,7 +73,7 @@ class Settings(BaseModel):
         return cls(
             DATABASE_URL=os.getenv("DATABASE_URL", "sqlite:///./auth.db"),
             REDIS_URL=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-            JWT_SECRET=os.getenv("JWT_SECRET", "47a329ef3118cf94a0d923bc650630ba5239a04a5cf2b07e5cba4839de848aef"),
+            JWT_SECRET=os.getenv("JWT_SECRET")
             JWT_ALGORITHM=os.getenv("JWT_ALGORITHM", "HS256"),
             ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")),
             REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
