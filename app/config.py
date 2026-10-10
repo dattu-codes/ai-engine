@@ -73,7 +73,7 @@ class Settings(BaseModel):
         return cls(
             DATABASE_URL=os.getenv("DATABASE_URL", "sqlite:///./auth.db"),
             REDIS_URL=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-            JWT_SECRET=os.getenv("JWT_SECRET")
+            JWT_SECRET=os.getenv("JWT_SECRET") or _fallback_secret(),
             JWT_ALGORITHM=os.getenv("JWT_ALGORITHM", "HS256"),
             ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")),
             REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
