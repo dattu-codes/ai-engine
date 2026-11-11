@@ -5,7 +5,9 @@ import asyncio
 from datetime import datetime
 
 # Add workspace directory to python path
-sys.path.append(r"c:\Users\datta\.gemini\antigravity-ide\scratch\ai-engine-intern")
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from app.auth.database.connection import SessionLocal, Base, engine
 from app.auth.models.auth_models import User

@@ -144,10 +144,6 @@ def create_v1_project(
     db: Session = Depends(get_db)
 ):
     """Create a new project via API."""
-    # Apply billing limits checks
-    from app.billing.services.billing_service import BillingService
-    BillingService.check_billing_limit(db, user, "projects")
-    
     project = Project(
         user_id=user.id,
         name=name,

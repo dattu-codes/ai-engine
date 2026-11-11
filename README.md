@@ -83,7 +83,6 @@ ai-engine/
 │   │   ├── database/      # SQLAlchemy SQLite/PostgreSQL connection
 │   │   ├── models/        # Database models (User, Session, ApiKey)
 │   │   └── routes/        # Auth endpoints (/signup, /login, /profile)
-│   ├── billing/           # Subscription tiers & Stripe gateways
 │   ├── projects/          # Core Domain Logic
 │   │   ├── models/        # Models (Project, Workspace, Finding, TestExecution)
 │   │   ├── repositories/  # DB Data Access Repositories
@@ -163,22 +162,60 @@ Open your browser and navigate to:
 
 ---
 
-## 🧪 Verification & Integration Test Suite
+## 🧪 Verification & Integration Test Battery (19 Test Suites)
 
-The platform includes automated end-to-end integration test scripts to verify platform integrity:
+AI Engine includes **19 comprehensive, in-memory automated integration test suites** validating end-to-end functionality across every architectural layer without external socket dependencies.
 
+To run the entire battery with a single command and view the execution scorecard:
 ```bash
-# Verify JWT Auth, Password Hashing, & Refresh Rotation
-python verify_auth.py
+python verify_all.py
+```
 
-# Verify Project Ingestion, Workspace Isolation, & AST Scanning
-python verify_projects.py
+### 1. Security & Core Infrastructure
+```bash
+python verify_auth.py                 # JWT token lifecycle, bcrypt, lockout rate-limiting, reuse detection
+python verify_deployment_readiness.py # Storage abstraction, path traversal containment, /health & /ready
+python verify_public_saas.py          # Public REST API v1, analytics aggregation, RBAC permissions
+```
 
-# Verify AI Review Engine & Quality Score Metrics
-python verify_review_pipeline.py
+### 2. Codebase Ingestion & AST Static Analysis
+```bash
+python verify_projects.py             # Multi-language ZIP ingestion, Zip-Slip prevention, git metadata
+python verify_analyzers.py            # AST Cyclomatic Complexity, Maintainability Index, vulnerability AST
+python verify_intelligence.py         # Framework auto-detection (FastAPI, Spring Boot), entry points, pom.xml
+```
 
-# Verify Versioning, AI Patch Generation, & Rollback Safety
-python verify_versioning.py
+### 3. Review Pipeline & Code Quality Findings
+```bash
+python verify_analysis.py             # Asynchronous review pipeline execution, report generation
+python verify_review_pipeline.py      # 6-stage pipeline transitions, timing benchmarks, issue deduplication
+python verify_review_findings.py      # Finding lifecycle (Open -> Assigned -> Ignored -> Reopened -> Resolved)
+python verify_multi_llm.py            # Multi-provider routing (Gemini, OpenAI, Anthropic, offline simulator)
+```
+
+### 4. Semantic Dependency Graph & Insights
+```bash
+python verify_semantic_graph.py       # Cross-file AST node extraction, circular loops, dead code detection
+python verify_repository_insights.py  # Engineering maturity scoring, architecture health, tech debt rating
+```
+
+### 5. AI Self-Healing, Versioning & Grounded Chat
+```bash
+python verify_ai_fix_center.py        # Cursor-style unified diffs, developer approval flow, auto-rollback
+python verify_versioning.py           # Snapshot version control (v1 -> v2), diff comparison, ZIP downloads
+python verify_project_chat.py         # Grounded RAG conversational stream, factual file/line citations
+```
+
+### 6. Testing Intelligence & Sandboxed Runner
+```bash
+python verify_test_generation.py      # AST-driven test suite synthesis, sandboxed pytest execution
+```
+
+### 7. GitHub Integration & Collaborative Workspaces
+```bash
+python verify_github.py               # Repository connection, branch detection, commit tracking, repo sync
+python verify_pull_requests.py        # PR audit portal, incremental review, risk scoring, timeline tracking
+python verify_team_collaboration.py   # Multi-tenant workspaces, team invites, threaded discussion comments
 ```
 
 ---

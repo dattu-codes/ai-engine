@@ -5766,7 +5766,6 @@ function initSassSettings() {
     if (openSettingsBtn && settingsModal) {
         openSettingsBtn.addEventListener('click', () => {
             settingsModal.classList.remove('hidden');
-            loadSettingsBilling();
             loadSettingsNotifications();
             loadSettingsApiKeys();
             loadSettingsOrgMembers();
@@ -5781,10 +5780,9 @@ function initSassSettings() {
 
     // Tab switcher
     const settingsTabs = [
-        { btn: 'settings-tab-billing-btn', pane: 'settings-pane-billing' },
+        { btn: 'settings-tab-llm-btn', pane: 'settings-pane-llm' },
         { btn: 'settings-tab-notifications-btn', pane: 'settings-pane-notifications' },
         { btn: 'settings-tab-api-btn', pane: 'settings-pane-api' },
-        { btn: 'settings-tab-llm-btn', pane: 'settings-pane-llm' },
         { btn: 'settings-tab-org-btn', pane: 'settings-pane-org' }
     ];
     settingsTabs.forEach(t => {
@@ -5893,49 +5891,6 @@ function initSassSettings() {
         testAnthropicBtn.addEventListener('click', (e) => {
             e.preventDefault();
             testAndSaveLLMKey('anthropic', 'settings-anthropic-key', 'status-anthropic-connection', 'anthropic_api_key');
-        });
-    }
-
-    // Subscriptions Billing Actions
-    async function loadSettingsBilling() {
-        try {
-            const res = await authorizedFetch('/auth/billing');
-            if (res.ok) {
-                const data = await res.json();
-                document.getElementById('settings-plan-label').textContent = `${data.billing_plan.toUpperCase()} PLAN`;
-                const isFree = data.billing_plan.toLowerCase() === 'free';
-                document.getElementById('btn-billing-subscribe').style.display = isFree ? 'block' : 'none';
-                document.getElementById('btn-billing-portal').style.display = isFree ? 'none' : 'block';
-            }
-        } catch(e) {}
-    }
-    
-    const btnSubscribe = document.getElementById('btn-billing-subscribe');
-    if (btnSubscribe) {
-        btnSubscribe.addEventListener('click', async () => {
-            btnSubscribe.disabled = true;
-            try {
-                const res = await authorizedFetch('/billing/checkout-session?plan_type=pro', { method: 'POST' });
-                if (res.ok) {
-                    const data = await res.json();
-                    window.location.href = data.checkout_url;
-                }
-            } catch(e) {
-                btnSubscribe.disabled = false;
-            }
-        });
-    }
-    
-    const btnPortal = document.getElementById('btn-billing-portal');
-    if (btnPortal) {
-        btnPortal.addEventListener('click', async () => {
-            try {
-                const res = await authorizedFetch('/billing/portal-session', { method: 'POST' });
-                if (res.ok) {
-                    const data = await res.json();
-                    window.location.href = data.portal_url;
-                }
-            } catch(e) {}
         });
     }
 

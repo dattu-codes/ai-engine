@@ -23,9 +23,10 @@ MOCK_GITHUB_REPOS = [
 
 @router.get("/login")
 def github_login(mock: bool = Query(False)):
-    """Redirects user to GitHub's OAuth authorize page or triggers mock callback."""
+    """Redirects user to GitHub's OAuth authorize page or triggers mock callback for local testing."""
+    if mock:
+        return RedirectResponse(url="/auth/github/callback?code=mock_oauth_code")
     if not settings.GITHUB_CLIENT_ID:
-        # Trigger mock redirect straight to callback
         raise HTTPException(status_code=503, detail="GitHub login is not configured")
         
     params = {
@@ -47,9 +48,9 @@ def github_callback(code: str, state: Optional[str] = None, db: Session = Depend
         "name": "Mock GitHub User"
     }
     
-    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+    is_mock = code.startswith("mock")
+    if not is_mock and (not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET):
         raise HTTPException(status_code=503, detail="GitHub login is not configured")
-    is_mock = False
     
     if not is_mock:
         try:

@@ -34,7 +34,6 @@ from app.projects.routes.repository_insights_routes import insights_router
 # SaaS Integrated routers
 from app.auth.routes.github_oauth_routes import router as github_oauth_router
 from app.projects.routes.github_webhook_routes import router as github_webhook_router
-from app.billing.routes.billing_routes import router as billing_router
 from app.analytics.routes.analytics_routes import router as analytics_router
 from app.admin.routes.admin_routes import router as admin_router
 from app.api.v1.public_api_v1 import router as public_api_v1_router, key_router as api_key_router
@@ -48,14 +47,13 @@ run_startup_validation()
 # Create database tables automatically on startup
 Base.metadata.create_all(bind=engine)
 
-# Start the background job worker daemon thread
-from app.projects.services.worker_service import start_worker
-start_worker()
-
-
-
 # FastAPI app
-app = FastAPI(title="Mini Workflow Engine")
+app = FastAPI(title="AI Engine - Developer Platform")
+
+@app.on_event("startup")
+def on_startup():
+    from app.projects.services.worker_service import start_worker
+    start_worker()
 
 # Add CORS Middleware
 app.add_middleware(
@@ -82,10 +80,9 @@ app.include_router(test_router)
 app.include_router(health_router)
 app.include_router(insights_router)
 
-# Register SaaS sub-modules
+# Register sub-modules
 app.include_router(github_oauth_router)
 app.include_router(github_webhook_router)
-app.include_router(billing_router)
 app.include_router(analytics_router)
 app.include_router(admin_router)
 app.include_router(api_key_router)

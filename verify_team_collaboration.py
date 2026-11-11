@@ -1,43 +1,12 @@
+import os
+import sys
 import json
 import time
-import urllib.request
-import urllib.error
-import sys
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
-
-def make_request(
-    method: str, 
-    path: str, 
-    data: Optional[dict] = None, 
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req_body = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=60) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        return 500, {"detail": str(e)}
+# In-memory test client runner
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from test_client_helper import make_request, make_multipart_request
 
 
 def run_tests():
@@ -122,29 +91,19 @@ def run_tests():
     
     # 8. Upload pasted code and start review pipeline (to populate findings)
     print("\n[STEP 8] Ingesting source code containing issues...")
-    # PASTED FILE
-    url = f"{BASE_URL}/projects/{project_id}/upload"
-    boundary = "---BoundaryVal---"
-    headers = {
-        "Content-Type": f"multipart/form-data; boundary={boundary}",
-        "Authorization": f"Bearer {owner_token}"
-    }
-    body_str = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="pasted_filename"\r\n\r\n'
-        f"vuln.py\r\n"
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="pasted_content"\r\n\r\n'
-        f"import sqlite3\n"
-        f"def get_user(uid):\n"
-        f"    # CRITICAL: Sqlite SQL Injection flaw!\n"
-        f"    conn = sqlite3.connect('test.db')\n"
-        f"    return conn.execute(f'SELECT * FROM users WHERE id = {{uid}}')\n\r\n"
-        f"--{boundary}--\r\n"
+    pasted_content = (
+        "import sqlite3\n"
+        "def get_user(uid):\n"
+        "    # CRITICAL: Sqlite SQL Injection flaw!\n"
+        "    conn = sqlite3.connect('test.db')\n"
+        "    return conn.execute(f'SELECT * FROM users WHERE id = {uid}')\n"
     )
-    req = urllib.request.Request(url, data=body_str.encode("utf-8"), headers=headers, method="POST")
-    with urllib.request.urlopen(req) as resp:
-        assert resp.status == 200, f"Source upload failed: {resp.status}"
+    status_code, upload_res = make_multipart_request(
+        f"/projects/{project_id}/upload",
+        fields={"pasted_filename": "vuln.py", "pasted_content": pasted_content},
+        token=owner_token
+    )
+    assert status_code == 200, f"Source upload failed: {upload_res}"
     print("Pasted file uploaded successfully.")
     
     # Start analysis
@@ -157,7 +116,7 @@ def run_tests():
     print("Waiting for review pipeline to complete...")
     for _ in range(20):
         status_code, details = make_request("GET", f"/analysis/{analysis_id}", token=owner_token)
-        if details.get("status") == "COMPLETED":
+        if details.get("status", "").lower() == "completed":
             print("Pipeline execution completed!")
             break
         time.sleep(1)

@@ -256,14 +256,14 @@
     <div class="layout-main">
         <div class="section-left">
             <div class="card">
-                <h2>User Subscriptions & Accounts</h2>
+                <h2>Platform Accounts & Users</h2>
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
                                 <th>Username</th>
                                 <th>Role</th>
-                                <th>Billing Tier</th>
+                                <th>Verification</th>
                                 <th>Integrations</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -360,7 +360,6 @@
                     
                     users.forEach(u => {
                         const tr = document.createElement("tr");
-                        const planClass = u.billing_plan.toLowerCase();
                         const statusLabel = u.is_active ? "Active" : "Suspended";
                         const btnText = u.is_active ? "Suspend" : "Activate";
                         const btnClass = u.is_active ? "action-btn" : "action-btn enable";
@@ -368,7 +367,7 @@
                         tr.innerHTML = `
                             <td style="font-weight: 600; color: var(--text-bright);">${u.username}</td>
                             <td>${u.role}</td>
-                            <td><span class="pill ${planClass}">${u.billing_plan}</span></td>
+                            <td><span class="pill ${u.is_verified ? 'green' : 'outline'}">${u.is_verified ? 'Verified' : 'Standard'}</span></td>
                             <td>${u.github_connected ? "✓ GitHub Connected" : "None"}</td>
                             <td style="font-weight: 600; color: ${u.is_active ? 'var(--accent-green)' : 'var(--accent-red)'};">${statusLabel}</td>
                             <td><button class="${btnClass}" onclick="toggleUserStatus(${u.id})">${btnText}</button></td>

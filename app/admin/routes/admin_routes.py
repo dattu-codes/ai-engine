@@ -24,11 +24,9 @@ def get_system_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Exposes infrastructure health, daemon worker queues, and diagnostics errors list."""
     # Count totals
     total_users = db.query(User).count()
-    active_plans = {
-        "Free": db.query(User).filter(User.billing_plan == "Free").count(),
-        "Pro": db.query(User).filter(User.billing_plan == "Pro").count(),
-        "Enterprise": db.query(User).filter(User.billing_plan == "Enterprise").count()
-    }
+    active_users = db.query(User).filter(User.is_active == True).count()
+    verified_users = db.query(User).filter(User.is_verified == True).count()
+    github_users = db.query(User).filter(User.github_connected == True).count()
     
     # Active background worker telemetry
     active_workers = 1
@@ -62,7 +60,9 @@ def get_system_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     return {
         "total_users": total_users,
-        "plans_breakdown": active_plans,
+        "active_users": active_users,
+        "verified_users": verified_users,
+        "github_connected_users": github_users,
         "active_workers": active_workers,
         "queue_size": queue_size,
         "total_files": total_files,
@@ -76,7 +76,7 @@ def get_system_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
 @router.get("/users", dependencies=[Depends(require_admin)])
 def list_users(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
-    """Lists users registered on the platform with subscription status details."""
+    """Lists users registered on the platform."""
     users = db.query(User).order_by(User.id.asc()).all()
     results = []
     for u in users:
@@ -85,8 +85,7 @@ def list_users(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
             "username": u.username,
             "role": u.role,
             "is_active": u.is_active,
-            "billing_plan": u.billing_plan,
-            "billing_status": u.billing_status,
+            "is_verified": u.is_verified,
             "github_connected": u.github_connected,
             "created_at": u.created_at.isoformat()
         })

@@ -2184,24 +2184,23 @@
             <div class="auth-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
                 <div>
                     <h2 style="font-size: 18px; margin: 0;">Account Settings</h2>
-                    <p style="margin: 0; font-size: 11px;">Configure subscription plans, developer tokens, and preferences.</p>
+                    <p style="margin: 0; font-size: 11px;">Configure developer tokens, AI providers, and platform preferences.</p>
                 </div>
                 <button id="btn-settings-close" style="background: transparent; border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; padding: 4px;">✕</button>
             </div>
             
             <!-- Settings Modal Navigation Tabs -->
             <div style="display: flex; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px; overflow-x: auto;">
-                <button class="auth-tab-btn active" id="settings-tab-billing-btn" style="font-size: 12px;">Billing & Plans</button>
+                <button class="auth-tab-btn active" id="settings-tab-llm-btn" style="font-size: 12px;">LLM Providers</button>
                 <button class="auth-tab-btn" id="settings-tab-notifications-btn" style="font-size: 12px;">Notifications</button>
                 <button class="auth-tab-btn" id="settings-tab-api-btn" style="font-size: 12px;">API Access</button>
-                <button class="auth-tab-btn" id="settings-tab-llm-btn" style="font-size: 12px;">LLM Providers</button>
                 <button class="auth-tab-btn" id="settings-tab-org-btn" style="font-size: 12px;">Workspace Organization</button>
             </div>
             
             <div style="flex: 1; display: flex; flex-direction: column;">
                 
                 <!-- Tab Pane: LLM Providers (v3.1) -->
-                <div class="settings-pane" id="settings-pane-llm" style="display: none;">
+                <div class="settings-pane" id="settings-pane-llm" style="display: block;">
                     <div style="display: flex; flex-direction: column; gap: 16px;">
                         <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Configure AI Providers</span>
                         
@@ -2237,23 +2236,6 @@
                     </div>
                 </div>
 
-                <!-- Tab Pane: Billing & Plans -->
-                <div class="settings-pane" id="settings-pane-billing" style="display: block;">
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
-                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Active Billing Plan</span>
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h3 id="settings-plan-label" style="font-size: 20px; font-weight: 800; color: var(--text-bright);">FREE PLAN</h3>
-                                <span class="pill outline" id="settings-plan-status" style="border-color: var(--accent-green); color: var(--accent-green);">Active</span>
-                            </div>
-                        </div>
-                        <p style="font-size: 12px; color: var(--text-muted);">Upgrade to Pro plan to increase repository limits (up to 5 projects) and increase parsed files limits (up to 20 files per scan).</p>
-                        <div style="display: flex; gap: 12px;">
-                            <button id="btn-billing-subscribe" class="btn btn-primary" style="flex: 1; margin: 0;">Subscribe to Pro ($19/mo)</button>
-                            <button id="btn-billing-portal" class="btn btn-secondary" style="flex: 1; margin: 0; display: none;">Manage Subscription</button>
-                        </div>
-                    </div>
-                </div>
                 
                 <!-- Tab Pane: Notifications Preferences -->
                 <div class="settings-pane" id="settings-pane-notifications" style="display: none;">

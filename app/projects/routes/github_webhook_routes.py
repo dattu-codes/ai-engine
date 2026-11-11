@@ -12,19 +12,19 @@ from app.config import settings
 
 router = APIRouter(prefix="/projects/github", tags=["GitHub Webhooks"])
 
-def verify_webhook_signature(payload: bytes, signature: str) -> bool:
+def verify_webhook_signature(payload: bytes, signature: Optional[str]) -> bool:
     """Verifies that the webhook payload is sent by GitHub using the shared secret."""
     if not settings.GITHUB_WEBHOOK_SECRET:
         return True
-    if not signature:
+    if not signature or "=" not in signature:
         return False
     
-    sha_name, signature = signature.split('=')
+    sha_name, sig_value = signature.split('=', 1)
     if sha_name != 'sha256':
         return False
         
     mac = hmac.new(settings.GITHUB_WEBHOOK_SECRET.encode('utf-8'), msg=payload, digestmod=hashlib.sha256)
-    return hmac.compare_digest(mac.hexdigest(), signature)
+    return hmac.compare_digest(mac.hexdigest(), sig_value)
 
 @router.post("/webhook")
 async def github_webhook(
@@ -57,10 +57,7 @@ async def github_webhook(
     ).first()
     
     if not project:
-        # For testing, fallback to first project if repo url is not found or matched
-        project = db.query(Project).first()
-        if not project:
-            return {"status": "ignored", "reason": "No registered project matches this repository"}
+        return {"status": "ignored", "reason": "No registered project matches this repository URL"}
 
     if event_type == "push":
         ref = payload.get("ref", "refs/heads/main")

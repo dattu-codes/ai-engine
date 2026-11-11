@@ -85,50 +85,26 @@ class IncrementalReviewService:
             
         db.commit()
         
-        # 3. Trigger the asynchronous review orchestrator task safely across thread environments
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(
-                IncrementalReviewService._execute_pr_analysis(
-                    analysis.id,
-                    db_files,
-                    api_key
-                )
-            )
-        except RuntimeError:
+        # 3. Launch the background PR review execution task in a dedicated worker thread
+        import threading
+        def _run_pr_analysis_bg():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                import anyio
-                anyio.from_thread.run_sync(
-                    lambda: asyncio.create_task(
-                        IncrementalReviewService._execute_pr_analysis(
-                            analysis.id,
-                            db_files,
-                            api_key
-                        )
+                loop.run_until_complete(
+                    IncrementalReviewService._execute_pr_analysis(
+                        analysis.id,
+                        db_files,
+                        api_key
                     )
                 )
-            except Exception:
-                try:
-                    main_loop = asyncio.get_event_loop_policy().get_event_loop()
-                    asyncio.run_coroutine_threadsafe(
-                        IncrementalReviewService._execute_pr_analysis(
-                            analysis.id,
-                            db_files,
-                            api_key
-                        ),
-                        main_loop
-                    )
-                except Exception:
-                    import threading
-                    def run_sync_fallback():
-                        asyncio.run(
-                            IncrementalReviewService._execute_pr_analysis(
-                                analysis.id,
-                                db_files,
-                                api_key
-                            )
-                        )
-                    threading.Thread(target=run_sync_fallback, daemon=True).start()
+            except Exception as bg_err:
+                print(f"Background PR analysis task error: {bg_err}")
+            finally:
+                loop.close()
+
+        bg_thread = threading.Thread(target=_run_pr_analysis_bg, daemon=True)
+        bg_thread.start()
         
         return analysis
 

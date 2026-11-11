@@ -538,7 +538,7 @@
         </div>
         <nav class="header-nav">
             <a href="#features">Features</a>
-            <a href="#pricing">Pricing</a>
+            <a href="#self-hosted">Self-Hosted</a>
             <a href="/docs">Documentation</a>
             <a href="/dashboard" class="cta-btn">Sign In</a>
         </nav>
@@ -592,52 +592,40 @@
         </div>
     </section>
 
-    <section class="section-container" id="pricing">
+    <section class="section-container" id="self-hosted">
         <div class="section-title">
-            <h2>Flexible Subscription Pricing</h2>
-            <p>Start free, scale subscription tiers as your engineering team grows.</p>
+            <h2>100% Free & Self-Hosted Developer Platform</h2>
+            <p>No paywalls, subscriptions, or tiered limitations. Deploy locally or in your private cloud.</p>
         </div>
-        <div class="pricing-grid">
-            <div class="pricing-card">
-                <div>
-                    <div class="plan-name">Free</div>
-                    <div class="plan-price">$0</div>
-                    <ul class="plan-features">
-                        <li>1 Project Repository limit</li>
-                        <li>Max 3 source files per review</li>
-                        <li>Standard Code analysis</li>
-                        <li>Basic Repository Insights</li>
-                    </ul>
-                </div>
-                <a href="/dashboard" class="pricing-btn">Get Started</a>
-            </div>
-
+        <div class="pricing-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 800px; margin: 0 auto;">
             <div class="pricing-card premium">
                 <div>
-                    <div class="plan-name">Pro</div>
-                    <div class="plan-price">$19<span>/mo</span></div>
+                    <div class="plan-name">Local Development</div>
+                    <div class="plan-price">Free & Open</div>
                     <ul class="plan-features">
-                        <li>Up to 5 Project Repositories</li>
-                        <li>Max 20 source files per review</li>
-                        <li>Full AI Code reviews & Refactoring</li>
-                        <li>Detailed Evolution Roadmap</li>
-                        <li>Public API (v1) access tokens</li>
+                        <li>Unlimited Project Repositories</li>
+                        <li>Full AST & Semantic Code Intelligence</li>
+                        <li>AI Self-Healing & Automated Patch Diffs</li>
+                        <li>Isolated Pytest runner & test generation</li>
+                        <li>Built-in SQLite & In-Memory Mock mode</li>
                     </ul>
                 </div>
-                <a href="/dashboard" class="pricing-btn">Upgrade Plan</a>
+                <a href="/dashboard" class="pricing-btn">Launch Cockpit</a>
             </div>
 
             <div class="pricing-card">
                 <div>
-                    <div class="plan-name">Enterprise</div>
-                    <div class="plan-price">Custom</div>
+                    <div class="plan-name">Production Docker / Cloud</div>
+                    <div class="plan-price">Self-Hosted</div>
                     <ul class="plan-features">
-                        <li>Unlimited Project Repositories</li>
-                        <li>Unlimited files parsing</li>
-                        <li>Admin portal dashboard console</li>
+                        <li>Docker Compose with PostgreSQL & Redis</li>
+                        <li>GitHub OAuth & Webhook auto-sync</li>
+                        <li>Multi-tenant team workspaces</li>
+                        <li>Public REST API v1 & token keys</li>
+                        <li>Administrative telemetry console</li>
                     </ul>
                 </div>
-                <a href="/dashboard" class="pricing-btn">Contact Sales</a>
+                <a href="/docs" class="pricing-btn">View Architecture Docs</a>
             </div>
         </div>
     </section>

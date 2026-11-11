@@ -1,45 +1,12 @@
+import os
+import sys
 import json
 import time
-import urllib.request
-import urllib.error
-import sys
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
-
-def make_request(
-    method: str, 
-    path: str, 
-    data: Optional[dict] = None, 
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    """Helper function to make HTTP requests using Python's standard library."""
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req_body = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        print(f"Network error on {method} {path}: {str(e)}")
-        return 500, {"detail": str(e)}
+# In-memory test client runner
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from test_client_helper import make_request
 
 def main():
     print("===================================================")

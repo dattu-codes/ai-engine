@@ -1,94 +1,12 @@
+import os
+import sys
 import json
 import time
-import urllib.request
-import urllib.error
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
-
-def make_request(
-    method: str, 
-    path: str, 
-    data: Optional[dict] = None, 
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    """Helper function to make HTTP requests using Python's standard library."""
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req_body = json.dumps(data).encode("utf-8") if data is not None else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=8) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        print(f"Network error: {str(e)}")
-        return 500, {"detail": str(e)}
-
-
-def make_multipart_request(
-    path: str,
-    fields: dict,
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    """Makes a POST multipart/form-data request using urllib."""
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-    CRLF = b"\r\n"
-    parts = []
-    
-    for key, value in fields.items():
-        parts.append(b"--" + boundary.encode("utf-8"))
-        parts.append(f'Content-Disposition: form-data; name="{key}"'.encode("utf-8"))
-        parts.append(b"")
-        parts.append(str(value).encode("utf-8"))
-        
-    parts.append(b"--" + boundary.encode("utf-8") + b"--")
-    parts.append(b"")
-    
-    body = CRLF.join(parts)
-    url = f"{BASE_URL}{path}"
-    headers = {
-        "Content-Type": f"multipart/form-data; boundary={boundary}",
-        "Content-Length": str(len(body))
-    }
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    
-    try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        print(f"Network error: {str(e)}")
-        return 500, {"detail": str(e)}
+# In-memory test client runner
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from test_client_helper import make_request, make_multipart_request
 
 
 def run_analysis_tests():

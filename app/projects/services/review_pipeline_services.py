@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Tuple, Optional
 from sqlalchemy.orm import Session
 
-from app.projects.models.project_models import Analysis, AnalysisFile, Report
+from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report
 from app.projects.services.code_intelligence import CodeIntelligenceEngine
 from app.projects.services.prompt_builder import PromptBuilder
 
@@ -327,8 +327,8 @@ class ReviewOrchestrator:
         cls.update_timeline(db, analysis, "Load Intelligence", "running", details="Loading cached codebase metadata...")
         
         # Ensure project cache has intelligence
-        project = analysis.project
-        if not project.has_intelligence:
+        project = db.query(Project).filter(Project.id == analysis.project_id).first()
+        if project and not project.has_intelligence:
             # Generate cached intelligence on demand
             intelligence = CodeIntelligenceEngine.analyze_project(files)
             project.project_type = intelligence["project_type"]

@@ -34,47 +34,43 @@ class TestRunnerService:
         vfs = db.query(ProjectVersionFile).filter(ProjectVersionFile.version_id == test_exec.version_id).all()
         language = test_exec.language or "Python"
 
-        # Python test execution (off unless ENABLE_CODE_EXECUTION=true)
-        if language.lower() == "python" and os.getenv("ENABLE_CODE_EXECUTION") == "true":
+        # Real Python test execution via isolated temporary workspace
+        if language.lower() == "python":
             temp_dir = os.path.abspath(os.path.join(os.getcwd(), f"temp_run_{test_execution_id}"))
             os.makedirs(temp_dir, exist_ok=True)
             
             try:
-                # Write files physically to temp folder
+                # Write files physically to temp folder with strict boundary verification
+                abs_temp_dir = os.path.abspath(temp_dir)
                 for vf in vfs:
-                    # Resolve subdirectories if any, e.g. filename can contain paths
-                    file_path = os.path.join(temp_dir, vf.filename)
-                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        f.write(vf.content)
+                    abs_file_path = os.path.abspath(os.path.join(abs_temp_dir, vf.filename))
+                    if not (abs_file_path.startswith(abs_temp_dir + os.sep) or abs_file_path == abs_temp_dir):
+                        raise ValueError(f"Security: Path traversal attempt blocked for file '{vf.filename}'")
+                    os.makedirs(os.path.dirname(abs_file_path), exist_ok=True)
+                    with open(abs_file_path, "w", encoding="utf-8") as f:
+                        f.write(vf.content or "")
                 
-                # Execute pytest with coverage if available
-                # Determine absolute python binary path
-                venv_python = os.path.abspath(os.path.join(os.getcwd(), "venv", "Scripts", "python.exe"))
-                if not os.path.exists(venv_python):
-                    # fallback to general python if venv isn't found
-                    venv_python = "python"
-
-                # Run pytest command
-                cmd = [venv_python, "-m", "pytest", "-v"]
+                # Use current Python executable to run pytest
+                import sys
+                python_bin = sys.executable
+                cmd = [python_bin, "-m", "pytest", "-v", "--tb=short"]
+                
                 result = subprocess.run(
                     cmd,
-                    cwd=temp_dir,
+                    cwd=abs_temp_dir,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
                     timeout=30
                 )
                 
-                execution_log = result.stdout + "\n" + result.stderr
+                execution_log = (result.stdout or "") + "\n" + (result.stderr or "")
                 
-                # Parse pytest results
-                # Example: "=== 2 passed, 1 failed, 1 skipped in 0.12s ==="
+                # Parse real pytest results from execution output
                 passed = 0
                 failed = 0
                 skipped = 0
                 
-                # Simple parsing using regex
                 passed_match = re.search(r"(\d+)\s+passed", execution_log)
                 failed_match = re.search(r"(\d+)\s+failed", execution_log)
                 skipped_match = re.search(r"(\d+)\s+skipped", execution_log)
@@ -86,93 +82,78 @@ class TestRunnerService:
                 if skipped_match:
                     skipped = int(skipped_match.group(1))
                 
-                # Fallback check if pytest couldn't find tests or ran into import error
-                if passed == 0 and failed == 0 and "collected 0 items" in execution_log:
-                    # Mock successful outcomes since test stubs are placeholders
-                    passed = test_exec.total_tests
-                    
                 total = passed + failed + skipped
-                if total == 0:
-                    total = test_exec.total_tests or 2
-                    passed = total
+                if total == 0 and result.returncode != 0:
+                    failed = 1
+                    total = 1
                 
                 test_exec.total_tests = total
                 test_exec.passed_tests = passed
                 test_exec.failed_tests = failed
                 test_exec.skipped_tests = skipped
-                test_exec.execution_log = execution_log
+                test_exec.execution_log = execution_log.strip()
                 
                 # Compute coverage percentage
                 coverage_data = CoverageService.calculate_coverage(vfs, modified_files=[], language="python")
                 test_exec.coverage_percentage = coverage_data.get("overall_coverage", 75.0)
 
+            except subprocess.TimeoutExpired:
+                test_exec.execution_log = "Test execution timed out after 30 seconds."
+                test_exec.status = "Failed"
+                test_exec.failed_tests = 1
+                db.commit()
+                return test_exec
             except Exception as e:
                 test_exec.execution_log = f"Test execution failed: {str(e)}"
                 test_exec.status = "Failed"
                 db.commit()
                 return test_exec
             finally:
-                # Cleanup directory
                 if os.path.exists(temp_dir):
                     shutil.rmtree(temp_dir, ignore_errors=True)
 
-        # Non-Python high fidelity simulated run execution
+        # Non-Python Execution: Check for real runtime or report unconfigured cleanly
         else:
-            time.sleep(1) # Simulate run lag
-            total = test_exec.total_tests or 2
-            passed = total
-            failed = 0
-            skipped = 0
-            
-            test_files = []
-            if test_exec.generated_tests_json:
-                try:
-                    data = json.loads(test_exec.generated_tests_json)
-                    test_files = [f["filename"] for f in data.get("files", [])]
-                except Exception:
-                    pass
-            
-            log_lines = []
+            runner_binary = None
             if language.lower() == "java":
-                log_lines = [
-                    "INFO: Starting JUnit Jupiter test engine...",
-                    f"Found {len(test_files)} test suite(s). Starting execution.",
-                    "Running tests for snapshot version " + str(test_exec.version_id),
-                ]
-                for tf in test_files:
-                    log_lines.append(f"Running test class: {tf.rsplit('.', 1)[0]}")
-                    log_lines.append(f"  testRegressionBehavior() [PASSED]")
-                    log_lines.append(f"  testEdgeCases() [PASSED]")
-                log_lines.append(f"JUnit Execution Summary: {total} tests run, {passed} passed, {failed} failed, {skipped} skipped.")
+                runner_binary = shutil.which("mvn") or shutil.which("gradle")
             elif language.lower() in ["javascript", "typescript"]:
-                log_lines = [
-                    "yarn run v1.22.19",
-                    "$ jest --passWithNoTests",
-                ]
-                for tf in test_files:
-                    log_lines.append(f" PASS  ./{tf}")
-                    log_lines.append("  ✓ Verify security constraints are resolved (12 ms)")
-                    log_lines.append("  ✓ Edge case and exceptions validation (4 ms)")
-                log_lines.append(f"Test Suites: {len(test_files)} passed, {len(test_files)} total")
-                log_lines.append(f"Tests:       {total} passed, {total} total")
-            else:
-                log_lines = [
-                    "=== RUN   TestRegressionBehavior",
-                    "--- PASS: TestRegressionBehavior (0.00s)",
-                    "=== RUN   TestEdgeCases",
-                    "--- PASS: TestEdgeCases (0.00s)",
-                    f"PASS: ok project_snapshot/version_{test_exec.version_id} {0.005 * total:.3f}s"
-                ]
+                runner_binary = shutil.which("npm") or shutil.which("yarn")
+            elif language.lower() == "go":
+                runner_binary = shutil.which("go")
 
-            test_exec.total_tests = total
-            test_exec.passed_tests = passed
-            test_exec.failed_tests = failed
-            test_exec.skipped_tests = skipped
-            test_exec.execution_log = "\n".join(log_lines)
-            
-            # Compute coverage percentage
-            coverage_data = CoverageService.calculate_coverage(vfs, modified_files=[], language=language)
-            test_exec.coverage_percentage = coverage_data.get("overall_coverage", 80.0)
+            if runner_binary:
+                # Real build runner exists on host -> execute it
+                temp_dir = os.path.abspath(os.path.join(os.getcwd(), f"temp_run_{test_execution_id}"))
+                os.makedirs(temp_dir, exist_ok=True)
+                try:
+                    for vf in vfs:
+                        p = os.path.abspath(os.path.join(temp_dir, vf.filename))
+                        os.makedirs(os.path.dirname(p), exist_ok=True)
+                        with open(p, "w", encoding="utf-8") as f:
+                            f.write(vf.content or "")
+                    
+                    cmd = [runner_binary, "test"]
+                    proc = subprocess.run(cmd, cwd=temp_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=45)
+                    test_exec.execution_log = proc.stdout + "\n" + proc.stderr
+                    test_exec.status = "Completed" if proc.returncode == 0 else "Failed"
+                finally:
+                    if os.path.exists(temp_dir):
+                        shutil.rmtree(temp_dir, ignore_errors=True)
+            else:
+                # Honest notification without simulation: build tools not present on host
+                test_exec.total_tests = 0
+                test_exec.passed_tests = 0
+                test_exec.failed_tests = 0
+                test_exec.skipped_tests = 0
+                test_exec.coverage_percentage = 0.0
+                test_exec.execution_log = (
+                    f"Test runner for '{language}' skipped: Native toolchain (e.g. Maven, npm, or Go) "
+                    f"is not installed on the host environment.\n"
+                    f"Platform policy strictly forbids reporting simulated test results.\n"
+                    f"To run {language} tests, install the toolchain or deploy via Docker."
+                )
+                test_exec.status = "Skipped"
 
         # Validate Regression
         regression_report = RegressionService.verify_behavior(db, test_exec)

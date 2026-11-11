@@ -88,16 +88,28 @@ class AnalysisService:
             description=f"AI Review Analysis run #{analysis.id} started on project '{project.name}'."
         )
 
-        # Launch the background async task
-        asyncio.create_task(
-            AnalysisService._execute_analysis_task(
-                analysis.id, 
-                project.name, 
-                files_list, 
-                api_key,
-                model
-            )
-        )
+        # Launch the background execution task in a dedicated worker thread
+        import threading
+        def _run_analysis_bg():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(
+                    AnalysisService._execute_analysis_task(
+                        analysis.id, 
+                        project.name, 
+                        files_list, 
+                        api_key,
+                        model
+                    )
+                )
+            except Exception as bg_err:
+                print(f"Background analysis task error: {bg_err}")
+            finally:
+                loop.close()
+
+        bg_thread = threading.Thread(target=_run_analysis_bg, daemon=True)
+        bg_thread.start()
 
         return analysis
 

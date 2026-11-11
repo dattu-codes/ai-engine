@@ -83,6 +83,10 @@ class AIFixCenter:
         )
 
         patch = await PatchGenerator.generate_patch(db, finding, current_version, api_key=api_key)
+        replacement_code = patch.get("replacement_code", "")
+        plan["replacement_code"] = replacement_code
+        plan["target_file"] = patch.get("file", finding.file_path)
+        fix_exec.fix_plan_json = json.dumps(plan)
         fix_exec.patch_summary = patch.get("unified_diff", "")
         fix_exec.files_modified = json.dumps([patch.get("file")])
         
@@ -145,16 +149,31 @@ class AIFixCenter:
         fix_exec.status = "Validating"
         db.commit()
 
-        # Re-fetch version and patch code details
+        # Re-fetch version and load the exact approved patch code
         current_version = db.query(ProjectVersion).filter(
             ProjectVersion.project_id == fix_exec.project_id
         ).order_by(ProjectVersion.version_number.desc()).first()
 
-        # The patch preview / replacement code needs to be reconstructed or load the cached generation
-        # To avoid storing massive contents, we can quickly regenerate or lookup
-        patch_info = await PatchGenerator.generate_patch(db, finding, current_version, api_key=api_key)
-        replacement_code = patch_info.get("replacement_code")
-        target_file = patch_info.get("file")
+        plan_data = {}
+        if fix_exec.fix_plan_json:
+            try:
+                plan_data = json.loads(fix_exec.fix_plan_json)
+            except Exception:
+                pass
+
+        replacement_code = plan_data.get("replacement_code")
+        target_file = plan_data.get("target_file")
+        if not target_file and fix_exec.files_modified:
+            try:
+                target_file = json.loads(fix_exec.files_modified)[0]
+            except Exception:
+                target_file = finding.file_path
+
+        # If not cached in plan_data, generate safely as fallback
+        if not replacement_code:
+            patch_info = await PatchGenerator.generate_patch(db, finding, current_version, api_key=api_key)
+            replacement_code = patch_info.get("replacement_code")
+            target_file = patch_info.get("file", target_file)
 
         start_time = time.time()
 

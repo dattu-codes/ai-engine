@@ -100,6 +100,53 @@ class PythonASTVisitor(ast.NodeVisitor):
                     "description": "tempfile.mktemp is deprecated and vulnerable to symlink race condition attacks.",
                     "recommendation": "Use tempfile.TemporaryFile or tempfile.NamedTemporaryFile instead."
                 })
+            # SQL Injection check in execute / executemany / raw
+            elif attr_name in ["execute", "executemany", "raw"]:
+                if node.args:
+                    arg0 = node.args[0]
+                    is_dynamic_sql = False
+                    if isinstance(arg0, ast.JoinedStr):
+                        for part in arg0.values:
+                            if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                                if any(k in part.value.lower() for k in ["select ", "insert ", "update ", "delete ", "drop "]):
+                                    is_dynamic_sql = True
+                                    break
+                    elif isinstance(arg0, ast.BinOp) and isinstance(arg0.op, (ast.Mod, ast.Add)):
+                        is_dynamic_sql = True
+                    elif isinstance(arg0, ast.Call) and isinstance(arg0.func, ast.Attribute) and arg0.func.attr == "format":
+                        is_dynamic_sql = True
+
+                    if is_dynamic_sql:
+                        self.vulnerabilities.append({
+                            "severity": "High",
+                            "line": node.lineno,
+                            "category": "SQL Injection",
+                            "title": "Unparameterized dynamic SQL execution",
+                            "description": "Constructing SQL queries dynamically via string formatting or concatenation exposes database calls to SQL injection.",
+                            "recommendation": "Use parameterized queries with placeholders: cursor.execute(query, params)."
+                        })
+            # Insecure deserialization checks (pickle, yaml)
+            elif attr_name in ["loads", "load"]:
+                if isinstance(node.func.value, ast.Name) and node.func.value.id == "pickle":
+                    self.vulnerabilities.append({
+                        "severity": "High",
+                        "line": node.lineno,
+                        "category": "Insecure Deserialization",
+                        "title": "Unsafe pickle deserialization",
+                        "description": "Deserializing untrusted data with pickle allows arbitrary code execution.",
+                        "recommendation": "Use safe serialization formats like JSON (json.loads)."
+                    })
+                elif isinstance(node.func.value, ast.Name) and node.func.value.id in ["yaml", "pyyaml"]:
+                    has_safe_loader = any(kw.arg == "Loader" and "safe" in getattr(kw.value, "id", "").lower() for kw in node.keywords)
+                    if not has_safe_loader and attr_name == "load":
+                        self.vulnerabilities.append({
+                            "severity": "High",
+                            "line": node.lineno,
+                            "category": "Insecure Deserialization",
+                            "title": "Unsafe YAML loading",
+                            "description": "yaml.load without SafeLoader allows arbitrary Python object instantiation.",
+                            "recommendation": "Use yaml.safe_load(data) instead."
+                        })
         self.generic_visit(node)
 
     def visit_Assign(self, node):

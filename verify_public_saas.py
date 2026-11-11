@@ -12,7 +12,6 @@ from app.auth.database.connection import SessionLocal, Base, engine
 from app.auth.models.auth_models import User, ApiKey, NotificationPreference
 from app.projects.models.project_models import Project, Analysis
 from app.auth.services.auth_service import AuthService
-from app.billing.services.billing_service import BillingService
 from app.notifications.services.notification_service import NotificationService, sent_notifications_log
 
 client = TestClient(app)
@@ -83,82 +82,23 @@ def test_github_oauth_and_webhooks():
     finally:
         db.close()
 
-def test_stripe_billing_limits():
-    print("Running Test 2: Stripe Billing Plan Limits & Sessions...")
+def test_unrestricted_self_hosted_projects():
+    print("Running Test 2: Unrestricted Self-Hosted Project Creation...")
     db = SessionLocal()
     try:
-        # Create users on different plans
-        free_user = User(username="free_user", hashed_password=AuthService.hash_password("password"), billing_plan="Free")
-        pro_user = User(username="pro_user", hashed_password=AuthService.hash_password("password"), billing_plan="Pro")
-        db.add_all([free_user, pro_user])
+        user = User(username="self_hosted_user", hashed_password=AuthService.hash_password("password"))
+        db.add(user)
         db.commit()
         
-        # 1. Test limits on projects
-        # Free allows 1, Pro allows 5
-        # Under Free: adding 1st project should pass, 2nd should fail
-        # Pro allows up to 5 projects
-        proj1 = Project(name="Free Proj 1", user_id=free_user.id)
-        db.add(proj1)
+        # Verify self-hosted user can create multiple projects without plan limitations
+        for i in range(10):
+            proj = Project(name=f"Project_{i}", user_id=user.id)
+            db.add(proj)
         db.commit()
         
-        # Gating project check for free user (should raise HTTP 402)
-        try:
-            BillingService.check_billing_limit(db, free_user, "projects")
-            assert False, "Free user did not fail creating > 1 project"
-        except Exception as e:
-            assert e.status_code == 402
-            assert "allows a maximum of 1 projects" in e.detail
-
-        # Gating project check for pro user (should pass)
-        for i in range(4):
-            db.add(Project(name=f"Pro Proj {i}", user_id=pro_user.id))
-        db.commit()
-        
-        # Pro user has 4, checking limit should pass
-        BillingService.check_billing_limit(db, pro_user, "projects")
-        
-        # Pro user adds 5th, checking limit should raise 402 next time
-        db.add(Project(name="Pro Proj 5", user_id=pro_user.id))
-        db.commit()
-        try:
-            BillingService.check_billing_limit(db, pro_user, "projects")
-            assert False, "Pro user did not fail creating > 5 projects"
-        except Exception as e:
-            assert e.status_code == 402
-            assert "allows a maximum of 5 projects" in e.detail
-            
-        # 2. Test limits on files per review
-        # Free allows max 3 files
-        BillingService.check_billing_limit(db, free_user, "files", file_count=3)
-        try:
-            BillingService.check_billing_limit(db, free_user, "files", file_count=4)
-            assert False, "Free user did not fail scanning > 3 files"
-        except Exception as e:
-            assert e.status_code == 402
-            assert "allows a maximum of 3 source files" in e.detail
-            
-        # Pro allows max 20 files
-        BillingService.check_billing_limit(db, pro_user, "files", file_count=20)
-        try:
-            BillingService.check_billing_limit(db, pro_user, "files", file_count=21)
-            assert False, "Pro user did not fail scanning > 20 files"
-        except Exception as e:
-            assert e.status_code == 402
-            
-        # 3. Test Stripe Session mocks
-        access_token, _, _, _ = AuthService.create_jwt_pair(pro_user.id, pro_user.role)
-        auth_header = {"Authorization": f"Bearer {access_token}"}
-        
-        checkout_resp = client.post("/billing/checkout-session?plan_type=pro", headers=auth_header)
-        assert checkout_resp.status_code == 200
-        assert "checkout_url" in checkout_resp.json()
-        assert "mock-activate" in checkout_resp.json()["checkout_url"]
-        
-        portal_resp = client.post("/billing/portal-session", headers=auth_header)
-        assert portal_resp.status_code == 200
-        assert "portal_url" in portal_resp.json()
-        
-        print("[OK] Test 2 Passed successfully!")
+        user_projects = db.query(Project).filter(Project.user_id == user.id).all()
+        assert len(user_projects) == 10
+        print("[OK] Test 2 Passed successfully: Unrestricted project creation verified!")
     finally:
         db.close()
 
@@ -336,7 +276,7 @@ if __name__ == "__main__":
     setup_database()
     
     test_github_oauth_and_webhooks()
-    test_stripe_billing_limits()
+    test_unrestricted_self_hosted_projects()
     test_notification_preferences()
     test_saas_analytics_summary()
     test_admin_portal_endpoints()

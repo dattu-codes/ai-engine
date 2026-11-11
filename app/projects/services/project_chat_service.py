@@ -305,72 +305,76 @@ class ProjectChatService:
                     yield f"data: {json.dumps({'text': err_msg})}\n\n"
                     generated_text += err_msg
         else:
-            # OFFLINE MOCK SIMULATOR MODE
-            await asyncio.sleep(0.5)
+            # GROUNDED OFFLINE LOCAL INTELLIGENCE MODE
+            await asyncio.sleep(0.1)
             query_lower = user_query.lower()
             ver_num = context.get("version_number", 1)
+            framework_val = framework if framework != "Unknown" else "Generic"
+            tokens = [t for t in re.findall(r'\b\w+\b', query_lower) if len(t) > 2 and t not in ["the", "and", "for", "with", "show", "what", "where", "how"]]
 
-            if "explain this project" in query_lower or "explain project" in query_lower:
-                response_text = (
-                    f"This project is a '{framework}' application structured around a '{architecture}' architecture patterns. "
-                    f"It defines core routes for API handlers and data access models. The total code volume measures {total_lines} lines "
-                    f"and we are currently at Version {ver_num} workspace snapshot state."
-                )
-            elif "architecture" in query_lower:
-                response_text = (
-                    f"The project architecture follows a '{architecture}' structure with clean separation of layers. "
-                    f"Dependencies are handled via standard configuration files. We can see main handlers registered at the entry point."
-                )
-            elif "auth" in query_lower or "login" in query_lower or "session" in query_lower:
-                response_text = (
-                    "The authentication module flow resides inside `app/auth.py` (referenced in [app/auth.py:L12]). It features a "
-                    "`check_session(token)` function which inspects session state signatures and validates security credentials."
-                )
-            elif "db" in query_lower or "database" in query_lower or "model" in query_lower:
-                response_text = (
-                    "Database models are defined in [app/projects/models/project_models.py:L74] as SQLAlchemy database class schemas. "
-                    "It has tables for version control (`project_versions`) and workspace files (`project_version_files`)."
-                )
-            elif "api documentation" in query_lower or "api doc" in query_lower:
-                response_text = (
-                    f"# API Documentation v{ver_num}\n\n"
-                    f"- `POST /projects/{{id}}/chat`: real-time project chat streaming\n"
-                    f"- `GET /projects/{{id}}/versions`: version snapshots history list\n"
-                    f"- `POST /projects/{{id}}/versions/apply-fix`: applies AI code fixes"
-                )
-            elif "api" in query_lower or "route" in query_lower:
-                response_text = (
-                    "API routes are managed by FastAPI APIRouter handlers. The project exposes version listings, code fixes, "
-                    "and project chat endpoints, mounted inside `app/projects/routes/version_routes.py` and `app/projects/routes/chat_routes.py`."
-                )
-            elif "math" in query_lower or "sum" in query_lower or "calculate" in query_lower:
-                response_text = (
-                    "The mathematical logic resides inside `app/math.py` (referenced in [app/math.py:L2]). "
-                    "It implements the `calculate_sum(a, b)` function to perform addition operations."
-                )
-            elif "readme" in query_lower:
-                response_text = (
-                    f"# Project README Documentation\n\n"
-                    f"This is a {framework} web service utilizing a {architecture} design pattern.\n\n"
-                    f"## Running the code\n"
-                    f"Install requirements and run via Uvicorn:\n"
-                    f"```bash\nvenv\\Scripts\\python -m uvicorn app.main:app\n```"
-                )
-            elif "suggest refactoring" in query_lower or "refactor" in query_lower:
-                response_text = (
-                    "Based on findings, we suggest refactoring the exception ignore handlers: "
-                    "replace empty broad `pass` statements in [app/auth.py:L22] with explicit structured logging logging statements."
-                )
-            elif "version" in query_lower or "changes" in query_lower:
-                response_text = (
-                    f"Looking at version details, the current state is Version {ver_num}. "
-                    f"The recent actions timeline includes: {version_history_text.replace('- ', '')}."
-                )
-            else:
-                response_text = (
-                    f"Based on the analysis of the {framework} workspace context, the codebase structure maps out "
-                    f"key utility helper handlers for your query. Let me know if you want me to explain any classes or functions."
-                )
+            # 1. Search for matching symbols in SemanticNode
+            from app.projects.models.project_models import SemanticNode, ReviewFinding
+            matched_nodes = []
+            if tokens:
+                for t in tokens:
+                    nodes = db.query(SemanticNode).filter(
+                        SemanticNode.project_id == project_id,
+                        SemanticNode.name.ilike(f"%{t}%")
+                    ).limit(3).all()
+                    for n in nodes:
+                        if n.id not in [x.id for x in matched_nodes]:
+                            matched_nodes.append(n)
+
+            # 2. Search for matching review findings
+            matched_findings = []
+            if tokens:
+                for t in tokens:
+                    findings = db.query(ReviewFinding).filter(
+                        ReviewFinding.project_id == project_id,
+                        (ReviewFinding.title.ilike(f"%{t}%") | ReviewFinding.description.ilike(f"%{t}%"))
+                    ).limit(3).all()
+                    for f in findings:
+                        if f.id not in [x.id for x in matched_findings]:
+                            matched_findings.append(f)
+
+            # 3. Grounded response synthesis from actual files
+            response_parts = []
+            retrieved_files = context.get("files", [])
+
+            if matched_nodes:
+                response_parts.append(f"### Code Intelligence References for '{user_query}':")
+                for n in matched_nodes:
+                    response_parts.append(f"- **{n.name}** ({n.node_type}) defined in `[{n.file_path}:L{n.start_line or 1}]`")
+
+            if matched_findings:
+                response_parts.append(f"### Relevant Review Findings:")
+                for f in matched_findings:
+                    response_parts.append(f"- **[{f.severity}] {f.title}** (`[{f.file_path}:L{f.line_number}]`): {f.description}")
+
+            if retrieved_files:
+                response_parts.append(f"### Indexed Codebase Files:")
+                for f in retrieved_files[:5]:
+                    lines = (f.content or "").splitlines()
+                    loc = len(lines)
+                    matching_snippets = []
+                    for i, l in enumerate(lines, 1):
+                        if any(t in l.lower() for t in tokens if len(t) > 3):
+                            matching_snippets.append(f"  - Line {i}: `{l.strip()[:85]}`")
+                            if len(matching_snippets) >= 2:
+                                break
+                    snippet_text = "\n" + "\n".join(matching_snippets) if matching_snippets else ""
+                    response_parts.append(f"- `[{f.filename}:L1-L{loc}]` ({f.language}, {loc} lines){snippet_text}")
+
+            if not response_parts:
+                response_parts.append(f"### {project.name if project else 'Project'} Workspace Overview (v{ver_num}):")
+                response_parts.append(f"Framework: **{framework_val}** | Architecture: **{architecture}** | Total Lines: **{total_lines}**.")
+                if retrieved_files:
+                    fnames = [f.filename for f in retrieved_files[:6]]
+                    response_parts.append(f"Active workspace files: {', '.join(fnames)}.")
+                else:
+                    response_parts.append("No files currently indexed for this project. Ingest files via ZIP upload or Git sync to enable code queries.")
+
+            response_text = "\n\n".join(response_parts)
 
             # Stream words with delay to simulate real LLM responses
             words = response_text.split(" ")

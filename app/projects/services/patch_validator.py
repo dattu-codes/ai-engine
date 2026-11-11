@@ -16,22 +16,28 @@ class PatchValidator:
             except SyntaxError as se:
                 raise ValueError(f"Syntax validation failed in Python AST compiler: {se}")
         
-        # Basic brace matching safety validation for languages like Java, JS, TS, Go
+        # String- and comment-aware brace matching validation for Java, JS, TS, Go
         elif filename.endswith((".java", ".js", ".ts", ".go")):
-            # Check basic brackets matching
+            # Strip comments and string literals to prevent false positives from quotes and strings
+            clean = re.sub(r'//.*', '', replacement_code)
+            clean = re.sub(r'/\*.*?\*/', '', clean, flags=re.DOTALL)
+            clean = re.sub(r'"(?:\\.|[^"\\])*"', '""', clean)
+            clean = re.sub(r"'(?:\\.|[^'\\])*'", "''", clean)
+            clean = re.sub(r"`(?:\\.|[^`\\])*`", "``", clean)
+
             stack = []
             pairs = {')': '(', '}': '{', ']': '['}
-            # Simple check for unclosed string literal indicators
-            for idx, char in enumerate(replacement_code):
+            for idx, char in enumerate(clean):
                 if char in "({[":
                     stack.append((char, idx))
                 elif char in ")}]":
                     if not stack:
-                        # Extra closing brackets are syntax issues
                         raise ValueError(f"Syntax validation failed: Mismatched brace '{char}' in {filename}")
                     last_open, last_idx = stack.pop()
                     if pairs[char] != last_open:
                         raise ValueError(f"Syntax validation failed: Mismatched brace '{char}' doesn't match '{last_open}' in {filename}")
+            if stack:
+                raise ValueError(f"Syntax validation failed: Unclosed brace '{stack[-1][0]}' in {filename}")
 
         # 2. Duplicate imports detection
         lines = replacement_code.splitlines()

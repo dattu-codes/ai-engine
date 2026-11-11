@@ -60,9 +60,11 @@ def run_startup_validation():
         report["status"] = "UNHEALTHY"
 
     # 4. Check JWT configurations
-    if settings.JWT_SECRET == "47a329ef3118cf94a0d923bc650630ba5239a04a5cf2b07e5cba4839de848aef" and settings.APP_ENVIRONMENT == "production":
-        report["errors"].append("JWT_SECRET is using default development value in production environment.")
-        report["status"] = "UNHEALTHY"
+    from app.config import DEFAULT_DEV_JWT_SECRET
+    if settings.APP_ENVIRONMENT == "production":
+        if not settings.JWT_SECRET or settings.JWT_SECRET == DEFAULT_DEV_JWT_SECRET or len(settings.JWT_SECRET) < 32:
+            report["errors"].append("JWT_SECRET must be an explicit, secure key of at least 32 characters in production.")
+            report["status"] = "UNHEALTHY"
 
     # Print validation results
     if report["status"] == "READY":

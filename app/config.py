@@ -14,11 +14,8 @@ if os.path.exists(env_path):
                 key, val = line.split("=", 1)
                 os.environ[key.strip()] = val.strip()
 
-import secrets
-
-def _fallback_secret():
-    print("WARNING: JWT_SECRET is not set. Using a temporary random secret.")
-    return secrets.token_hex(32)
+# Default deterministic secret for local development / testing
+DEFAULT_DEV_JWT_SECRET = "ai-engine-development-secret-key-32chars-minimum-hs256"
 
 class Settings(BaseModel):
     # Database configurations
@@ -28,14 +25,16 @@ class Settings(BaseModel):
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
     # Security & Auth configurations
-    JWT_SECRET: str = Field(default="")
+    JWT_SECRET: str = Field(default=DEFAULT_DEV_JWT_SECRET)
     JWT_ALGORITHM: str = Field(default="HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
     RATE_LIMIT_WINDOW_SECONDS: int = Field(default=2)
 
-    # Integrations
+    # Integrations & LLM Providers
     GEMINI_API_KEY: str = Field(default="")
+    OPENAI_API_KEY: str = Field(default="")
+    ANTHROPIC_API_KEY: str = Field(default="")
 
     # Storage configurations
     STORAGE_PROVIDER: str = Field(default="local")  # local, s3, r2
@@ -50,12 +49,6 @@ class Settings(BaseModel):
     GITHUB_PRIVATE_KEY: str = Field(default="")
     GITHUB_WEBHOOK_SECRET: str = Field(default="")
 
-    # Stripe Billing
-    STRIPE_SECRET_KEY: str = Field(default="")
-    STRIPE_WEBHOOK_SECRET: str = Field(default="")
-    STRIPE_PRICE_PRO_ID: str = Field(default="")
-    STRIPE_PRICE_ENT_ID: str = Field(default="")
-
     # SMTP Notifications
     SMTP_HOST: str = Field(default="localhost")
     SMTP_PORT: int = Field(default=1025)
@@ -69,16 +62,25 @@ class Settings(BaseModel):
 
     @classmethod
     def load_from_env(cls):
-        # Allow loading environment variables dynamically
+        env = os.getenv("APP_ENVIRONMENT", "development")
+        jwt_secret = os.getenv("JWT_SECRET")
+
+        if not jwt_secret:
+            if env == "production":
+                raise ValueError("JWT_SECRET must be explicitly set in production environment (minimum 32 characters).")
+            jwt_secret = DEFAULT_DEV_JWT_SECRET
+
         return cls(
             DATABASE_URL=os.getenv("DATABASE_URL", "sqlite:///./auth.db"),
             REDIS_URL=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-            JWT_SECRET=os.getenv("JWT_SECRET") or _fallback_secret(),
+            JWT_SECRET=jwt_secret,
             JWT_ALGORITHM=os.getenv("JWT_ALGORITHM", "HS256"),
             ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")),
             REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
             RATE_LIMIT_WINDOW_SECONDS=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "2")),
             GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", ""),
+            OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", ""),
+            ANTHROPIC_API_KEY=os.getenv("ANTHROPIC_API_KEY", ""),
             STORAGE_PROVIDER=os.getenv("STORAGE_PROVIDER", "local"),
             STORAGE_BUCKET=os.getenv("STORAGE_BUCKET", "ai-engine-uploads"),
             STORAGE_REGION=os.getenv("STORAGE_REGION", "us-east-1"),
@@ -88,17 +90,13 @@ class Settings(BaseModel):
             GITHUB_APP_ID=os.getenv("GITHUB_APP_ID", ""),
             GITHUB_PRIVATE_KEY=os.getenv("GITHUB_PRIVATE_KEY", ""),
             GITHUB_WEBHOOK_SECRET=os.getenv("GITHUB_WEBHOOK_SECRET", ""),
-            STRIPE_SECRET_KEY=os.getenv("STRIPE_SECRET_KEY", ""),
-            STRIPE_WEBHOOK_SECRET=os.getenv("STRIPE_WEBHOOK_SECRET", ""),
-            STRIPE_PRICE_PRO_ID=os.getenv("STRIPE_PRICE_PRO_ID", ""),
-            STRIPE_PRICE_ENT_ID=os.getenv("STRIPE_PRICE_ENT_ID", ""),
             SMTP_HOST=os.getenv("SMTP_HOST", "localhost"),
             SMTP_PORT=int(os.getenv("SMTP_PORT", "1025")),
             SMTP_USER=os.getenv("SMTP_USER", ""),
             SMTP_PASSWORD=os.getenv("SMTP_PASSWORD", ""),
             SMTP_FROM=os.getenv("SMTP_FROM", "noreply@aiengine.dev"),
             LOG_LEVEL=os.getenv("LOG_LEVEL", "INFO"),
-            APP_ENVIRONMENT=os.getenv("APP_ENVIRONMENT", "development")
+            APP_ENVIRONMENT=env
         )
 
 settings = Settings.load_from_env()

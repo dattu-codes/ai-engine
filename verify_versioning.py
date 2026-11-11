@@ -1,101 +1,14 @@
+import os
+import sys
 import json
 import time
-import urllib.request
-import urllib.error
 import io
 import zipfile
-import sys
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
-
-def make_request(
-    method: str, 
-    path: str, 
-    data: Optional[dict] = None, 
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req_body = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        return 500, {"detail": str(e)}
-
-
-def make_multipart_request(
-    path: str,
-    fields: dict,
-    files: dict,
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-    CRLF = b"\r\n"
-    parts = []
-    
-    for key, value in fields.items():
-        parts.append(b"--" + boundary.encode("utf-8"))
-        parts.append(f'Content-Disposition: form-data; name="{key}"'.encode("utf-8"))
-        parts.append(b"")
-        parts.append(str(value).encode("utf-8"))
-        
-    for key, (filename, content_bytes) in files.items():
-        parts.append(b"--" + boundary.encode("utf-8"))
-        parts.append(f'Content-Disposition: form-data; name="{key}"; filename="{filename}"'.encode("utf-8"))
-        parts.append(b"Content-Type: application/octet-stream")
-        parts.append(b"")
-        parts.append(content_bytes)
-        
-    parts.append(b"--" + boundary.encode("utf-8") + b"--")
-    parts.append(b"")
-    
-    body = CRLF.join(parts)
-    url = f"{BASE_URL}{path}"
-    headers = {
-        "Content-Type": f"multipart/form-data; boundary={boundary}",
-        "Content-Length": str(len(body))
-    }
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    
-    try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        return 500, {"detail": str(e)}
+# In-memory test client runner
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from test_client_helper import make_request, make_multipart_request, client
 
 
 def create_test_zip() -> bytes:
@@ -254,25 +167,22 @@ def run_tests():
 
     # 10. Download Version 2 ZIP
     print("\n[STEP 10] Downloading Version 2 ZIP archive snapshot...")
-    url = f"{BASE_URL}/projects/{project_id}/versions/{new_ver['id']}/download"
-    req = urllib.request.Request(url, method="GET")
-    req.add_header("Authorization", f"Bearer {token}")
-    try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            assert response.status == 200, f"ZIP download failed: {response.status}"
-            assert response.headers.get("Content-Type") == "application/zip", "Content-Type is not application/zip"
-            zip_data = response.read()
-            
-            # Verify zip content actually holds fixed code
-            with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
-                file_list = zf.namelist()
-                assert "app/auth.py" in file_list, "Missing app/auth.py inside downloaded ZIP"
-                auth_content = zf.read("app/auth.py").decode("utf-8")
-                # Eval security issue should be replaced with secure comment
-                assert "eval(" not in auth_content, "Security vulnerability 'eval' was not fixed in download codebase"
-                assert "eval removed" in auth_content, "Vulnerability signature missing refactored log"
-    except Exception as e:
-        raise AssertionError(f"ZIP download verification failed: {e}")
+    resp = client.get(
+        f"/projects/{project_id}/versions/{new_ver['id']}/download",
+        headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 200, f"ZIP download failed: {resp.status_code}"
+    assert "zip" in resp.headers.get("Content-Type", ""), "Content-Type is not application/zip"
+    zip_data = resp.content
+    
+    # Verify zip content actually holds fixed code
+    with zipfile.ZipFile(io.BytesIO(zip_data)) as zf:
+        file_list = zf.namelist()
+        assert "app/auth.py" in file_list, "Missing app/auth.py inside downloaded ZIP"
+        auth_content = zf.read("app/auth.py").decode("utf-8")
+        # Eval security issue should be replaced with secure comment
+        assert "eval(" not in auth_content, "Security vulnerability 'eval' was not fixed in download codebase"
+        assert "eval removed" in auth_content, "Vulnerability signature missing refactored log"
 
     print("ZIP archive download check successful!")
     print("\n" + "=" * 80)

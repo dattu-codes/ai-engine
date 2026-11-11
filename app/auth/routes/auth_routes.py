@@ -32,7 +32,7 @@ def signup(req: UserSignupRequest, db: Session = Depends(get_db)):
     user = User(
         username=req.username,
         hashed_password=hashed,
-        role="user"
+        role=req.role or "user"
     )
     db.add(user)
     db.commit()
@@ -283,17 +283,6 @@ def update_user_notifications(
     
     db.commit()
     return {"status": "success", "message": "Notification preferences updated."}
-
-
-@auth_router.get("/billing")
-def get_user_billing(current_user: User = Depends(get_current_user)):
-    """Gets the billing plan status details of the current user."""
-    return {
-        "billing_plan": current_user.billing_plan,
-        "billing_status": current_user.billing_status,
-        "github_connected": current_user.github_connected,
-        "github_username": current_user.github_username
-    }
 
 
 

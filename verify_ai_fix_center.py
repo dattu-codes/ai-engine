@@ -1,43 +1,12 @@
+import os
+import sys
 import json
 import time
-import urllib.request
-import urllib.error
-import sys
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
-
-def make_request(
-    method: str, 
-    path: str, 
-    data: Optional[dict] = None, 
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req_body = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=60) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        return 500, {"detail": str(e)}
+# In-memory test client runner
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from test_client_helper import make_request, make_multipart_request
 
 def run_tests():
     print("=" * 80)
@@ -81,35 +50,18 @@ def run_tests():
     
     # 4. Upload Paste Vulnerable Code
     print("\n[STEP 4] Uploading vulnerable source code containing eval(...) security issue...")
-    url = f"{BASE_URL}/projects/{project_id}/upload"
-    boundary = "---BoundaryVal---"
-    headers = {
-        "Content-Type": f"multipart/form-data; boundary={boundary}",
-        "Authorization": f"Bearer {token}"
-    }
-    body_str = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="pasted_filename"\r\n\r\n'
-        f"auth_vuln.py\r\n"
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="pasted_content"\r\n\r\n'
-        f"# Auth module\n"
-        f"# Line 2\n"
-        f"# Line 3\n"
-        f"# Line 4\n"
-        f"# Line 5\n"
-        f"# Line 6\n"
-        f"# Line 7\n"
-        f"# Line 8\n"
-        f"# Line 9\n"
-        f"# Line 10\n"
-        f"# Line 11\n"
-        f"eval(\"arbitrary_string\")\n\r\n"
-        f"--{boundary}--\r\n"
+    pasted_content = (
+        "# Auth module\n"
+        "# Line 2\n# Line 3\n# Line 4\n# Line 5\n# Line 6\n"
+        "# Line 7\n# Line 8\n# Line 9\n# Line 10\n# Line 11\n"
+        "eval(\"arbitrary_string\")\n"
     )
-    req = urllib.request.Request(url, data=body_str.encode("utf-8"), headers=headers, method="POST")
-    with urllib.request.urlopen(req) as resp:
-        assert resp.status == 200, f"Source upload failed: {resp.status}"
+    status_code, upload_res = make_multipart_request(
+        f"/projects/{project_id}/upload",
+        fields={"pasted_filename": "auth_vuln.py", "pasted_content": pasted_content},
+        token=token
+    )
+    assert status_code == 200, f"Source upload failed: {upload_res}"
     print("Pasted vulnerable file uploaded successfully.")
     
     # 5. Run Ingestion Review Pipeline
@@ -198,19 +150,12 @@ def run_tests():
     # 12. Test AST validation failures & auto-rollback
     print("\n[STEP 12] Uploading a second project issue to test auto-rollback handling...")
     # Add another finding to project
-    body_str_2 = (
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="pasted_filename"\r\n\r\n'
-        f"print_vuln.py\r\n"
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="pasted_content"\r\n\r\n'
-        f"def dummy():\n"
-        f"    print('leak')\n\r\n"
-        f"--{boundary}--\r\n"
+    status_code, upload_res = make_multipart_request(
+        f"/projects/{project_id}/upload",
+        fields={"pasted_filename": "print_vuln.py", "pasted_content": "def dummy():\n    print('leak')\n"},
+        token=token
     )
-    req = urllib.request.Request(url, data=body_str_2.encode("utf-8"), headers=headers, method="POST")
-    with urllib.request.urlopen(req) as resp:
-         assert resp.status == 200
+    assert status_code == 200, f"Source upload failed: {upload_res}"
          
     # Run analysis to populate findings
     status_code, analysis_info_2 = make_request("POST", f"/analysis/{project_id}/run", {"api_key": None}, token=token)

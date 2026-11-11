@@ -1,84 +1,12 @@
+import os
+import sys
 import json
 import time
-import urllib.request
-import urllib.error
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
-
-def make_request(
-    method: str, 
-    path: str, 
-    data: Optional[dict] = None, 
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-        
-    req_body = json.dumps(data).encode("utf-8") if data is not None else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    
-    try:
-        with urllib.request.urlopen(req, timeout=8) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        print(f"Network error: {str(e)}")
-        return 500, {"detail": str(e)}
-
-
-def make_multipart_request(
-    path: str,
-    fields: dict,
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-    url = f"{BASE_URL}{path}"
-    
-    headers = {
-        "Content-Type": f"multipart/form-data; boundary={boundary}"
-    }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-
-    body_parts = []
-    for key, val in fields.items():
-        body_parts.append(f"--{boundary}")
-        body_parts.append(f'Content-Disposition: form-data; name="{key}"')
-        body_parts.append("")
-        body_parts.append(str(val))
-        
-    body_parts.append(f"--{boundary}--")
-    body_parts.append("")
-    req_body = "\r\n".join(body_parts).encode("utf-8")
-    
-    req = urllib.request.Request(url, data=req_body, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=8) as response:
-            res_body = response.read().decode("utf-8")
-            return response.status, json.loads(res_body) if res_body else {}
-    except urllib.error.HTTPError as e:
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return e.code, res_json
-    except Exception as e:
-        return 500, {"detail": str(e)}
+# In-memory test client runner
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from test_client_helper import make_request, make_multipart_request
 
 
 def run_tests():

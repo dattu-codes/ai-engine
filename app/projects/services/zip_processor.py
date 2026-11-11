@@ -1,4 +1,5 @@
 import io
+import os
 import zipfile
 import hashlib
 from typing import List, Dict, Any
@@ -32,13 +33,25 @@ class ZipProcessor:
                     if member.is_dir():
                         continue
 
+                    # Path traversal (Zip Slip) security protection
+                    raw_name = member.filename.replace("\\", "/")
+                    norm_path = os.path.normpath(raw_name).replace("\\", "/")
+                    if (
+                        norm_path.startswith("..") or 
+                        norm_path.startswith("/") or 
+                        "://" in raw_name or
+                        ".." in norm_path.split("/")
+                    ):
+                        # Block malicious archive paths attempting directory traversal
+                        continue
+
                     # Split path components to check if any part is ignored
-                    path_parts = member.filename.replace("\\", "/").split("/")
+                    path_parts = norm_path.split("/")
                     if any(part in cls.IGNORED_DIRS for part in path_parts):
                         continue
 
                     # Extract file extension and verify if supported
-                    filename = member.filename
+                    filename = norm_path
                     dot_idx = filename.rfind(".")
                     if dot_idx == -1:
                         continue

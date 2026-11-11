@@ -27,11 +27,6 @@ class User(Base):
     github_token = Column(String(512), nullable=True)
     github_connected = Column(Boolean, default=False, nullable=False)
 
-    # Stripe Billing
-    stripe_customer_id = Column(String(255), unique=True, index=True, nullable=True)
-    stripe_subscription_id = Column(String(255), nullable=True)
-    billing_plan = Column(String(50), default="Free", nullable=False)
-    billing_status = Column(String(50), default="active", nullable=False)
 
     # Relationships
     sessions = relationship("UserSession", back_populates="user", cascade="all, delete-orphan")

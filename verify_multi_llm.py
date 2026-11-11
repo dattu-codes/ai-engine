@@ -1,34 +1,12 @@
-import asyncio
+import os
 import sys
 import json
-import urllib.request
+import asyncio
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
-
-def make_request(
-    method: str, 
-    path: str, 
-    data: Optional[dict] = None, 
-    token: Optional[str] = None
-) -> Tuple[int, dict]:
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    req_body = json.dumps(data).encode("utf-8") if data is not None else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            return response.status, json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8")
-        try:
-            return e.code, json.loads(body)
-        except Exception:
-            return e.code, {"detail": body}
-    except Exception as e:
-        return 500, {"detail": str(e)}
+# In-memory test client runner
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from test_client_helper import make_request
 
 async def run_tests():
     print("==================================================")

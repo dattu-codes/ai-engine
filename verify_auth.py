@@ -1,10 +1,15 @@
+import sys
+import os
 import json
 import time
-import urllib.request
-import urllib.error
 from typing import Tuple, Optional
 
-BASE_URL = "http://127.0.0.1:8000"
+# Set up project path
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+from app.main import app
+from fastapi.testclient import TestClient
+
+client = TestClient(app)
 
 def make_request(
     method: str, 
@@ -12,33 +17,17 @@ def make_request(
     data: Optional[dict] = None, 
     token: Optional[str] = None
 ) -> Tuple[int, dict]:
-    """Helper function to make HTTP requests using Python's standard library."""
-    url = f"{BASE_URL}{path}"
+    """In-memory HTTP request executor using FastAPI TestClient."""
     headers = {"Content-Type": "application/json"}
-    
     if token:
         headers["Authorization"] = f"Bearer {token}"
         
-    req_body = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=req_body, headers=headers, method=method)
-    
+    resp = client.request(method, path, json=data, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            status = response.status
-            res_body = response.read().decode("utf-8")
-            res_json = json.loads(res_body) if res_body else {}
-            return status, res_json
-    except urllib.error.HTTPError as e:
-        status = e.code
-        res_body = e.read().decode("utf-8")
-        try:
-            res_json = json.loads(res_body)
-        except Exception:
-            res_json = {"detail": res_body}
-        return status, res_json
-    except Exception as e:
-        print(f"Network error: {str(e)}")
-        return 500, {"detail": str(e)}
+        res_json = resp.json()
+    except Exception:
+        res_json = {"detail": resp.text}
+    return resp.status_code, res_json
 
 def run_tests():
     print("=========================================================")
