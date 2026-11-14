@@ -3,7 +3,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Google Gemini](https://img.shields.io/badge/AI-Google%20Gemini-8E75B2?logo=googlegemini&logoColor=white)](https://ai.google.dev/)
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-brightgreen?logo=render&logoColor=white)](https://ai-engine-0kvf.onrender.com)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Render-brightgreen?logo=render&logoColor=white)](https://ai-engine-1-yqgf.onrender.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **AI Engine** is an advanced, production-ready AI codebase analysis, self-healing code repair, and test orchestration platform built with **Python & FastAPI**. 
