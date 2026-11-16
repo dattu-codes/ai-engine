@@ -184,7 +184,7 @@
                         <button id="btn-theme-toggle" style="background: transparent; border: none; font-size: 16px; cursor: pointer; color: var(--text-bright); padding: 4px;" title="Toggle Light/Dark Theme">🌓</button>
                         <div class="system-status" style="display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 600; color: var(--text-muted);">
                             <span class="status-indicator online" style="width: 6px; height: 6px; border-radius: 50%; background-color: var(--accent-green); box-shadow: 0 0 6px var(--accent-green); display: inline-block;"></span>
-                            <span id="status-text">SYSTEM ONLINE (DEMO MODE)</span>
+                            <span id="status-text">Offline mode (no API key)</span>
                         </div>
                     </div>
                 </div>
@@ -472,7 +472,7 @@
                                             </div>
                                         </div>
                                         <div class="metric-box">
-                                            <span class="metric-label">Complexity</span>
+                                            <span class="metric-label">Complexity <small style="font-size: 10px; color: var(--text-muted); font-weight: normal;">(lower is better)</small></span>
                                             <span class="metric-value" id="val-complexity">--</span>
                                         </div>
                                         <div class="metric-box">
@@ -582,25 +582,77 @@
                                             </tbody>
                                         </table>
                                     </div>
+                                    <!-- Collapsed Style Suggestions Section -->
+                                    <div id="style-suggestions-container" style="margin-top: 14px; display: none;">
+                                        <details style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+                                            <summary style="font-size: 12px; font-weight: 600; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none;">
+                                                <span>🎨 Style suggestions (<span id="style-count">0</span>)</span>
+                                                <span style="font-size: 10px; color: var(--text-muted);">Click to expand</span>
+                                            </summary>
+                                            <div id="style-suggestions-list" style="margin-top: 10px; font-size: 12px; color: var(--text-main); display: flex; flex-direction: column; gap: 8px;">
+                                            </div>
+                                        </details>
+                                    </div>
                                 </div>
 
-                                <!-- Tab: Refactored Code -->
+                                <!-- Tab: AI Fixes / Refactored Code -->
                                 <div class="tab-pane" id="tab-code">
                                     <div class="refactor-layout">
                                         <div class="refactor-meta">
-                                            <h3>Optimized Implementation</h3>
-                                            <button class="btn btn-secondary btn-sm" id="btn-copy">Copy Code</button>
+                                            <h3>Verification & Patch Diff</h3>
+                                            <button class="btn btn-secondary btn-sm" id="btn-copy">Copy Refactored Code</button>
                                         </div>
-                                        <div class="refactor-improvements">
-                                            <h4>Key Improvements Applied:</h4>
-                                            <ul id="improvements-list">
-                                                <li class="placeholder-li">Execute workflow to generate suggested improvements.</li>
-                                            </ul>
+                                        
+                                        <!-- Three Verification Sections -->
+                                        <div class="verification-sections" style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+                                            <!-- Section 1: Resolved -->
+                                            <div class="section-box" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 16px;">
+                                                <h4 style="font-size: 13px; font-weight: 700; color: #34d399; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                                    <span>✅</span> Resolved (<span id="resolved-count">0</span>)
+                                                </h4>
+                                                <ul id="resolved-list" style="margin: 0; padding-left: 20px; font-size: 12px; color: var(--text-main); line-height: 1.6;">
+                                                    <li class="placeholder-li" style="color: var(--text-muted); font-style: italic; list-style: none; margin-left: -20px;">Execute workflow to view resolved findings.</li>
+                                                </ul>
+                                            </div>
+
+                                            <!-- Section 2: Still open (needs manual fix) -->
+                                            <div class="section-box" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 12px 16px;">
+                                                <h4 style="font-size: 13px; font-weight: 700; color: #f87171; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                                    <span>⚠️</span> Still open (needs manual fix) (<span id="remaining-count">0</span>)
+                                                </h4>
+                                                <ul id="remaining-list" style="margin: 0; padding-left: 20px; font-size: 12px; color: var(--text-main); line-height: 1.6;">
+                                                    <li class="placeholder-li" style="color: var(--text-muted); font-style: italic; list-style: none; margin-left: -20px;">Execute workflow to view remaining findings.</li>
+                                                </ul>
+                                            </div>
+
+                                            <!-- Section 3: Verification (syntax OK / re-scan result) -->
+                                            <div class="section-box" style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 12px 16px;">
+                                                <h4 style="font-size: 13px; font-weight: 700; color: #c084fc; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                                    <span>🔍</span> Verification (syntax OK / re-scan result)
+                                                </h4>
+                                                <div id="verification-summary-text" style="font-size: 12px; color: var(--text-main); line-height: 1.5;">
+                                                    Execute workflow to run in-memory re-scan and AST syntax verification.
+                                                </div>
+                                            </div>
                                         </div>
+
+                                        <!-- Diff View (red/green lines) -->
                                         <div class="code-views">
                                             <div class="code-view-container">
-                                                <div class="code-view-header">Refactored Code</div>
-                                                <pre><code class="language-python" id="refactored-code-block"># Refactored output will appear here...</code></pre>
+                                                <div class="code-view-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                                    <span>Patch Diff</span>
+                                                    <div style="display: flex; gap: 14px; font-size: 11px; font-weight: 600;">
+                                                        <span style="color: #fca5a5;"><span style="display:inline-block; width:8px; height:8px; background:#ef4444; border-radius:2px; margin-right:4px;"></span>- Removed</span>
+                                                        <span style="color: #86efac;"><span style="display:inline-block; width:8px; height:8px; background:#22c55e; border-radius:2px; margin-right:4px;"></span>+ Added</span>
+                                                    </div>
+                                                </div>
+                                                <div id="diff-view-content" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6; padding: 14px; background: #0b1120; border-radius: 0 0 8px 8px; overflow-x: auto; max-height: 500px; white-space: pre;">
+<span style="color: var(--text-muted); font-style: italic;">Unified diff will appear here after review execution...</span>
+                                                </div>
+                                                <!-- Keep hidden pre/code so copy button or scripts can access clean refactored code -->
+                                                <div style="display: none;">
+                                                    <pre><code class="language-python" id="refactored-code-block"># Refactored output will appear here...</code></pre>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

@@ -61,9 +61,12 @@ class PatchGenerator:
         ))
         unified_diff = "".join(diff)
 
-        explanation = f"Automated refactoring applied to secure database connection or style in {target_file}."
-        if finding.category == "Security":
-            explanation = f"Refactored user-controlled values to parameterization/sanitization on line {finding.line_number} of {target_file}."
+        if original_code == replacement_code:
+            explanation = f"Finding on line {finding.line_number} in {target_file} requires manual remediation. No automatic patch could be safely applied without risk of breaking runtime behavior."
+        else:
+            explanation = f"Automated refactoring applied to secure database connection or style in {target_file}."
+            if finding.category == "Security":
+                explanation = f"Refactored code on line {finding.line_number} of {target_file} to resolve security vulnerability."
 
         # Risk estimation
         risk = "Low"

@@ -30,10 +30,10 @@ class MockAnalysisSimulator:
                 stripped = line.strip()
 
                 # 1. Eval usage check
-                if "eval(" in line and not stripped.startswith("//") and not stripped.startswith("#"):
+                if "eval(" in line and "literal_eval" not in line and not stripped.startswith("//") and not stripped.startswith("#"):
                     issues.append({
                         "category": "Security",
-                        "severity": "critical",
+                        "severity": "high",
                         "file": filename,
                         "line": i,
                         "evidence": line.strip(),
@@ -42,7 +42,59 @@ class MockAnalysisSimulator:
                         "confidence": 0.95
                     })
 
-                # 2. Print / Console log check
+                # 2. Pickle deserialization check
+                if ("pickle.loads(" in line or "pickle.load(" in line) and not stripped.startswith("#"):
+                    issues.append({
+                        "category": "Security",
+                        "severity": "high",
+                        "file": filename,
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "The code uses pickle deserialization, which allows arbitrary code execution and is vulnerable to untrusted data injection.",
+                        "recommendation": "Use safe serialization formats like JSON (json.loads) instead of pickle.",
+                        "confidence": 0.95
+                    })
+
+                # 3. YAML load without SafeLoader
+                if "yaml.load(" in line and "safeloader" not in line.lower() and not stripped.startswith("#"):
+                    issues.append({
+                        "category": "Security",
+                        "severity": "high",
+                        "file": filename,
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "yaml.load without SafeLoader allows arbitrary Python object instantiation and code execution.",
+                        "recommendation": "Use yaml.safe_load(data) instead.",
+                        "confidence": 0.95
+                    })
+
+                # 4. os.system command injection
+                if "os.system(" in line and not stripped.startswith("#"):
+                    issues.append({
+                        "category": "Security",
+                        "severity": "high",
+                        "file": filename,
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "Executing arbitrary shell commands via os.system allows command injection.",
+                        "recommendation": "Use subprocess.run with argument vectors and shell=False.",
+                        "confidence": 0.95
+                    })
+
+                # 5. subprocess with shell=True
+                if ("subprocess." in line or "popen(" in line.lower()) and "shell=true" in line.lower().replace(" ", "") and not stripped.startswith("#"):
+                    issues.append({
+                        "category": "Security",
+                        "severity": "high",
+                        "file": filename,
+                        "line": i,
+                        "evidence": line.strip(),
+                        "explanation": "Executing commands via system shell permits malicious command manipulation and input injection.",
+                        "recommendation": "Pass argument vectors as lists and set shell=False.",
+                        "confidence": 0.95
+                    })
+
+                # 6. Print / Console log check
                 if "print(" in line and "logging" not in line and not stripped.startswith("#"):
                     issues.append({
                         "category": "Style",

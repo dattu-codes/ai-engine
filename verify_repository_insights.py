@@ -222,8 +222,12 @@ func QueryUser(db *sql.DB, id string) {
         
         # Run async test safely
         import asyncio
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(mock_chat())
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(mock_chat())
+        finally:
+            loop.close()
         print("[x] Project Chat prompt integration context verified successfully")
 
         print("======================================================================")

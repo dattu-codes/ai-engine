@@ -688,7 +688,7 @@ class ReviewOrchestrator:
         
         if module_name == "Authentication":
             auth_file_content = files[0].get("content", "") if files else ""
-            if "eval(" in auth_file_content:
+            if "eval(" in auth_file_content and "literal_eval" not in auth_file_content:
                 simulated_issues.append({
                     "category": "Security",
                     "severity": "critical",

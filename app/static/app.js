@@ -45,12 +45,22 @@ function initTabs() {
 
 // Form Controls listeners
 function initFormControls() {
-    // Threshold slider
+    // Threshold slider with visible filled track
     const thresholdSlider = document.getElementById('threshold');
     const thresholdVal = document.getElementById('threshold-val');
-    thresholdSlider.addEventListener('input', (e) => {
-        thresholdVal.textContent = `${e.target.value}%`;
-    });
+    function updateThresholdTrack(val) {
+        if (!thresholdSlider) return;
+        const min = parseFloat(thresholdSlider.min) || 50;
+        const max = parseFloat(thresholdSlider.max) || 95;
+        const current = parseFloat(val) || 80;
+        const pct = Math.max(0, Math.min(100, ((current - min) / (max - min)) * 100));
+        thresholdSlider.style.background = `linear-gradient(to right, #6f61f6 ${pct}%, rgba(255, 255, 255, 0.15) ${pct}%)`;
+        if (thresholdVal) thresholdVal.textContent = `${current}%`;
+    }
+    if (thresholdSlider) {
+        thresholdSlider.addEventListener('input', (e) => updateThresholdTrack(e.target.value));
+        updateThresholdTrack(thresholdSlider.value);
+    }
 
     // Toggle API Key visibility
     const apiKeyInput = document.getElementById('api-key');
@@ -146,7 +156,7 @@ function initDemoSetup() {
             statusText.style.color = '#fff';
             statusIndicator.className = 'status-indicator online';
         } else {
-            statusText.textContent = 'SYSTEM ONLINE (DEMO MODE)';
+            statusText.textContent = 'Offline mode (no API key)';
             statusText.style.color = '';
             statusIndicator.className = 'status-indicator online';
         }
@@ -255,7 +265,41 @@ async  function executeWorkflow() {
     document.getElementById('summary-text').textContent = 'Engine processing workflow graph...';
     document.getElementById('functions-list-container').style.display = 'none';
     document.getElementById('functions-list').innerHTML = '';
-    document.getElementById('improvements-list').innerHTML = '<li class="placeholder-li">Reviewing suggestions...</li>';
+    
+    // Reset banner (shown only while fix loop is running)
+    const loopIndicator = document.getElementById('loop-indicator');
+    if (loopIndicator) {
+        loopIndicator.style.display = 'none';
+        loopIndicator.style.background = '';
+        loopIndicator.style.borderColor = '';
+        loopIndicator.style.color = '';
+        loopIndicator.innerHTML = '<span class="loop-icon">🔄</span> Self-Healing Loop Triggered: Refining Code for Quality Check...';
+    }
+    
+    // Reset Verification Sections & Diff View
+    const resCountEl = document.getElementById('resolved-count');
+    const resListEl = document.getElementById('resolved-list');
+    const remCountEl = document.getElementById('remaining-count');
+    const remListEl = document.getElementById('remaining-list');
+    const verBox = document.getElementById('verification-summary-text');
+    const diffContainer = document.getElementById('diff-view-content');
+    
+    if (resCountEl) resCountEl.textContent = '0';
+    if (resListEl) resListEl.innerHTML = '<li class="placeholder-li" style="color: var(--text-muted); font-style: italic; list-style: none; margin-left: -20px;">Analyzing codebase...</li>';
+    if (remCountEl) remCountEl.textContent = '0';
+    if (remListEl) remListEl.innerHTML = '<li class="placeholder-li" style="color: var(--text-muted); font-style: italic; list-style: none; margin-left: -20px;">Analyzing codebase...</li>';
+    if (verBox) verBox.textContent = 'Running in-memory AST scan and syntax verification...';
+    if (diffContainer) diffContainer.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Computing patch diff...</span>';
+
+    const styleContainer = document.getElementById('style-suggestions-container');
+    const styleCountEl = document.getElementById('style-count');
+    const styleList = document.getElementById('style-suggestions-list');
+    if (styleContainer) styleContainer.style.display = 'none';
+    if (styleCountEl) styleCountEl.textContent = '0';
+    if (styleList) styleList.innerHTML = '';
+
+    const oldImpsList = document.getElementById('improvements-list');
+    if (oldImpsList) oldImpsList.innerHTML = '<li class="placeholder-li">Reviewing suggestions...</li>';
     document.getElementById('refactored-code-block').textContent = '# Refactoring output will appear here...';
     Prism.highlightElement(document.getElementById('refactored-code-block'));
     
@@ -469,22 +513,30 @@ function finalizeWorkflow(runData) {
         funcsContainer.style.display = 'block';
     }
     
-    // 2. Populate Bugs List
+    // 2. Populate Bugs List & Collapsed Style Suggestions
     const bugsBody = document.getElementById('bugs-tbody');
-    const bugsCount = state.issues ? state.issues.length : 0;
     const badgeBugs = document.getElementById('badge-bugs');
-    badgeBugs.textContent = bugsCount;
+    const styleContainer = document.getElementById('style-suggestions-container');
+    const styleList = document.getElementById('style-suggestions-list');
+    const styleCountEl = document.getElementById('style-count');
+
+    const allIssues = state.issues || [];
+    const isStyle = (iss) => (iss.type || '').toLowerCase() === 'style' || (iss.severity || '').toLowerCase() === 'low' || (iss.description || '').toLowerCase().includes('pep 8') || (iss.description || '').toLowerCase().includes('style');
+    const coreIssues = allIssues.filter(iss => !isStyle(iss));
+    const styleIssues = allIssues.filter(iss => isStyle(iss));
+
+    const coreCount = coreIssues.length;
+    badgeBugs.textContent = coreCount;
     
-    if (bugsCount > 0) {
+    if (coreCount > 0) {
         badgeBugs.classList.add('red-glow');
         bugsBody.innerHTML = '';
-        state.issues.forEach(iss => {
+        coreIssues.forEach(iss => {
             const tr = document.createElement('tr');
-            
             const severityClass = (iss.severity || 'low').toLowerCase();
             tr.innerHTML = `
-                <td class="type-cell">${iss.type || 'Style'}</td>
-                <td><span class="pill ${severityClass}">${iss.severity || 'Low'}</span></td>
+                <td class="type-cell">${iss.type || 'Security'}</td>
+                <td><span class="pill ${severityClass}">${iss.severity || 'High'}</span></td>
                 <td>${iss.description}</td>
                 <td class="loc-cell">${iss.location || 'Unknown'}</td>
             `;
@@ -495,25 +547,194 @@ function finalizeWorkflow(runData) {
         bugsBody.innerHTML = `
             <tr class="empty-row">
                 <td colspan="4" style="color: var(--accent-green); font-style: normal; font-weight: 500;">
-                    🎉 Excellent! Code scans detected no bugs, warnings, or stylistic violations.
+                    🎉 Excellent! Code scans detected no security vulnerabilities or critical bugs.
                 </td>
             </tr>`;
     }
+
+    // Populate Collapsed Style Suggestions
+    if (styleContainer && styleList && styleCountEl) {
+        if (styleIssues.length > 0) {
+            styleContainer.style.display = 'block';
+            styleCountEl.textContent = styleIssues.length;
+            styleList.innerHTML = '';
+            styleIssues.forEach(s => {
+                const item = document.createElement('div');
+                item.style.cssText = 'padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; gap: 12px;';
+                item.innerHTML = `
+                    <span style="color: var(--text-main); font-size: 12px;">${escapeHtml(s.description)}</span>
+                    <span class="pill outline" style="font-size: 11px; white-space: nowrap;">${escapeHtml(s.location || 'Codebase')}</span>
+                `;
+                styleList.appendChild(item);
+            });
+        } else {
+            styleContainer.style.display = 'none';
+            styleCountEl.textContent = '0';
+            styleList.innerHTML = '';
+        }
+    }
     
-    // 3. Populate Refactored Code and Improvements
+    // 3. Update Loop Indicator / Honest Re-scan Result
+    const loopIndicator = document.getElementById('loop-indicator');
+    if (loopIndicator) {
+        const remaining = state.remaining || state.verification?.remaining || [];
+        const highRemaining = remaining.filter(r => (r.severity || '').toLowerCase() === 'high').length;
+        const totalRemaining = remaining.length;
+        
+        loopIndicator.style.display = 'flex';
+        if (totalRemaining > 0) {
+            loopIndicator.style.background = 'rgba(239, 68, 68, 0.08)';
+            loopIndicator.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+            loopIndicator.style.color = '#fca5a5';
+            if (highRemaining > 0) {
+                loopIndicator.innerHTML = `<span class="loop-icon">⚠️</span> Re-scan: ${highRemaining} HIGH remaining`;
+            } else {
+                loopIndicator.innerHTML = `<span class="loop-icon">⚠️</span> Re-scan: ${totalRemaining} finding(s) remaining`;
+            }
+        } else {
+            loopIndicator.style.background = 'rgba(16, 185, 129, 0.08)';
+            loopIndicator.style.borderColor = 'rgba(16, 185, 129, 0.25)';
+            loopIndicator.style.color = '#34d399';
+            loopIndicator.innerHTML = '<span class="loop-icon">✅</span> Re-scan: All findings resolved (Syntax OK)';
+        }
+    }
+
+    // 4. Populate Honest Verification Sections: Resolved, Still open, and Verification
+    const resolved = state.resolved || state.verification?.resolved || [];
+    const remaining = state.remaining || state.verification?.remaining || [];
+    const syntaxOk = state.syntax_ok !== undefined ? state.syntax_ok : (state.verification?.syntax_ok !== false);
+    const summaryText = state.summary || state.verification?.summary || (
+        syntaxOk ? `Re-scan complete: ${resolved.length} resolved, ${remaining.length} remaining.` : 'Verification failed: Syntax error in patched code.'
+    );
+
+    // Section 1: Resolved (without duplicate "Resolved:" prefix)
+    const resCountEl = document.getElementById('resolved-count');
+    const resListEl = document.getElementById('resolved-list');
+    if (resCountEl) resCountEl.textContent = resolved.length;
+    if (resListEl) {
+        resListEl.innerHTML = '';
+        if (resolved.length === 0) {
+            resListEl.innerHTML = '<li class="placeholder-li" style="color: var(--text-muted); font-style: italic; list-style: none; margin-left: -20px;">No findings automatically resolved.</li>';
+        } else {
+            resolved.forEach(item => {
+                const li = document.createElement('li');
+                const desc = item.description || (typeof item === 'string' ? item : JSON.stringify(item));
+                const loc = item.location ? ` (${item.location})` : '';
+                li.innerHTML = `${escapeHtml(desc)}${escapeHtml(loc)}`;
+                resListEl.appendChild(li);
+            });
+        }
+    }
+
+    // Section 2: Still open (show original line numbers and mark verification lines in patched code)
+    const remCountEl = document.getElementById('remaining-count');
+    const remListEl = document.getElementById('remaining-list');
+    if (remCountEl) remCountEl.textContent = remaining.length;
+    if (remListEl) {
+        remListEl.innerHTML = '';
+        if (remaining.length === 0) {
+            remListEl.innerHTML = '<li class="placeholder-li" style="color: var(--text-muted); font-style: italic; list-style: none; margin-left: -20px;">No remaining findings requiring manual remediation.</li>';
+        } else {
+            remaining.forEach(item => {
+                const li = document.createElement('li');
+                const desc = item.description || (typeof item === 'string' ? item : JSON.stringify(item));
+                
+                const origLoc = item.original_location || (item.location && item.location.includes('(') ? item.location.split('(')[0].trim() : item.location);
+                const patchedLoc = item.patched_location || (item.location && item.location.includes('(') ? item.location.split('(')[1].replace(')', '').trim() : '');
+                const locDisplay = patchedLoc ? ` [${origLoc} (${patchedLoc})]` : (item.location ? ` [${item.location}]` : '');
+                
+                const sev = (item.severity || 'HIGH').toUpperCase();
+                const sevColor = sev === 'HIGH' ? '#f87171' : '#fbbf24';
+                li.innerHTML = `<strong style="color: ${sevColor};">[${escapeHtml(sev)}]</strong> ${escapeHtml(desc)}${escapeHtml(locDisplay)} <em style="color: var(--text-muted);">(needs manual fix)</em>`;
+                remListEl.appendChild(li);
+            });
+        }
+    }
+
+    // Section 3: Verification (syntax OK / re-scan result)
+    const verBox = document.getElementById('verification-summary-text');
+    if (verBox) {
+        verBox.innerHTML = `
+            <div style="margin-bottom: 6px;"><strong>Status:</strong> ${escapeHtml(summaryText)}</div>
+            <div style="display: flex; gap: 16px; font-size: 11px;">
+                <span>Syntax: <strong style="color: ${syntaxOk ? '#34d399' : '#f87171'};">${syntaxOk ? 'OK (ast.parse verified)' : 'SYNTAX ERROR'}</strong></span>
+                <span>Re-scan check: <strong style="color: var(--accent-purple);">Strict AST In-Memory Analysis</strong></span>
+            </div>
+        `;
+    }
+
+    // 5. Populate Refactored Code (hidden for clipboard copy) and Render Diff View (red/green lines)
     const refCode = state.code || '';
     const refBlock = document.getElementById('refactored-code-block');
-    refBlock.textContent = refCode;
-    Prism.highlightElement(refBlock);
+    if (refBlock) {
+        refBlock.textContent = refCode;
+        Prism.highlightElement(refBlock);
+    }
     
-    const impsList = document.getElementById('improvements-list');
-    impsList.innerHTML = '';
-    const improvements = state.improvements || ['Code structure validated against targets.'];
-    improvements.forEach(imp => {
-        const li = document.createElement('li');
-        li.textContent = imp;
-        impsList.appendChild(li);
+    renderPatchDiffView(state.diff, state.original_code, state.code);
+
+    const oldImpsList = document.getElementById('improvements-list');
+    if (oldImpsList) {
+        oldImpsList.innerHTML = '';
+        const improvements = state.improvements || ['Code structure validated against targets.'];
+        improvements.forEach(imp => {
+            const li = document.createElement('li');
+            li.textContent = imp;
+            oldImpsList.appendChild(li);
+        });
+    }
+}
+
+function renderPatchDiffView(diffText, originalCode, patchedCode) {
+    const container = document.getElementById('diff-view-content');
+    if (!container) return;
+
+    let lines = [];
+    if (diffText && diffText.trim()) {
+        lines = diffText.split('\n');
+    } else if (originalCode !== undefined && patchedCode !== undefined) {
+        const origLines = (originalCode || '').split('\n');
+        const patchLines = (patchedCode || '').split('\n');
+        lines.push('--- original.py');
+        lines.push('+++ patched.py');
+        let i = 0, j = 0;
+        while (i < origLines.length || j < patchLines.length) {
+            if (i < origLines.length && j < patchLines.length && origLines[i] === patchLines[j]) {
+                lines.push(' ' + origLines[i]);
+                i++; j++;
+            } else if (j < patchLines.length && (i >= origLines.length || !origLines.includes(patchLines[j]))) {
+                lines.push('+' + patchLines[j]);
+                j++;
+            } else if (i < origLines.length) {
+                lines.push('-' + origLines[i]);
+                i++;
+            } else {
+                break;
+            }
+        }
+    }
+
+    if (lines.length === 0) {
+        container.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">No modifications applied. Code is identical to original.</span>';
+        return;
+    }
+
+    let html = '';
+    lines.forEach(line => {
+        if (line.startsWith('+++') || line.startsWith('---')) {
+            html += `<div style="color: var(--text-muted); font-weight: 600; padding: 2px 6px;">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('+')) {
+            html += `<div style="background: rgba(34, 197, 94, 0.15); color: #86efac; border-left: 3px solid #22c55e; padding: 2px 8px; margin: 1px 0;">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('-')) {
+            html += `<div style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-left: 3px solid #ef4444; padding: 2px 8px; margin: 1px 0;">${escapeHtml(line)}</div>`;
+        } else if (line.startsWith('@@')) {
+            html += `<div style="color: var(--accent-purple); font-weight: 600; padding: 3px 6px; margin: 2px 0;">${escapeHtml(line)}</div>`;
+        } else {
+            html += `<div style="color: var(--text-muted); padding: 1px 6px;">${escapeHtml(line)}</div>`;
+        }
     });
+
+    container.innerHTML = html;
 }
 
 /* ==========================================================================

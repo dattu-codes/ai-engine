@@ -185,15 +185,38 @@ async def suggest_improvements(state):
             fallback_res = MockAISimulator.suggest_improvements(code, issues)
             state["code"] = fallback_res["refactored_code"]
             state["improvements"] = fallback_res["improvements"]
+            state["needs_manual_fix"] = fallback_res.get("needs_manual_fix", [])
             
         # Re-run pipeline on the new code to verify quality improvement!
         state["next"] = "extract"
         log["action"] = "Looping back to 'extract' with refactored code to re-evaluate quality score."
         log["improvements"] = state["improvements"]
     else:
-        # Done! If we looped once, we are now finished.
-        log["action"] = "Workflow complete. Final quality checks passed or retry budget exhausted."
-        log["improvements"] = state.get("improvements", ["Code layout matches targeted guidelines."])
+        # Done! If we looped once, compute verification derived strictly from AST re-scan
+        original_code = state.get("original_code", code)
+        patched_code = state.get("code", code)
+        verification = MockAISimulator.verify_patch(original_code, patched_code)
+        
+        import difflib
+        diff_lines = list(difflib.unified_diff(
+            original_code.splitlines(),
+            patched_code.splitlines(),
+            fromfile="original.py",
+            tofile="patched.py",
+            lineterm=""
+        ))
+        state["diff"] = "\n".join(diff_lines)
+        state["verification"] = verification
+        state["resolved"] = verification["resolved"]
+        state["remaining"] = verification["remaining"]
+        state["syntax_ok"] = verification["syntax_ok"]
+        state["summary"] = verification["summary"]
+        
+        log["action"] = "Workflow complete. Re-scan completed."
+        log["message"] = verification["summary"]
+        log["improvements"] = state.get("improvements") or []
+        log["verification"] = verification
+        log["diff"] = state["diff"]
         
     return state, log
 

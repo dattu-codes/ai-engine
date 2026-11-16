@@ -62,8 +62,13 @@ Do NOT output any markdown code blocks, explanatory text, or backticks. Return O
             if not evidence or evidence in target_line or (target_line.strip() and target_line.strip() in evidence):
                 matched = True
                 if "eval(" in target_line:
-                    lines[line_no - 1] = target_line.replace('eval("arbitrary_string")', '# eval removed for safety')
-                    lines[line_no - 1] = lines[line_no - 1].replace("eval(", "# eval removed: ")
+                    lines[line_no - 1] = target_line.replace("eval(", "ast.literal_eval(")
+                    if not any("import ast" in l for l in lines):
+                        lines.insert(0, "import ast")
+                    # If not safe: do not alter code; needs manual fix
+                elif "pickle.loads" in target_line or "pickle.load" in target_line:
+                    # Insecure deserialization needs manual fix: leave code untouched
+                    pass
                 elif "print(" in target_line:
                     lines[line_no - 1] = target_line.replace("print(", "logging.info(")
                     if not any("import logging" in l for l in lines):
@@ -73,10 +78,27 @@ Do NOT output any markdown code blocks, explanatory text, or backticks. Return O
                 elif "System.out.println(" in target_line:
                     lines[line_no - 1] = target_line.replace("System.out.println(", "logger.info(")
                 elif "pass" in target_line:
-                    indent = len(target_line) - len(target_line.lstrip())
-                    lines[line_no - 1] = " " * indent + "logging.warning('Exception caught and ignored', exc_info=True)"
-                    if not any("import logging" in l for l in lines):
-                        lines.insert(0, "import logging")
+                    # Only modify if this pass is directly inside an except: block
+                    is_except_pass = False
+                    except_line_idx = None
+                    for idx in range(line_no - 2, -1, -1):
+                        chk = lines[idx].strip()
+                        if not chk:
+                            continue
+                        if chk.startswith("except"):
+                            is_except_pass = True
+                            except_line_idx = idx
+                            break
+                        else:
+                            break
+                    if is_except_pass and except_line_idx is not None:
+                        indent_ex = len(lines[except_line_idx]) - len(lines[except_line_idx].lstrip())
+                        lines[except_line_idx] = " " * indent_ex + "except Exception as e:"
+                        indent_pass = len(target_line) - len(target_line.lstrip())
+                        lines[line_no - 1] = " " * indent_pass + 'logging.warning("An error occurred: %s", e)'
+                        if not any("import logging" in l for l in lines):
+                            lines.insert(0, "import logging")
+                    # If it was try-body pass: NEVER touch!
                 elif "TODO" in target_line:
                     lines[line_no - 1] = target_line.replace("TODO", "RESOLVED TODO")
                 else:

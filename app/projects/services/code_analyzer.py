@@ -67,6 +67,35 @@ class PythonASTVisitor(ast.NodeVisitor):
                     "description": f"Executing arbitrary code via '{func_name}' creates immediate code-injection vulnerabilities.",
                     "recommendation": "Use structural data parsing (like json.loads) instead of raw python evaluation."
                 })
+            elif func_name == "system":
+                self.vulnerabilities.append({
+                    "severity": "High",
+                    "line": node.lineno,
+                    "category": "Command Injection",
+                    "title": "Dangerous usage of 'os.system'",
+                    "description": "Executing system commands directly allows command injection.",
+                    "recommendation": "Use subprocess.run with argument vectors and shell=False."
+                })
+            elif func_name in ["loads", "load"]:
+                self.vulnerabilities.append({
+                    "severity": "High",
+                    "line": node.lineno,
+                    "category": "Insecure Deserialization",
+                    "title": "Unsafe pickle deserialization",
+                    "description": "Deserializing untrusted data with pickle allows arbitrary code execution.",
+                    "recommendation": "Use safe serialization formats like JSON (json.loads)."
+                })
+            elif func_name in ["Popen", "run", "call", "check_output", "check_call"]:
+                for kw in node.keywords:
+                    if kw.arg == "shell" and ((isinstance(kw.value, ast.Constant) and bool(kw.value.value)) or (isinstance(kw.value, ast.Name) and kw.value.id == "True")):
+                        self.vulnerabilities.append({
+                            "severity": "High",
+                            "line": node.lineno,
+                            "category": "Command Injection",
+                            "title": "Subprocess execution with shell=True",
+                            "description": "Executing commands via system shell permits malicious command manipulation and input injection.",
+                            "recommendation": "Pass argument vectors as lists and set shell=False."
+                        })
             elif func_name == "mktemp":
                 self.vulnerabilities.append({
                     "severity": "Medium",
@@ -78,11 +107,21 @@ class PythonASTVisitor(ast.NodeVisitor):
                 })
         elif isinstance(node.func, ast.Attribute):
             attr_name = node.func.attr
-            # Check for subprocess.Popen/run with shell=True
-            if attr_name in ["Popen", "run", "call", "check_output"]:
+            # Check for os.system
+            if attr_name == "system" and isinstance(node.func.value, ast.Name) and node.func.value.id == "os":
+                self.vulnerabilities.append({
+                    "severity": "High",
+                    "line": node.lineno,
+                    "category": "Command Injection",
+                    "title": "Dangerous usage of 'os.system'",
+                    "description": "Executing arbitrary shell commands via os.system allows command injection.",
+                    "recommendation": "Use subprocess.run with argument vectors and shell=False."
+                })
+            # Check for subprocess.Popen/run/call/check_output with shell=True
+            elif attr_name in ["Popen", "run", "call", "check_output", "check_call"]:
                 # Check keyword arguments for shell=True
                 for kw in node.keywords:
-                    if kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                    if kw.arg == "shell" and ((isinstance(kw.value, ast.Constant) and bool(kw.value.value)) or (isinstance(kw.value, ast.Name) and kw.value.id == "True")):
                         self.vulnerabilities.append({
                             "severity": "High",
                             "line": node.lineno,
@@ -127,7 +166,7 @@ class PythonASTVisitor(ast.NodeVisitor):
                         })
             # Insecure deserialization checks (pickle, yaml)
             elif attr_name in ["loads", "load"]:
-                if isinstance(node.func.value, ast.Name) and node.func.value.id == "pickle":
+                if isinstance(node.func.value, ast.Name) and node.func.value.id in ["pickle", "_pickle"]:
                     self.vulnerabilities.append({
                         "severity": "High",
                         "line": node.lineno,
@@ -137,8 +176,14 @@ class PythonASTVisitor(ast.NodeVisitor):
                         "recommendation": "Use safe serialization formats like JSON (json.loads)."
                     })
                 elif isinstance(node.func.value, ast.Name) and node.func.value.id in ["yaml", "pyyaml"]:
-                    has_safe_loader = any(kw.arg == "Loader" and "safe" in getattr(kw.value, "id", "").lower() for kw in node.keywords)
-                    if not has_safe_loader and attr_name == "load":
+                    safe_loader = False
+                    for kw in node.keywords:
+                        if kw.arg == "Loader":
+                            if isinstance(kw.value, ast.Attribute) and "safe" in kw.value.attr.lower():
+                                safe_loader = True
+                            elif isinstance(kw.value, ast.Name) and "safe" in kw.value.id.lower():
+                                safe_loader = True
+                    if not safe_loader:
                         self.vulnerabilities.append({
                             "severity": "High",
                             "line": node.lineno,
@@ -147,6 +192,15 @@ class PythonASTVisitor(ast.NodeVisitor):
                             "description": "yaml.load without SafeLoader allows arbitrary Python object instantiation.",
                             "recommendation": "Use yaml.safe_load(data) instead."
                         })
+            elif attr_name == "unsafe_load" and isinstance(node.func.value, ast.Name) and node.func.value.id in ["yaml", "pyyaml"]:
+                self.vulnerabilities.append({
+                    "severity": "High",
+                    "line": node.lineno,
+                    "category": "Insecure Deserialization",
+                    "title": "Unsafe YAML loading",
+                    "description": "yaml.unsafe_load allows arbitrary Python object instantiation.",
+                    "recommendation": "Use yaml.safe_load(data) instead."
+                })
         self.generic_visit(node)
 
     def visit_Assign(self, node):
@@ -428,7 +482,7 @@ class CodeAnalyzerService:
                         })
 
             # 1. Check for eval
-            if "eval(" in line_str or "eval (" in line_str:
+            if ("eval(" in line_str or "eval (" in line_str) and "literal_eval" not in line_str:
                 vulnerabilities.append({
                     "severity": "High",
                     "line": idx,
@@ -436,6 +490,50 @@ class CodeAnalyzerService:
                     "title": "Dangerous usage of 'eval()'",
                     "description": "Executing code via eval() dynamically parses text inputs as active commands, introducing command injection vulnerabilities.",
                     "recommendation": "Use structural serializers, parsers (JSON.parse), or switch to safe arithmetic operators."
+                })
+
+            # Check for pickle deserialization
+            if ("pickle.loads(" in line_str or "pickle.load(" in line_str) and not line_str.startswith("#"):
+                vulnerabilities.append({
+                    "severity": "High",
+                    "line": idx,
+                    "category": "Insecure Deserialization",
+                    "title": "Unsafe pickle deserialization",
+                    "description": "Deserializing untrusted data with pickle allows arbitrary code execution.",
+                    "recommendation": "Use safe serialization formats like JSON (json.loads)."
+                })
+
+            # Check for yaml load without safe loader
+            if "yaml.load(" in line_str and "safeloader" not in line_str.lower() and not line_str.startswith("#"):
+                vulnerabilities.append({
+                    "severity": "High",
+                    "line": idx,
+                    "category": "Insecure Deserialization",
+                    "title": "Unsafe YAML loading",
+                    "description": "yaml.load without SafeLoader allows arbitrary Python object instantiation.",
+                    "recommendation": "Use yaml.safe_load(data) instead."
+                })
+
+            # Check for os.system
+            if "os.system(" in line_str and not line_str.startswith("#"):
+                vulnerabilities.append({
+                    "severity": "High",
+                    "line": idx,
+                    "category": "Command Injection",
+                    "title": "Dangerous usage of 'os.system'",
+                    "description": "Executing arbitrary shell commands via os.system allows command injection.",
+                    "recommendation": "Use subprocess.run with argument vectors and shell=False."
+                })
+
+            # Check for subprocess with shell=True
+            if ("subprocess." in line_str or "popen(" in line_str.lower()) and re.search(r'\bshell\s*=\s*True\b', line_str, re.IGNORECASE) and not line_str.startswith("#"):
+                vulnerabilities.append({
+                    "severity": "High",
+                    "line": idx,
+                    "category": "Command Injection",
+                    "title": "Subprocess execution with shell=True",
+                    "description": "Executing commands via system shell permits malicious command manipulation and input injection.",
+                    "recommendation": "Pass argument vectors as lists and set shell=False."
                 })
 
             # 2. Check for innerHTML (JS/TS specific)
