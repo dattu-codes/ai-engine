@@ -57,26 +57,40 @@ def test_github_oauth_and_webhooks():
         db.commit()
         db.refresh(proj)
         
-        webhook_payload = {
-            "ref": "refs/heads/main",
-            "head_commit": {
-                "id": "commit_sha_12345",
-                "message": "Update code"
-            },
-            "repository": {
-                "clone_url": "https://github.com/insights_tester/ai-engine-demo"
-            }
-        }
+        import hmac, hashlib
+        from app.config import settings
+        original_secret = settings.GITHUB_WEBHOOK_SECRET
+        settings.GITHUB_WEBHOOK_SECRET = "test_saas_webhook_secret"
         
-        webhook_resp = client.post(
-            "/projects/github/webhook",
-            json=webhook_payload,
-            headers={"X-GitHub-Event": "push"}
-        )
-        assert webhook_resp.status_code == 200
-        wb_data = webhook_resp.json()
-        assert wb_data["status"] == "triggered"
-        assert wb_data["project_id"] == proj.id
+        try:
+            webhook_payload = {
+                "ref": "refs/heads/main",
+                "head_commit": {
+                    "id": "commit_sha_12345",
+                    "message": "Update code"
+                },
+                "repository": {
+                    "clone_url": "https://github.com/insights_tester/ai-engine-demo"
+                }
+            }
+            raw_payload = json.dumps(webhook_payload).encode("utf-8")
+            sig = hmac.new(b"test_saas_webhook_secret", raw_payload, hashlib.sha256).hexdigest()
+            
+            webhook_resp = client.post(
+                "/projects/github/webhook",
+                content=raw_payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-GitHub-Event": "push",
+                    "X-Hub-Signature-256": f"sha256={sig}"
+                }
+            )
+            assert webhook_resp.status_code == 200
+            wb_data = webhook_resp.json()
+            assert wb_data["status"] == "triggered"
+            assert wb_data["project_id"] == proj.id
+        finally:
+            settings.GITHUB_WEBHOOK_SECRET = original_secret
         
         print("[OK] Test 1 Passed successfully!")
     finally:

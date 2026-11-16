@@ -13,18 +13,35 @@ from app.config import settings
 router = APIRouter(prefix="/projects/github", tags=["GitHub Webhooks"])
 
 def verify_webhook_signature(payload: bytes, signature: Optional[str]) -> bool:
-    """Verifies that the webhook payload is sent by GitHub using the shared secret."""
-    if not settings.GITHUB_WEBHOOK_SECRET:
-        return True
-    if not signature or "=" not in signature:
-        return False
-    
-    sha_name, sig_value = signature.split('=', 1)
-    if sha_name != 'sha256':
+    """
+    Verifies that the webhook payload is sent by GitHub using the shared secret.
+    Fails closed if GITHUB_WEBHOOK_SECRET is empty/missing.
+    Handles malformed signature headers safely without crashing.
+    """
+    secret = (getattr(settings, "GITHUB_WEBHOOK_SECRET", None) or "").strip()
+    if not secret:
+        # Fail closed: reject requests if secret is empty or unconfigured
         return False
         
-    mac = hmac.new(settings.GITHUB_WEBHOOK_SECRET.encode('utf-8'), msg=payload, digestmod=hashlib.sha256)
-    return hmac.compare_digest(mac.hexdigest(), sig_value)
+    if not signature or not isinstance(signature, str):
+        return False
+    
+    try:
+        if "=" not in signature:
+            return False
+            
+        sha_name, sig_value = signature.split('=', 1)
+        if sha_name.lower().strip() != 'sha256':
+            return False
+            
+        sig_value = sig_value.strip()
+        if not sig_value:
+            return False
+            
+        mac = hmac.new(secret.encode('utf-8'), msg=payload, digestmod=hashlib.sha256)
+        return hmac.compare_digest(mac.hexdigest(), sig_value)
+    except Exception:
+        return False
 
 @router.post("/webhook")
 async def github_webhook(
@@ -38,10 +55,16 @@ async def github_webhook(
     if not verify_webhook_signature(payload_bytes, x_hub_signature_256):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid signature"
+            detail="Invalid signature or webhook secret not configured"
         )
         
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Malformed JSON payload"
+        )
     event_type = request.headers.get("X-GitHub-Event", "push")
     
     # 1. Inspect repository url from payload

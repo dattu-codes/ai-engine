@@ -16,6 +16,7 @@ from app.engine.runner import Runner
 from app.auth.database.connection import Base, engine
 from app.auth.routes.auth_routes import auth_router
 from app.auth.dependencies import get_current_user
+from app.auth.models.auth_models import User
 
 from app.projects.routes.project_routes import project_router
 from app.projects.routes.analysis_routes import analysis_router
@@ -139,7 +140,10 @@ async def get_static_file(file_path: str):
     raise HTTPException(status_code=404, detail="File not found")
 
 @app.post("/graph/create")
-async def create_graph(req: CreateGraphRequest):
+async def create_graph(
+    req: CreateGraphRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Create a graph from a preset or a provided definition.
     """
@@ -155,7 +159,10 @@ async def create_graph(req: CreateGraphRequest):
 
 
 @app.post("/graph/run")
-async def run_graph(req: RunGraphRequest):
+async def run_graph(
+    req: RunGraphRequest,
+    current_user: User = Depends(get_current_user)
+):
     """
     Start a run and schedule it asynchronously.
     """
@@ -172,7 +179,10 @@ async def run_graph(req: RunGraphRequest):
 
 
 @app.get("/graph/state/{run_id}")
-async def get_state(run_id: str):
+async def get_state(
+    run_id: str,
+    current_user: User = Depends(get_current_user)
+):
     """
     Get the state of a workflow run.
     """
