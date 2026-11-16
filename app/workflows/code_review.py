@@ -211,7 +211,7 @@ async def suggest_improvements(state):
         state["remaining"] = verification["remaining"]
         state["syntax_ok"] = verification["syntax_ok"]
         state["summary"] = verification["summary"]
-        
+            
         log["action"] = "Workflow complete. Re-scan completed."
         log["message"] = verification["summary"]
         log["improvements"] = state.get("improvements") or []

@@ -1,4 +1,4 @@
-﻿import uuid
+import uuid
 from typing import Dict
 from app.engine.graph import Graph
 
@@ -19,10 +19,11 @@ class RunStore:
     def __init__(self):
         self._runs = {}
 
-    def create_run(self, graph_id: str, initial_state: dict) -> str:
+    def create_run(self, graph_id: str, initial_state: dict, user_id=None) -> str:
         run_id = str(uuid.uuid4())
         self._runs[run_id] = {
             "graph_id": graph_id,
+            "user_id": user_id,
             "state": dict(initial_state),
             "logs": [],
             "status": "pending"

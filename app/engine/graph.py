@@ -1,4 +1,12 @@
-﻿from typing import Dict, Callable, Optional
+from typing import Dict, Callable, Optional, Set
+
+ALLOWED_NODE_TYPES: Set[str] = {
+    "extract",
+    "complexity",
+    "detect",
+    "suggest_improvements",
+    "stub"
+}
 
 class Node:
     def __init__(self, name: str, fn: Callable):
@@ -14,11 +22,25 @@ class Graph:
     @classmethod
     def from_dict(cls, d: dict):
         """
-        Create a simple graph with stub nodes. Useful for custom graph_def in requests.
-        Nodes created here are placeholders and return a trivial log.
+        Create a graph with nodes restricted strictly to the built-in allowlist.
+        Rejects arbitrary callables or unknown node types.
         """
+        raw_nodes = d.get("nodes", {})
+        if not isinstance(raw_nodes, (dict, list)):
+            raise ValueError("nodes must be a dict or list")
+            
+        node_names = list(raw_nodes.keys()) if isinstance(raw_nodes, dict) else list(raw_nodes)
+        for name in node_names:
+            node_type = name
+            if isinstance(raw_nodes, dict) and isinstance(raw_nodes[name], dict):
+                node_type = raw_nodes[name].get("type", name)
+            if node_type not in ALLOWED_NODE_TYPES:
+                raise ValueError(f"Unknown node type '{node_type}'. Allowed node types: {sorted(list(ALLOWED_NODE_TYPES))}")
+
         nodes = {name: Node(name, lambda state, _name=name: (state, {"node": _name, "info": "stub"}))
-                 for name in d.get("nodes", {})}
+                 for name in node_names}
         edges = d.get("edges", {})
         start = d.get("start")
+        if start and start not in nodes:
+            raise ValueError(f"Start node '{start}' not defined in nodes")
         return cls(nodes, edges, start)

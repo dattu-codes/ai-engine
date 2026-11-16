@@ -146,11 +146,18 @@ async def create_graph(
 ):
     """
     Create a graph from a preset or a provided definition.
+    Only presets and node types from fixed built-in allowlists are accepted.
     """
-    if req.preset == "code_review":
+    allowed_presets = {"code_review"}
+    if req.preset:
+        if req.preset not in allowed_presets:
+            raise HTTPException(status_code=400, detail=f"Invalid preset '{req.preset}'. Allowed presets: {list(allowed_presets)}")
         graph = build_code_review_graph()
     elif req.graph_def:
-        graph = Graph.from_dict(req.graph_def)
+        try:
+            graph = Graph.from_dict(req.graph_def)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     else:
         raise HTTPException(status_code=400, detail="provide preset or graph_def")
 
@@ -164,13 +171,13 @@ async def run_graph(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Start a run and schedule it asynchronously.
+    Start a run and schedule it asynchronously. Stores current_user id as run owner.
     """
     graph = graph_store.get_graph(req.graph_id)
     if graph is None:
         raise HTTPException(status_code=404, detail="graph not found")
 
-    run_id = run_store.create_run(req.graph_id, req.initial_state)
+    run_id = run_store.create_run(req.graph_id, req.initial_state, user_id=current_user.id)
 
     # Schedule async execution
     asyncio.create_task(runner.run(run_id))
@@ -184,10 +191,10 @@ async def get_state(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Get the state of a workflow run.
+    Get the state of a workflow run. Returns 404 if run not found or belongs to another user.
     """
     run = run_store.get_run(run_id)
-    if run is None:
+    if run is None or (run.get("user_id") is not None and run.get("user_id") != current_user.id):
         raise HTTPException(status_code=404, detail="run not found")
 
     return {
