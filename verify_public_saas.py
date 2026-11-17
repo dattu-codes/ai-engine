@@ -25,33 +25,33 @@ def test_github_oauth_and_webhooks():
     print("Running Test 1: GitHub OAuth & Webhooks...")
     db = SessionLocal()
     try:
-        # 1. Login redirect
-        login_resp = client.get("/auth/github/login?mock=true", follow_redirects=False)
-        assert login_resp.status_code == 307
-        assert "auth/github/callback" in login_resp.headers["location"]
+        # 1. Login fails closed when OAuth is unconfigured
+        orig_cid = settings.GITHUB_CLIENT_ID
+        settings.GITHUB_CLIENT_ID = ""
+        try:
+            login_resp = client.get("/auth/github/login", follow_redirects=False)
+            assert login_resp.status_code == 503
+        finally:
+            settings.GITHUB_CLIENT_ID = orig_cid
         
-        # 2. Callback code exchange
-        callback_resp = client.get("/auth/github/callback?code=mock_oauth_code", follow_redirects=False)
-        assert callback_resp.status_code == 307
-        redirect_url = callback_resp.headers["location"]
-        assert "access_token=" in redirect_url
-        assert "mock_github_user" in redirect_url
+        # 2. Callback rejects missing state/code
+        cb_resp = client.get("/auth/github/callback?code=test", follow_redirects=False)
+        assert cb_resp.status_code == 400
         
-        # Get tokens from redirected URL fragment
-        url_hash = redirect_url.split("#")[1]
-        params = dict(x.split("=") for x in url_hash.split("&"))
-        access_token = params["access_token"]
-        
-        # 3. Retrieve repositories
-        repos_resp = client.get("/auth/github/repositories", headers={"Authorization": f"Bearer {access_token}"})
-        assert repos_resp.status_code == 200
-        repos = repos_resp.json()
-        assert len(repos) > 0
-        assert repos[0]["name"] == "ai-engine-demo"
+        # 3. Create test user and auth token for webhook tests
+        user = User(
+            username="saas_test_user",
+            hashed_password=AuthService.hash_password("Pass123!"),
+            role="developer",
+            is_active=True,
+            is_verified=True
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        access_token, _, _, _ = AuthService.create_jwt_pair(user.id, user.role)
         
         # 4. Trigger push webhook
-        # Create project first
-        user = db.query(User).filter(User.username == "mock_github_user").first()
         proj = Project(name="Test Webhook Proj", repo_url="https://github.com/insights_tester/ai-engine-demo", user_id=user.id)
         db.add(proj)
         db.commit()

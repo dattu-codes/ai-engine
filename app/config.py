@@ -16,6 +16,7 @@ if os.path.exists(env_path):
 
 # Default deterministic secret for local development / testing
 DEFAULT_DEV_JWT_SECRET = "ai-engine-development-secret-key-32chars-minimum-hs256"
+DEFAULT_DEV_TOKEN_ENCRYPTION_KEY = "WeJ9DI7Ijt8TNFNRnCtH5juEPp5oRjIgfGlpVCWAWFE="
 
 class Settings(BaseModel):
     # Database configurations
@@ -30,6 +31,7 @@ class Settings(BaseModel):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
     RATE_LIMIT_WINDOW_SECONDS: int = Field(default=2)
+    TOKEN_ENCRYPTION_KEY: str = Field(default=DEFAULT_DEV_TOKEN_ENCRYPTION_KEY)
 
     # Integrations & LLM Providers
     GEMINI_API_KEY: str = Field(default="")
@@ -70,6 +72,12 @@ class Settings(BaseModel):
                 raise ValueError("JWT_SECRET must be explicitly set in production environment (minimum 32 characters).")
             jwt_secret = DEFAULT_DEV_JWT_SECRET
 
+        token_encryption_key = os.getenv("TOKEN_ENCRYPTION_KEY")
+        if not token_encryption_key:
+            if env == "production":
+                raise ValueError("TOKEN_ENCRYPTION_KEY must be explicitly set in production environment.")
+            token_encryption_key = DEFAULT_DEV_TOKEN_ENCRYPTION_KEY
+
         return cls(
             DATABASE_URL=os.getenv("DATABASE_URL", "sqlite:///./auth.db"),
             REDIS_URL=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
@@ -78,6 +86,7 @@ class Settings(BaseModel):
             ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")),
             REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
             RATE_LIMIT_WINDOW_SECONDS=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "2")),
+            TOKEN_ENCRYPTION_KEY=token_encryption_key,
             GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", ""),
             OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", ""),
             ANTHROPIC_API_KEY=os.getenv("ANTHROPIC_API_KEY", ""),

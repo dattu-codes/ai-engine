@@ -60,11 +60,22 @@ def run_startup_validation():
         report["status"] = "UNHEALTHY"
 
     # 4. Check JWT configurations
-    from app.config import DEFAULT_DEV_JWT_SECRET
+    from app.config import DEFAULT_DEV_JWT_SECRET, DEFAULT_DEV_TOKEN_ENCRYPTION_KEY
     if settings.APP_ENVIRONMENT == "production":
         if not settings.JWT_SECRET or settings.JWT_SECRET == DEFAULT_DEV_JWT_SECRET or len(settings.JWT_SECRET) < 32:
             report["errors"].append("JWT_SECRET must be an explicit, secure key of at least 32 characters in production.")
             report["status"] = "UNHEALTHY"
+
+        if not settings.TOKEN_ENCRYPTION_KEY or settings.TOKEN_ENCRYPTION_KEY == DEFAULT_DEV_TOKEN_ENCRYPTION_KEY:
+            report["errors"].append("TOKEN_ENCRYPTION_KEY must be explicitly set and not use default in production.")
+            report["status"] = "UNHEALTHY"
+        else:
+            try:
+                from cryptography.fernet import Fernet
+                Fernet(settings.TOKEN_ENCRYPTION_KEY.encode("utf-8"))
+            except Exception as e:
+                report["errors"].append(f"TOKEN_ENCRYPTION_KEY is invalid for Fernet: {str(e)}")
+                report["status"] = "UNHEALTHY"
 
     # Print validation results
     if report["status"] == "READY":

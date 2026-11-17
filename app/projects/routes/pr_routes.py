@@ -95,9 +95,17 @@ async def trigger_pull_request_review(
             owner, repo = extracted_owner, extracted_repo
 
     # 3. Fetch details and files list with patches from GitHub (or mock)
+    token = None
+    if current_user.github_token:
+        from app.auth.services.token_encryption_service import decrypt_token
+        try:
+            token = decrypt_token(current_user.github_token)
+        except Exception:
+            token = None
+
     try:
-        pr_details = GitHubPRService.fetch_pr_details(owner, repo, req.pull_request_number)
-        pr_files = GitHubPRService.fetch_pr_files(owner, repo, req.pull_request_number)
+        pr_details = GitHubPRService.fetch_pr_details(owner, repo, req.pull_request_number, api_key=token)
+        pr_files = GitHubPRService.fetch_pr_files(owner, repo, req.pull_request_number, api_key=token)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -283,9 +291,17 @@ def refresh_pull_request_metadata(
         if is_valid:
             owner, repo = extracted_owner, extracted_repo
 
+    token = None
+    if current_user.github_token:
+        from app.auth.services.token_encryption_service import decrypt_token
+        try:
+            token = decrypt_token(current_user.github_token)
+        except Exception:
+            token = None
+
     try:
-        pr_details = GitHubPRService.fetch_pr_details(owner, repo, pr.github_pr_number)
-        pr_files = GitHubPRService.fetch_pr_files(owner, repo, pr.github_pr_number)
+        pr_details = GitHubPRService.fetch_pr_details(owner, repo, pr.github_pr_number, api_key=token)
+        pr_files = GitHubPRService.fetch_pr_files(owner, repo, pr.github_pr_number, api_key=token)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

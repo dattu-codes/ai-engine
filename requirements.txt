@@ -9,3 +9,4 @@ redis
 psycopg2-binary
 boto3
 httpx
+cryptography>=41.0.0

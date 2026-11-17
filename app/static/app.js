@@ -789,8 +789,41 @@ function initAuth() {
     // Logout Action
     logoutBtn.addEventListener('click', handleLogout);
 
+    // Remove legacy hash tokens if present and clean URL history
+    if (window.location.hash && window.location.hash.includes('access_token')) {
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+
+    // Handle OAuth ?code= exchange (store session like normal login, remove code from URL)
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthCode = urlParams.get('code');
+    if (oauthCode) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+        handleOAuthExchange(oauthCode);
+    }
+
     // Initial session verification
     checkUserSession();
+}
+
+async function handleOAuthExchange(code) {
+    try {
+        const res = await fetch('/auth/github/exchange', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('refresh_token', data.refresh_token);
+            await checkUserSession();
+        } else {
+            showAuthError(data.detail || 'GitHub OAuth sign-in failed.');
+        }
+    } catch (err) {
+        showAuthError('Connection error during GitHub OAuth exchange.');
+    }
 }
 
 function clearAuthError() {

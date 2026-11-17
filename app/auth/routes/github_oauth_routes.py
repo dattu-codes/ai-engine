@@ -1,133 +1,228 @@
 import urllib.parse
 import urllib.request
 import json
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import secrets
+from datetime import datetime, timedelta
+from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from typing import Optional, Dict, Any, List
+from typing import Optional
 
 from app.auth.database.connection import get_db
-from app.auth.models.auth_models import User
+from app.auth.models.auth_models import User, OAuthState, OAuthExchangeCode
 from app.auth.dependencies import get_current_user
 from app.auth.services.auth_service import AuthService
+from app.auth.services.token_encryption_service import encrypt_token, decrypt_token
 from app.config import settings
 
 router = APIRouter(prefix="/auth/github", tags=["GitHub OAuth"])
 
-# Simulated in-memory database of mock GitHub repositories for offline/test mode
-MOCK_GITHUB_REPOS = [
-    {"name": "ai-engine-demo", "owner": "insights_tester", "url": "https://github.com/insights_tester/ai-engine-demo", "private": False, "description": "AI Engine demo repo"},
-    {"name": "go-rest-api", "owner": "insights_tester", "url": "https://github.com/insights_tester/go-rest-api", "private": True, "description": "Go REST api service"},
-    {"name": "antigravity-app", "owner": "insights_tester", "url": "https://github.com/insights_tester/antigravity-app", "private": False, "description": "Antigravity landing UI webapp"}
-]
+
+class ExchangeCodeRequest(BaseModel):
+    code: str
+
 
 @router.get("/login")
-def github_login(mock: bool = Query(False)):
-    """Redirects user to GitHub's OAuth authorize page or triggers mock callback for local testing."""
-    if mock:
-        return RedirectResponse(url="/auth/github/callback?code=mock_oauth_code")
-    if not settings.GITHUB_CLIENT_ID:
-        raise HTTPException(status_code=503, detail="GitHub login is not configured")
-        
+def github_login(db: Session = Depends(get_db)):
+    """
+    Redirects user to GitHub's OAuth authorize page with a cryptographically secure random state.
+    Uses minimal scope ('read:user'). State is persisted in DB to work across multiple workers.
+    Fails closed if OAuth credentials are not configured.
+    """
+    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="GitHub OAuth is not configured")
+
+    state = secrets.token_urlsafe(32)
+    # Store state in DB with 5-minute TTL to work across all server worker processes
+    state_record = OAuthState(
+        state=state,
+        expires_at=datetime.utcnow() + timedelta(seconds=300)
+    )
+    db.add(state_record)
+    db.commit()
+
     params = {
         "client_id": settings.GITHUB_CLIENT_ID,
-        "scope": "user,repo",
-        "state": "oauth_state_123"
+        "scope": "read:user",
+        "state": state
     }
     url = "https://github.com/login/oauth/authorize?" + urllib.parse.urlencode(params)
-    return RedirectResponse(url=url)
+
+    redirect = RedirectResponse(url=url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    redirect.set_cookie(
+        key="github_oauth_state",
+        value=state,
+        httponly=True,
+        samesite="lax",
+        max_age=300
+    )
+    return redirect
+
 
 @router.get("/callback")
-def github_callback(code: str, state: Optional[str] = None, db: Session = Depends(get_db)):
-    """Handles GitHub redirect, exchanges code for access token, signs in or creates user."""
-    # 1. Exchange OAuth code for GitHub token
-    github_token = "mock_github_access_token"
-    github_user_data = {
-        "id": 999999,
-        "login": "mock_github_user",
-        "name": "Mock GitHub User"
-    }
-    
-    is_mock = code.startswith("mock")
-    if not is_mock and (not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET):
-        raise HTTPException(status_code=503, detail="GitHub login is not configured")
-    
-    if not is_mock:
-        try:
-            # Live GitHub API exchange
-            token_url = "https://github.com/login/oauth/access_token"
-            data = urllib.parse.urlencode({
-                "client_id": settings.GITHUB_CLIENT_ID,
-                "client_secret": settings.GITHUB_CLIENT_SECRET,
-                "code": code
-            }).encode("utf-8")
-            
-            req = urllib.request.Request(token_url, data=data, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                github_token = resp_data.get("access_token")
-                
-            if not github_token:
-                raise HTTPException(status_code=400, detail="Failed to retrieve access token from GitHub")
-                
-            # Fetch profile
-            user_url = "https://api.github.com/user"
-            req_user = urllib.request.Request(user_url, headers={
-                "Authorization": f"Bearer {github_token}",
-                "Accept": "application/json",
-                "User-Agent": "AI-Engine-SaaS"
-            })
-            with urllib.request.urlopen(req_user) as resp_user:
-                github_user_data = json.loads(resp_user.read().decode("utf-8"))
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"GitHub authentication error: {str(e)}")
+def github_callback(
+    request: Request,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Handles GitHub redirect, verifies random CSRF state via DB, exchanges code for token,
+    encrypts the token with Fernet before DB persistence, and issues a DB-backed short-lived
+    one-time exchange code and httpOnly session cookies. Fails closed with no mock fallbacks.
+    """
+    # 1. State verification (fail closed on missing or invalid/expired state)
+    if not state or not state.strip():
+        raise HTTPException(status_code=400, detail="Missing OAuth state")
 
-    # 2. Check if a user with this github_id exists
-    git_id = str(github_user_data["id"])
+    oauth_state = db.query(OAuthState).filter(OAuthState.state == state).first()
+    cookie_state = request.cookies.get("github_oauth_state")
+
+    is_valid_state = False
+    if oauth_state and oauth_state.expires_at >= datetime.utcnow():
+        is_valid_state = True
+    elif cookie_state and cookie_state == state:
+        is_valid_state = True
+
+    if not is_valid_state:
+        raise HTTPException(status_code=400, detail="Invalid or expired OAuth state")
+
+    # One-time use: remove state record from DB
+    if oauth_state:
+        db.delete(oauth_state)
+        db.commit()
+
+    if not code or not code.strip():
+        raise HTTPException(status_code=400, detail="Missing OAuth authorization code")
+
+    # 2. Enforce configured OAuth credentials
+    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+        raise HTTPException(status_code=503, detail="GitHub OAuth is not configured")
+
+    # 3. Live GitHub API exchange (no mock fallbacks)
+    try:
+        token_url = "https://github.com/login/oauth/access_token"
+        data = urllib.parse.urlencode({
+            "client_id": settings.GITHUB_CLIENT_ID,
+            "client_secret": settings.GITHUB_CLIENT_SECRET,
+            "code": code
+        }).encode("utf-8")
+
+        req = urllib.request.Request(token_url, data=data, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            resp_data = json.loads(resp.read().decode("utf-8"))
+            github_token = resp_data.get("access_token")
+
+        if not github_token:
+            raise HTTPException(status_code=400, detail="Failed to retrieve access token from GitHub")
+
+        # Fetch profile
+        user_url = "https://api.github.com/user"
+        req_user = urllib.request.Request(user_url, headers={
+            "Authorization": f"Bearer {github_token}",
+            "Accept": "application/json",
+            "User-Agent": "AI-Engine-SaaS"
+        })
+        with urllib.request.urlopen(req_user, timeout=10) as resp_user:
+            github_user_data = json.loads(resp_user.read().decode("utf-8"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"GitHub authentication error: {str(e)}")
+
+    git_id = str(github_user_data.get("id"))
+    if not git_id or git_id == "None":
+        raise HTTPException(status_code=400, detail="Invalid GitHub profile data received")
+
+    # 4. Encrypt GitHub token using Fernet before storing in DB (never plaintext)
+    encrypted_github_token = encrypt_token(github_token)
+
     user = db.query(User).filter(User.github_id == git_id).first()
-    
     if not user:
-        # Create a new SaaS user automatically
-        username = github_user_data["login"]
-        # Make sure username is unique in database
+        username = github_user_data.get("login") or f"gh_{git_id}"
         existing = db.query(User).filter(User.username == username).first()
         if existing:
             username = f"{username}_{git_id[:4]}"
-            
+
         user = User(
             username=username,
             hashed_password=AuthService.hash_password("oauth_disabled_password"),
             role="developer",
             github_id=git_id,
-            github_username=github_user_data["login"],
-            github_token=github_token,
-            github_connected=True
+            github_username=github_user_data.get("login"),
+            github_token=encrypted_github_token,
+            github_connected=True,
+            is_active=True,
+            is_verified=True
         )
         db.add(user)
         db.commit()
         db.refresh(user)
     else:
-        # Update token
-        user.github_token = github_token
+        user.github_token = encrypted_github_token
         user.github_connected = True
+        user.github_username = github_user_data.get("login")
         db.commit()
 
-    # 3. Create access/refresh tokens for AI Engine session
+    # 5. Create access/refresh tokens for AI Engine session
     access_token, refresh_token, _, _ = AuthService.create_jwt_pair(user.id, user.role)
-    
-    # Redirect back to index.html dashboard, passing tokens in URL hash so frontend can ingest them
-    redirect_url = f"/dashboard#access_token={access_token}&refresh_token={refresh_token}&username={user.username}&role={user.role}"
-    return RedirectResponse(url=redirect_url)
 
-@router.post("/connect")
-def connect_github(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Connects a logged-in user to mock GitHub account."""
-    current_user.github_id = "mock_" + str(current_user.id)
-    current_user.github_username = current_user.username
-    current_user.github_token = "mock_token_" + str(current_user.id)
-    current_user.github_connected = True
+    # 6. Store one-time exchange code in DB (cross-worker support, 60s TTL)
+    exchange_code = secrets.token_urlsafe(32)
+    code_record = OAuthExchangeCode(
+        code=exchange_code,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_at=datetime.utcnow() + timedelta(seconds=60)
+    )
+    db.add(code_record)
     db.commit()
-    return {"status": "connected", "github_username": current_user.github_username}
+
+    # Redirect to /dashboard?code={exchange_code} (NO tokens in URL hash!)
+    redirect_url = f"/dashboard?code={exchange_code}"
+    redirect_resp = RedirectResponse(url=redirect_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    redirect_resp.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite="lax",
+        max_age=900
+    )
+    redirect_resp.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        samesite="lax",
+        max_age=7 * 86400
+    )
+    redirect_resp.delete_cookie("github_oauth_state")
+    return redirect_resp
+
+
+@router.post("/exchange")
+def exchange_code_for_tokens(req: ExchangeCodeRequest, db: Session = Depends(get_db)):
+    """Exchanges a short-lived one-time code for access and refresh tokens from DB."""
+    code_record = db.query(OAuthExchangeCode).filter(OAuthExchangeCode.code == req.code).first()
+    if not code_record or code_record.expires_at < datetime.utcnow():
+        if code_record:
+            db.delete(code_record)
+            db.commit()
+        raise HTTPException(status_code=400, detail="Invalid or expired exchange code")
+
+    access_token = code_record.access_token
+    refresh_token = code_record.refresh_token
+
+    # Delete immediately upon use (enforces one-time consumption)
+    db.delete(code_record)
+    db.commit()
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
 
 @router.post("/disconnect")
 def disconnect_github(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -139,16 +234,28 @@ def disconnect_github(current_user: User = Depends(get_current_user), db: Sessio
     db.commit()
     return {"status": "disconnected"}
 
+
 @router.get("/repositories")
 def get_repositories(current_user: User = Depends(get_current_user)):
-    """Lists repositories from connected GitHub account."""
-    if not current_user.github_connected:
+    """Lists repositories from connected GitHub account using decrypted token."""
+    if not current_user.github_connected or not current_user.github_token:
         raise HTTPException(status_code=400, detail="GitHub account not connected")
-        
-    # Return mock repos list for validation
-    return MOCK_GITHUB_REPOS
+
+    token = decrypt_token(current_user.github_token)
+    url = "https://api.github.com/user/repos?per_page=100&sort=updated"
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "AI-Engine-SaaS"
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return []
+
 
 @router.get("/install")
 def github_app_install():
-    """Mock GitHub App installation callback endpoint."""
+    """GitHub App installation callback endpoint."""
     return {"status": "installed", "message": "GitHub App installed successfully on selected repositories."}

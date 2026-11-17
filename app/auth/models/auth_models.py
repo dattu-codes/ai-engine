@@ -121,3 +121,23 @@ class ApiKey(Base):
 
     user = relationship("User", back_populates="api_keys")
 
+
+class OAuthState(Base):
+    __tablename__ = "oauth_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    state = Column(String(255), unique=True, index=True, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class OAuthExchangeCode(Base):
+    __tablename__ = "oauth_exchange_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(255), unique=True, index=True, nullable=False)
+    access_token = Column(String(1024), nullable=False)
+    refresh_token = Column(String(1024), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
