@@ -14,10 +14,6 @@ if os.path.exists(env_path):
                 key, val = line.split("=", 1)
                 os.environ[key.strip()] = val.strip()
 
-# Default deterministic secret for local development / testing
-DEFAULT_DEV_JWT_SECRET = "ai-engine-development-secret-key-32chars-minimum-hs256"
-DEFAULT_DEV_TOKEN_ENCRYPTION_KEY = "WeJ9DI7Ijt8TNFNRnCtH5juEPp5oRjIgfGlpVCWAWFE="
-
 class Settings(BaseModel):
     # Database configurations
     DATABASE_URL: str = Field(default="sqlite:///./auth.db")
@@ -26,12 +22,15 @@ class Settings(BaseModel):
     REDIS_URL: str = Field(default="redis://localhost:6379/0")
 
     # Security & Auth configurations
-    JWT_SECRET: str = Field(default=DEFAULT_DEV_JWT_SECRET)
+    JWT_SECRET: str = Field(default="")
     JWT_ALGORITHM: str = Field(default="HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)
-    RATE_LIMIT_WINDOW_SECONDS: int = Field(default=2)
-    TOKEN_ENCRYPTION_KEY: str = Field(default=DEFAULT_DEV_TOKEN_ENCRYPTION_KEY)
+    RATE_LIMIT_WINDOW_SECONDS: int = Field(default=60)
+    TOKEN_ENCRYPTION_KEY: str = Field(default="")
+
+    # CORS configuration
+    ALLOWED_ORIGINS: str = Field(default="http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000")
 
     # Integrations & LLM Providers
     GEMINI_API_KEY: str = Field(default="")
@@ -62,21 +61,29 @@ class Settings(BaseModel):
     LOG_LEVEL: str = Field(default="INFO")
     APP_ENVIRONMENT: str = Field(default="development")  # development, testing, production
 
+    def get_cors_origins(self):
+        """Returns list of allowed origins. Strips wildcard '*' if present to maintain secure credentials mode."""
+        origins = [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+        clean = [o for o in origins if o != "*"]
+        return clean or ["http://localhost:8000", "http://127.0.0.1:8000"]
+
     @classmethod
     def load_from_env(cls):
         env = os.getenv("APP_ENVIRONMENT", "development")
         jwt_secret = os.getenv("JWT_SECRET")
 
-        if not jwt_secret:
+        if not jwt_secret or len(jwt_secret.strip()) < 32:
             if env == "production":
                 raise ValueError("JWT_SECRET must be explicitly set in production environment (minimum 32 characters).")
-            jwt_secret = DEFAULT_DEV_JWT_SECRET
+            jwt_secret = "dev-insecure-jwt-secret-key-for-local-testing-only-32chars"
 
         token_encryption_key = os.getenv("TOKEN_ENCRYPTION_KEY")
         if not token_encryption_key:
             if env == "production":
                 raise ValueError("TOKEN_ENCRYPTION_KEY must be explicitly set in production environment.")
-            token_encryption_key = DEFAULT_DEV_TOKEN_ENCRYPTION_KEY
+            # Dynamically generated in memory only when ENV=development or testing
+            from cryptography.fernet import Fernet
+            token_encryption_key = Fernet.generate_key().decode("utf-8")
 
         return cls(
             DATABASE_URL=os.getenv("DATABASE_URL", "sqlite:///./auth.db"),
@@ -85,8 +92,9 @@ class Settings(BaseModel):
             JWT_ALGORITHM=os.getenv("JWT_ALGORITHM", "HS256"),
             ACCESS_TOKEN_EXPIRE_MINUTES=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15")),
             REFRESH_TOKEN_EXPIRE_DAYS=int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7")),
-            RATE_LIMIT_WINDOW_SECONDS=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "2")),
+            RATE_LIMIT_WINDOW_SECONDS=int(os.getenv("RATE_LIMIT_WINDOW_SECONDS", "60")),
             TOKEN_ENCRYPTION_KEY=token_encryption_key,
+            ALLOWED_ORIGINS=os.getenv("ALLOWED_ORIGINS", "http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000"),
             GEMINI_API_KEY=os.getenv("GEMINI_API_KEY", ""),
             OPENAI_API_KEY=os.getenv("OPENAI_API_KEY", ""),
             ANTHROPIC_API_KEY=os.getenv("ANTHROPIC_API_KEY", ""),

@@ -18,10 +18,17 @@ def encrypt_token(plain_token: Optional[str]) -> Optional[str]:
     encrypted = f.encrypt(plain_token.encode("utf-8"))
     return encrypted.decode("utf-8")
 
+class GitHubTokenDecryptionError(Exception):
+    """Raised when decrypting a stored GitHub token fails (e.g. invalid key, corrupted data, or unencrypted plaintext)."""
+    pass
+
 def decrypt_token(encrypted_token: Optional[str]) -> Optional[str]:
-    """Decrypt a Fernet-encrypted token string. Returns original plaintext."""
+    """Decrypt a Fernet-encrypted token string. Raises GitHubTokenDecryptionError on failure."""
     if not encrypted_token:
         return None
-    f = get_fernet()
-    decrypted = f.decrypt(encrypted_token.encode("utf-8"))
-    return decrypted.decode("utf-8")
+    try:
+        f = get_fernet()
+        decrypted = f.decrypt(encrypted_token.encode("utf-8"))
+        return decrypted.decode("utf-8")
+    except Exception as e:
+        raise GitHubTokenDecryptionError("Unable to decrypt GitHub token. Please reconnect your GitHub account.") from e

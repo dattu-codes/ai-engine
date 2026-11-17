@@ -43,6 +43,7 @@ from app.projects.models.project_models import Project, Analysis, AnalysisFile, 
 
 # Run production diagnostics and environment validation checks on startup
 from app.startup_validator import run_startup_validation
+from app.config import settings
 run_startup_validation()
 
 # Create database tables automatically on startup
@@ -56,12 +57,13 @@ def on_startup():
     from app.projects.services.worker_service import start_worker
     start_worker()
 
-# Add CORS Middleware
+# Add CORS Middleware with explicit origins from settings (never "*" with credentials)
+cors_origins = settings.get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
 )
 

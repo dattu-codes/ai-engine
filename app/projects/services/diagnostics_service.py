@@ -70,11 +70,11 @@ class DiagnosticsService:
             report["status"] = "FAIL"
 
         # 4. Critical Security & Key Checks
-        if settings.JWT_SECRET == "47a329ef3118cf94a0d923bc650630ba5239a04a5cf2b07e5cba4839de848aef":
-            report["warnings"].append("JWT_SECRET is set to the default development value.")
+        if not settings.JWT_SECRET or len(settings.JWT_SECRET.strip()) < 32:
+            report["warnings"].append("JWT_SECRET is missing or shorter than 32 characters.")
             if settings.APP_ENVIRONMENT == "production":
                 report["status"] = "FAIL"
-                report["recommendations"].append("Configure a secure, high-entropy JWT_SECRET in production.")
+                report["recommendations"].append("Configure a secure, high-entropy JWT_SECRET of at least 32 characters in production.")
                 
         if not settings.GEMINI_API_KEY:
             report["warnings"].append("GEMINI_API_KEY is empty. The application will fall back to offline simulator mode.")

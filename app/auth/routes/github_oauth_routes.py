@@ -13,7 +13,7 @@ from app.auth.database.connection import get_db
 from app.auth.models.auth_models import User, OAuthState, OAuthExchangeCode
 from app.auth.dependencies import get_current_user
 from app.auth.services.auth_service import AuthService
-from app.auth.services.token_encryption_service import encrypt_token, decrypt_token
+from app.auth.services.token_encryption_service import encrypt_token, decrypt_token, GitHubTokenDecryptionError
 from app.config import settings
 
 router = APIRouter(prefix="/auth/github", tags=["GitHub OAuth"])
@@ -241,7 +241,14 @@ def get_repositories(current_user: User = Depends(get_current_user)):
     if not current_user.github_connected or not current_user.github_token:
         raise HTTPException(status_code=400, detail="GitHub account not connected")
 
-    token = decrypt_token(current_user.github_token)
+    try:
+        token = decrypt_token(current_user.github_token)
+    except GitHubTokenDecryptionError:
+        raise HTTPException(
+            status_code=400,
+            detail="Stored GitHub token is invalid or unencrypted. Please reconnect your GitHub account."
+        )
+
     url = "https://api.github.com/user/repos?per_page=100&sort=updated"
     req = urllib.request.Request(url, headers={
         "Authorization": f"Bearer {token}",

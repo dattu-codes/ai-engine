@@ -1,3 +1,4 @@
+import os
 import urllib.parse
 import secrets
 from datetime import datetime, timedelta
@@ -202,3 +203,65 @@ def test_startup_fails_in_production_if_token_encryption_key_missing():
         settings.APP_ENVIRONMENT = orig_env
         settings.TOKEN_ENCRYPTION_KEY = orig_key
         settings.JWT_SECRET = orig_jwt
+
+
+def test_dev_fernet_key_dynamically_generated_and_not_hardcoded_default():
+    """Verify that in development mode, when TOKEN_ENCRYPTION_KEY is unset, a dynamic key is generated rather than hardcoded."""
+    from app.config import Settings
+    orig_env = os.environ.get("APP_ENVIRONMENT")
+    orig_key = os.environ.get("TOKEN_ENCRYPTION_KEY")
+
+    os.environ["APP_ENVIRONMENT"] = "development"
+    if "TOKEN_ENCRYPTION_KEY" in os.environ:
+        del os.environ["TOKEN_ENCRYPTION_KEY"]
+
+    try:
+        s1 = Settings.load_from_env()
+        s2 = Settings.load_from_env()
+
+        # Both keys must be valid Fernet keys
+        assert len(s1.TOKEN_ENCRYPTION_KEY) == 44
+        assert len(s2.TOKEN_ENCRYPTION_KEY) == 44
+
+        # They are generated dynamically on demand, not a shared static hardcoded default
+        assert s1.TOKEN_ENCRYPTION_KEY != s2.TOKEN_ENCRYPTION_KEY
+    finally:
+        if orig_env is not None:
+            os.environ["APP_ENVIRONMENT"] = orig_env
+        else:
+            os.environ.pop("APP_ENVIRONMENT", None)
+        if orig_key is not None:
+            os.environ["TOKEN_ENCRYPTION_KEY"] = orig_key
+        else:
+            os.environ.pop("TOKEN_ENCRYPTION_KEY", None)
+
+
+def test_decrypt_failure_on_old_plaintext_token_returns_reconnect_github_not_500(db_session):
+    """Verify that attempting to decrypt an old, corrupted or plaintext token returns 400 with 'reconnect GitHub' and never crashes with 500."""
+    legacy_username = f"legacy_gh_{secrets.token_hex(4)}"
+    user = User(
+        username=legacy_username,
+        hashed_password=AuthService.hash_password("Pass123!"),
+        role="developer",
+        github_id="gh_legacy_123",
+        github_username="legacy_user",
+        github_token="ghp_plaintext_old_token_not_fernet_encrypted",
+        github_connected=True,
+        is_active=True,
+        is_verified=True
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+
+    try:
+        access_token, _, _, _ = AuthService.create_jwt_pair(user.id, user.role)
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        resp = client.get("/auth/github/repositories", headers=headers)
+        # MUST NOT BE 500!
+        assert resp.status_code == 400, f"Expected 400 for legacy plaintext token, got {resp.status_code}"
+        assert "reconnect your github account" in resp.json()["detail"].lower()
+    finally:
+        db_session.delete(user)
+        db_session.commit()
