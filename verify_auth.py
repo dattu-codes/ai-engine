@@ -67,20 +67,21 @@ def run_tests():
 
     # --- 2. Rate Limiting / Lockout Check ---
     print("2. Testing Rate Limiting & Account Lock...")
-    # Attempt 5 failed logins for user
+    rl_uname = f"rl_user_{timestamp}"
+    # Attempt 5 failed logins for test user
     for i in range(5):
         status, res = make_request("POST", "/auth/login", {
-            "username": user_uname,
+            "username": rl_uname,
             "password": "wrong_password"
         })
         assert status == 401, f"Expected 401, got {status}"
 
     # The 6th attempt within the same minute should be blocked by rate limiter (429)
     status, res = make_request("POST", "/auth/login", {
-        "username": user_uname,
+        "username": rl_uname,
         "password": "wrong_password"
     })
-    assert status == 429 or status == 401, f"Expected 429 (or 401 lockout), got {status}: {res}"
+    assert status == 429, f"Expected 429 lockout, got {status}: {res}"
     print("   [PASS] Rate limiter/Failed attempts successfully tracked.")
     print()
 

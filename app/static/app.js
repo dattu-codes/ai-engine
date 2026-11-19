@@ -1128,8 +1128,8 @@ async function fetchDeploymentMetrics() {
         const metricsRes = await fetch('/metrics', { headers });
         let metricsData = {
             projects: 0, analyses: 0, fixes: 0, tests: 0,
-            queue_size: 0, active_workers: 1, average_processing_time: 4.5,
-            failure_rate: '0.0%', cache_hits: 0, cache_misses: 0
+            queue_size: 0, active_workers: 1, average_processing_time: null,
+            failure_rate: 'N/A', cache_hits: 0, cache_misses: 0
         };
         if (metricsRes.ok) {
             metricsData = await metricsRes.json();
@@ -1159,10 +1159,21 @@ async function fetchDeploymentMetrics() {
         
         const redisStatus = document.getElementById('metrics-redis-status');
         const redisInfo = document.getElementById('metrics-redis-info');
-        const isRedisOffline = healthData.redis.includes('Unhealthy');
-        redisStatus.textContent = isRedisOffline ? 'OFFLINE' : 'CONNECTED';
-        redisStatus.style.color = isRedisOffline ? 'var(--accent-red)' : 'var(--accent-green)';
-        redisInfo.textContent = isRedisOffline ? 'Offline Fallback' : 'Active Connection Cache';
+        const isRedisDegraded = healthData.redis === 'Degraded' || (typeof healthData.redis === 'string' && healthData.redis.toLowerCase().includes('degraded'));
+        const isRedisOffline = !isRedisDegraded && (healthData.redis.includes('Unhealthy') || healthData.redis.includes('Offline'));
+        if (isRedisDegraded) {
+            redisStatus.textContent = 'DEGRADED';
+            redisStatus.style.color = 'var(--accent-orange, #f59e0b)';
+            redisInfo.textContent = 'In-Memory Fallback';
+        } else if (isRedisOffline) {
+            redisStatus.textContent = 'OFFLINE';
+            redisStatus.style.color = 'var(--accent-red)';
+            redisInfo.textContent = 'Offline Fallback';
+        } else {
+            redisStatus.textContent = 'CONNECTED';
+            redisStatus.style.color = 'var(--accent-green)';
+            redisInfo.textContent = 'Active Connection Cache';
+        }
         
         const storageStatus = document.getElementById('metrics-storage-status');
         const storageProvider = document.getElementById('metrics-storage-provider');
@@ -1173,8 +1184,9 @@ async function fetchDeploymentMetrics() {
         
         document.getElementById('metrics-active-workers').textContent = metricsData.active_workers;
         document.getElementById('queue-pending-count').textContent = metricsData.queue_size;
-        document.getElementById('queue-failure-rate').textContent = metricsData.failure_rate;
-        document.getElementById('queue-avg-latency').textContent = `${metricsData.average_processing_time}s`;
+        document.getElementById('queue-failure-rate').textContent = (metricsData.failure_rate !== undefined && metricsData.failure_rate !== null) ? metricsData.failure_rate : 'N/A';
+        const avgProcessingTime = metricsData.average_processing_time;
+        document.getElementById('queue-avg-latency').textContent = (avgProcessingTime !== null && avgProcessingTime !== undefined && avgProcessingTime !== 'N/A') ? `${avgProcessingTime}s` : 'N/A';
         
         document.getElementById('metric-total-projects').textContent = metricsData.projects;
         document.getElementById('metric-total-analyses').textContent = metricsData.analyses;

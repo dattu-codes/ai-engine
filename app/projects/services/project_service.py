@@ -7,7 +7,12 @@ from fastapi import HTTPException, status
 
 from app.projects.models.project_models import Project, Analysis, AnalysisFile, Report, WorkspaceMember
 from app.projects.repositories.project_repository import ProjectRepository
-from app.projects.services.zip_processor import ZipProcessor
+from app.projects.services.zip_processor import (
+    ZipProcessor,
+    ZipUploadTooLargeError,
+    ZipBombDetectedError,
+    ZipFileCountLimitError,
+)
 from app.projects.services.git_service import GitService
 from app.projects.services.permission_service import PermissionService
 from app.projects.services.activity_service import ActivityService
@@ -253,6 +258,10 @@ class ProjectService:
 
         try:
             files = ZipProcessor.process_zip(zip_bytes)
+        except ZipUploadTooLargeError as e:
+            raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e))
+        except (ZipBombDetectedError, ZipFileCountLimitError) as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -461,6 +470,19 @@ class ProjectService:
                 status_code=status.HTTP_400_BAD_REQUEST, 
                 detail="Project is not linked to a GitHub repository."
             )
+
+        # Fast path: check remote HEAD SHA via ls-remote before doing an expensive full clone
+        remote_sha = GitService.get_remote_head_sha(project.repo_url)
+        if remote_sha and project.last_commit_sha == remote_sha:
+            project.last_sync_time = datetime.utcnow()
+            db.commit()
+            db.refresh(project)
+            return {
+                "status": "up_to_date",
+                "message": "Repository is already up to date.",
+                "last_commit_sha": project.last_commit_sha,
+                "last_sync_time": project.last_sync_time.isoformat() if project.last_sync_time else None
+            }
 
         try:
             metadata, files = GitService.clone_and_parse_repository(project.repo_url)

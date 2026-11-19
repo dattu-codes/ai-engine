@@ -1,5 +1,6 @@
 import re
 import os
+import time
 import shutil
 import stat
 import subprocess
@@ -11,6 +12,9 @@ from app.projects.services.zip_processor import ZipProcessor
 GITHUB_URL_PATTERN = re.compile(
     r'^https?://(?:www\.)?github\.com/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_.-]+?)(?:\.git)?/?$'
 )
+
+_repo_accessibility_cache: Dict[str, Tuple[bool, float]] = {}
+CACHE_TTL_SECONDS = 300
 
 def remove_readonly(func, path, excinfo):
     """
@@ -34,64 +38,93 @@ class GitService:
         return True, match.group(1), match.group(2)
 
     @staticmethod
-    def is_public_repo(repo_url: str) -> bool:
+    def _get_git_base_cmd() -> List[str]:
+        cmd = ["git", "-c", "credential.helper="]
+        try:
+            import certifi
+            ca_path = certifi.where()
+            if os.path.exists(ca_path):
+                cmd.extend(["-c", "http.sslBackend=openssl", "-c", f"http.sslCAInfo={ca_path}"])
+        except Exception:
+            pass
+        return cmd
+
+    @classmethod
+    def is_public_repo(cls, repo_url: str) -> bool:
         """
         Checks if the repository is public and accessible.
+        Caches result for CACHE_TTL_SECONDS to avoid redundant remote roundtrips.
         """
-        if "dattu-codes/ai-engine-intern" in repo_url:
-            return True
+        clean_url = repo_url.strip()
+        now = time.time()
+        if clean_url in _repo_accessibility_cache:
+            is_pub, cached_at = _repo_accessibility_cache[clean_url]
+            if now - cached_at < CACHE_TTL_SECONDS:
+                return is_pub
+
         try:
+            env = os.environ.copy()
+            env["GIT_TERMINAL_PROMPT"] = "0"
+            env["GCM_INTERACTIVE"] = "never"
+            cmd = cls._get_git_base_cmd() + ["ls-remote", clean_url, "HEAD"]
             result = subprocess.run(
-                ["git", "ls-remote", repo_url.strip(), "HEAD"],
+                cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=15
+                timeout=60,
+                env=env
             )
-            return result.returncode == 0
+            is_public = (result.returncode == 0)
+            _repo_accessibility_cache[clean_url] = (is_public, now)
+            return is_public
         except Exception:
             return False
 
-    @staticmethod
-    def clone_repository(repo_url: str, dest_dir: str) -> bool:
+    @classmethod
+    def get_remote_head_sha(cls, repo_url: str) -> Optional[str]:
         """
-        Clones the repository at repo_url into dest_dir with --depth 1.
+        Retrieves the latest commit SHA of HEAD from remote repository via git ls-remote without full cloning.
         """
-        if "dattu-codes/ai-engine-intern" in repo_url:
-            try:
-                os.makedirs(dest_dir, exist_ok=True)
-                with open(os.path.join(dest_dir, "main.py"), "w", encoding="utf-8") as f:
-                    f.write("print('Hello from mock clone python')\n")
-                with open(os.path.join(dest_dir, "Engine.java"), "w", encoding="utf-8") as f:
-                    f.write("public class Engine {}\n")
-                with open(os.path.join(dest_dir, "script.js"), "w", encoding="utf-8") as f:
-                    f.write("console.log('Hello from mock clone js');\n")
-                with open(os.path.join(dest_dir, "layout.ts"), "w", encoding="utf-8") as f:
-                    f.write("console.log('Hello from mock clone ts');\n")
-                with open(os.path.join(dest_dir, "README.md"), "w", encoding="utf-8") as f:
-                    f.write("# Mock Repository\n")
-                
-                # Run git init and add a commit inside the destination directory so git rev-parse commands succeed
-                env = os.environ.copy()
-                env["GIT_AUTHOR_DATE"] = "2026-07-20T12:00:00"
-                env["GIT_COMMITTER_DATE"] = "2026-07-20T12:00:00"
-                subprocess.run(["git", "init"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                subprocess.run(["git", "config", "user.email", "tester@antigravity.ai"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                subprocess.run(["git", "config", "user.name", "Tester"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                subprocess.run(["git", "add", "."], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=dest_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-                return True
-            except Exception as e:
-                print(f"Error copying local workspace: {e}")
-                return False
         try:
-            os.makedirs(dest_dir, exist_ok=True)
+            env = os.environ.copy()
+            env["GIT_TERMINAL_PROMPT"] = "0"
+            env["GCM_INTERACTIVE"] = "never"
+            cmd = cls._get_git_base_cmd() + ["ls-remote", repo_url.strip(), "HEAD"]
             result = subprocess.run(
-                ["git", "clone", "--depth", "1", repo_url.strip(), dest_dir],
+                cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                timeout=60
+                timeout=30,
+                env=env
+            )
+            if result.returncode == 0 and result.stdout:
+                parts = result.stdout.strip().split()
+                if parts:
+                    return parts[0]
+            return None
+        except Exception:
+            return None
+
+    @classmethod
+    def clone_repository(cls, repo_url: str, dest_dir: str) -> bool:
+        """
+        Clones the repository at repo_url into dest_dir with --depth 1.
+        """
+        try:
+            os.makedirs(dest_dir, exist_ok=True)
+            env = os.environ.copy()
+            env["GIT_TERMINAL_PROMPT"] = "0"
+            env["GCM_INTERACTIVE"] = "never"
+            cmd = cls._get_git_base_cmd() + ["clone", "--depth", "1", repo_url.strip(), dest_dir]
+            result = subprocess.run(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=120,
+                env=env
             )
             return result.returncode == 0
         except Exception:

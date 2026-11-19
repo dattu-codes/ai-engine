@@ -1,3 +1,4 @@
+import ast
 import json
 from typing import List, Dict, Any
 
@@ -25,12 +26,58 @@ class MockAnalysisSimulator:
             lines = content.splitlines()
             total_lines += len(lines)
 
+            is_python = filename.endswith(".py") or filename == ""
+            if is_python:
+                try:
+                    tree = ast.parse(content)
+                    pickle_aliases = set()
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.ImportFrom) and node.module in ["pickle", "_pickle"]:
+                            for alias in node.names:
+                                if alias.name in ["loads", "load"]:
+                                    pickle_aliases.add(alias.asname or alias.name)
+                    for node in ast.walk(tree):
+                        if isinstance(node, ast.Call):
+                            if isinstance(node.func, ast.Name) and node.func.id == "eval":
+                                line_text = lines[node.lineno - 1] if node.lineno <= len(lines) else "eval(...)"
+                                issues.append({
+                                    "category": "Security",
+                                    "severity": "high",
+                                    "file": filename,
+                                    "line": node.lineno,
+                                    "evidence": line_text.strip(),
+                                    "explanation": "The code uses 'eval()', which allows arbitrary code execution and poses a major security vulnerability.",
+                                    "recommendation": "Avoid using eval(). Parse inputs using structured libraries (such as json.loads) or execute functions dynamically via map tables.",
+                                    "confidence": 0.95
+                                })
+                            is_pickle = False
+                            if isinstance(node.func, ast.Attribute) and node.func.attr in ["loads", "load"]:
+                                if isinstance(node.func.value, ast.Name) and node.func.value.id in ["pickle", "_pickle"]:
+                                    is_pickle = True
+                            elif isinstance(node.func, ast.Name) and node.func.id in pickle_aliases:
+                                is_pickle = True
+
+                            if is_pickle:
+                                line_text = lines[node.lineno - 1] if node.lineno <= len(lines) else "pickle.loads(...)"
+                                issues.append({
+                                    "category": "Security",
+                                    "severity": "high",
+                                    "file": filename,
+                                    "line": node.lineno,
+                                    "evidence": line_text.strip(),
+                                    "explanation": "The code uses pickle deserialization, which allows arbitrary code execution and is vulnerable to untrusted data injection.",
+                                    "recommendation": "Use safe serialization formats like JSON (json.loads) instead of pickle.",
+                                    "confidence": 0.95
+                                })
+                except Exception:
+                    pass
+
             # File-specific scans
             for i, line in enumerate(lines, 1):
                 stripped = line.strip()
 
-                # 1. Eval usage check
-                if "eval(" in line and "literal_eval" not in line and not stripped.startswith("//") and not stripped.startswith("#"):
+                # 1. Eval usage check (non-Python only; Python security detection uses ONLY AST)
+                if not is_python and "eval(" in line and "literal_eval" not in line and not stripped.startswith("//") and not stripped.startswith("#"):
                     issues.append({
                         "category": "Security",
                         "severity": "high",
@@ -42,8 +89,8 @@ class MockAnalysisSimulator:
                         "confidence": 0.95
                     })
 
-                # 2. Pickle deserialization check
-                if ("pickle.loads(" in line or "pickle.load(" in line) and not stripped.startswith("#"):
+                # 2. Pickle deserialization check (non-Python only; Python security detection uses ONLY AST)
+                if not is_python and ("pickle.loads(" in line or "pickle.load(" in line) and not stripped.startswith("#"):
                     issues.append({
                         "category": "Security",
                         "severity": "high",

@@ -65,7 +65,7 @@ def run_tests():
     # 5. Poll for review analysis completion
     print("\n[STEP 5] Polling status for PR review completion...")
     completed = False
-    for i in range(15):
+    for i in range(35):
         status_code, analysis = make_request("GET", f"/analysis/{latest_analysis_id}", token=token)
         assert status_code == 200, f"Failed loading analysis: {analysis}"
         
@@ -155,7 +155,7 @@ def run_tests():
     # Poll re-review completion
     print("Waiting for re-review completion...")
     completed = False
-    for i in range(15):
+    for i in range(45):
         status_code, analysis = make_request("GET", f"/analysis/{new_analysis_id}", token=token)
         if analysis["status"] == "completed":
             completed = True

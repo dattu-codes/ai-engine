@@ -59,7 +59,17 @@ class Settings(BaseModel):
 
     # System parameters
     LOG_LEVEL: str = Field(default="INFO")
-    APP_ENVIRONMENT: str = Field(default="development")  # development, testing, production
+    APP_ENVIRONMENT: str = Field(default="production")  # development, testing, production
+
+    @property
+    def is_development(self) -> bool:
+        """Returns True if the application is running in explicit development mode."""
+        return (self.APP_ENVIRONMENT or "").strip().lower() == "development"
+
+    @property
+    def is_production(self) -> bool:
+        """Treats any environment other than explicit 'development' as production (fail closed)."""
+        return not self.is_development
 
     def get_cors_origins(self):
         """Returns list of allowed origins. Strips wildcard '*' if present to maintain secure credentials mode."""
@@ -69,19 +79,20 @@ class Settings(BaseModel):
 
     @classmethod
     def load_from_env(cls):
-        env = os.getenv("APP_ENVIRONMENT", "development")
+        env = os.getenv("APP_ENVIRONMENT", "production").strip()
+        is_dev = (env.lower() == "development")
         jwt_secret = os.getenv("JWT_SECRET")
 
         if not jwt_secret or len(jwt_secret.strip()) < 32:
-            if env == "production":
+            if not is_dev:
                 raise ValueError("JWT_SECRET must be explicitly set in production environment (minimum 32 characters).")
             jwt_secret = "dev-insecure-jwt-secret-key-for-local-testing-only-32chars"
 
         token_encryption_key = os.getenv("TOKEN_ENCRYPTION_KEY")
         if not token_encryption_key:
-            if env == "production":
+            if not is_dev:
                 raise ValueError("TOKEN_ENCRYPTION_KEY must be explicitly set in production environment.")
-            # Dynamically generated in memory only when ENV=development or testing
+            # Dynamically generated in memory only when ENV=development
             from cryptography.fernet import Fernet
             token_encryption_key = Fernet.generate_key().decode("utf-8")
 

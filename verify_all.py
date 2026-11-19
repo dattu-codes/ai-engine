@@ -26,6 +26,9 @@ TEST_SCRIPTS = [
 ]
 
 def main():
+    if not os.environ.get("APP_ENVIRONMENT"):
+        os.environ["APP_ENVIRONMENT"] = "development"
+
     print("=" * 80)
     print("   AI ENGINE — MASTER INTEGRATION VERIFICATION BATTERY")
     print("=" * 80)

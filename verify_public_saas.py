@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 # Import project setup
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from app.main import app
+from app.config import settings
 from app.auth.database.connection import SessionLocal, Base, engine
 from app.auth.models.auth_models import User, ApiKey, NotificationPreference
 from app.projects.models.project_models import Project, Analysis
@@ -58,7 +59,6 @@ def test_github_oauth_and_webhooks():
         db.refresh(proj)
         
         import hmac, hashlib
-        from app.config import settings
         original_secret = settings.GITHUB_WEBHOOK_SECRET
         settings.GITHUB_WEBHOOK_SECRET = "test_saas_webhook_secret"
         

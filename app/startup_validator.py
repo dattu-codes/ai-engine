@@ -16,6 +16,8 @@ def run_startup_validation():
         "errors": []
     }
     
+    is_prod = settings.APP_ENVIRONMENT.strip().lower() != "development"
+
     # 1. Check Database connection
     try:
         from app.auth.database.connection import engine
@@ -33,18 +35,11 @@ def run_startup_validation():
         r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
         r.ping()
     except ImportError:
-        report["redis"] = "Unhealthy: redis library not installed"
-        if settings.APP_ENVIRONMENT == "production":
-            report["errors"].append("redis python package is missing.")
-            report["status"] = "UNHEALTHY"
+        report["redis"] = "Degraded: redis library not installed (in-memory fallback)"
+        logger.warning("Redis library not installed, background tasks and caching will fallback to in-memory mock.")
     except Exception as e:
-        report["redis"] = f"Unhealthy: {str(e)}"
-        # Warn in dev, but strictly fail in production environment
-        if settings.APP_ENVIRONMENT == "production":
-            report["errors"].append(f"Redis connection failed (Required in production): {str(e)}")
-            report["status"] = "UNHEALTHY"
-        else:
-            logger.warning(f"Redis is offline, background tasks and caching will fallback: {str(e)}")
+        report["redis"] = f"Degraded: {str(e)} (in-memory fallback)"
+        logger.warning(f"Redis is offline, background tasks and caching will fallback: {str(e)}")
 
     # 3. Check upload directory write permissions
     try:
@@ -59,13 +54,16 @@ def run_startup_validation():
         report["errors"].append(f"Upload directory '{settings.UPLOAD_DIRECTORY}' is not writable: {str(e)}")
         report["status"] = "UNHEALTHY"
 
-    # 4. Check JWT and Token Encryption configurations in production
-    if settings.APP_ENVIRONMENT == "production":
+    # 4. Check JWT and Token Encryption configurations in production (Fatal checks)
+    fatal_errors = []
+    if is_prod:
         if not settings.JWT_SECRET or len(settings.JWT_SECRET.strip()) < 32:
+            fatal_errors.append("JWT_SECRET must be an explicit, secure key of at least 32 characters in production.")
             report["errors"].append("JWT_SECRET must be an explicit, secure key of at least 32 characters in production.")
             report["status"] = "UNHEALTHY"
 
         if not settings.TOKEN_ENCRYPTION_KEY or not settings.TOKEN_ENCRYPTION_KEY.strip():
+            fatal_errors.append("TOKEN_ENCRYPTION_KEY must be explicitly set in production.")
             report["errors"].append("TOKEN_ENCRYPTION_KEY must be explicitly set in production.")
             report["status"] = "UNHEALTHY"
         else:
@@ -73,6 +71,7 @@ def run_startup_validation():
                 from cryptography.fernet import Fernet
                 Fernet(settings.TOKEN_ENCRYPTION_KEY.encode("utf-8"))
             except Exception as e:
+                fatal_errors.append(f"TOKEN_ENCRYPTION_KEY is invalid for Fernet: {str(e)}")
                 report["errors"].append(f"TOKEN_ENCRYPTION_KEY is invalid for Fernet: {str(e)}")
                 report["status"] = "UNHEALTHY"
 
@@ -80,10 +79,10 @@ def run_startup_validation():
     if report["status"] == "READY":
         logger.info(f"Startup Readiness Validation succeeded: {report}")
     else:
-        logger.error(f"Startup Readiness Validation failed! Report: {report}")
-        # Only abort start up in production if critical errors occur
-        if settings.APP_ENVIRONMENT == "production" and len(report["errors"]) > 0:
+        logger.error(f"Startup Readiness Validation report: {report}")
+        # Only abort startup in production if fatal security keys are missing/invalid
+        if is_prod and len(fatal_errors) > 0:
             import sys
-            sys.exit(f"Startup Readiness Validation failed: {report['errors']}")
+            sys.exit(f"Startup Readiness Validation failed: {fatal_errors}")
             
     return report

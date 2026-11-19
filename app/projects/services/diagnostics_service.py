@@ -39,7 +39,7 @@ class DiagnosticsService:
             redis_service.client.ping()
             latency = (time.time() - start_time) * 1000  # ms
             report["checks"]["redis"] = {
-                "status": "Healthy",
+                "status": "Degraded" if getattr(redis_service, "is_mock", False) else "Healthy",
                 "latency_ms": f"{latency:.2f}ms",
                 "is_mock_fallback": redis_service.is_mock
             }

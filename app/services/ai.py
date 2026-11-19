@@ -409,26 +409,8 @@ class MockAISimulator:
                         "description": "Uses direct 'print()' statements. Consider using a structured logger for production.",
                         "location": f"Line {i}"
                     })
-            if "eval(" in line and "literal_eval" not in line:
-                key = (i, "security")
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    issues.append({
-                        "type": "security",
-                        "severity": "high",
-                        "description": "Potentially hazardous use of 'eval()'. This allows arbitrary code execution and is a critical security vulnerability.",
-                        "location": f"Line {i}"
-                    })
-            if "pickle.loads(" in line or "pickle.load(" in line:
-                key = (i, "security")
-                if key not in seen_keys:
-                    seen_keys.add(key)
-                    issues.append({
-                        "type": "security",
-                        "severity": "high",
-                        "description": "Unsafe pickle deserialization. Deserializing untrusted data with pickle allows arbitrary code execution.",
-                        "location": f"Line {i}"
-                    })
+            # Note: eval and pickle security detection uses ONLY the AST in Step 1 (PythonASTVisitor)
+            # Text-based scans for eval and pickle are omitted to prevent false positives in strings, comments, and docstrings.
             if "yaml.load(" in line and "safeloader" not in line.lower():
                 key = (i, "security")
                 if key not in seen_keys:

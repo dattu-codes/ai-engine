@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Dict, Any, List
 
 from app.auth.database.connection import get_db
 from app.auth.dependencies import get_current_user
 from app.auth.models.auth_models import User
-from app.projects.models.project_models import Project, Analysis, AnalysisFile
+from app.projects.models.project_models import Project, Analysis, AnalysisFile, ActivityLog
 from app.projects.services.redis_service import redis_service
 
 router = APIRouter(prefix="/admin", tags=["Admin Portal"])
@@ -39,23 +40,32 @@ def get_system_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
     # Storage usage metrics
     total_files = db.query(AnalysisFile).count()
     # Compute size of all stored source files
-    total_storage_bytes = db.query(func.sum(AnalysisFile.size)).scalar() or 0 if hasattr(db.query(AnalysisFile), "sum") else 102400
-    if not isinstance(total_storage_bytes, (int, float)):
-        # Fallback if sum return is not numeric
-        total_storage_bytes = 102400
+    try:
+        storage_sum = db.query(func.coalesce(func.sum(AnalysisFile.size), 0)).scalar()
+        total_storage_bytes = int(storage_sum) if storage_sum is not None else 0
+    except Exception:
+        total_storage_bytes = "N/A"
 
     # System status flags
     db_status = "Healthy"
-    redis_status = "Healthy"
-    try:
-        redis_service.client.ping()
-    except Exception:
-        redis_status = "Offline (Mock mode active)"
+    if getattr(redis_service, "is_mock", False):
+        redis_status = "Degraded"
+    else:
+        try:
+            redis_service.client.ping()
+            redis_status = "Healthy"
+        except Exception:
+            redis_status = "Degraded"
         
-    # Mock system diagnostics errors list
+    # Real system activity/diagnostic logs
+    recent_logs = db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(20).all()
     diagnostic_logs = [
-        {"timestamp": "2026-07-09T18:01:00Z", "level": "WARNING", "message": "High Redis connection latency detected."},
-        {"timestamp": "2026-07-09T18:05:00Z", "level": "INFO", "message": "Background daemon thread sync completed."}
+        {
+            "timestamp": log.created_at.isoformat() if log.created_at else "N/A",
+            "level": "INFO",
+            "message": f"[{log.activity_type}] {log.description}"
+        }
+        for log in recent_logs
     ]
 
     return {

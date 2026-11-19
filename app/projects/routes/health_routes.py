@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import text, func
 from app.auth.database.connection import get_db
 from app.config import settings
 from app.projects.services.redis_service import redis_service
@@ -27,13 +27,17 @@ def get_health(db: Session = Depends(get_db)):
         health_status["status"] = "Unhealthy"
         
     # 2. Test Redis pool connectivity
-    try:
-        redis_service.client.ping()
-    except Exception as e:
-        health_status["redis"] = f"Unhealthy: {str(e)}"
-        # Warn in dev mode, but flag system Unhealthy in production
-        if settings.APP_ENVIRONMENT == "production":
-            health_status["status"] = "Unhealthy"
+    if getattr(redis_service, "is_mock", False):
+        health_status["redis"] = "Degraded"
+    else:
+        try:
+            redis_service.client.ping()
+            health_status["redis"] = "Healthy"
+        except Exception as e:
+            health_status["redis"] = f"Unhealthy: {str(e)}"
+            # Warn in dev mode, but flag system Unhealthy in production
+            if settings.APP_ENVIRONMENT == "production":
+                health_status["status"] = "Unhealthy"
             
     # 3. Test local storage directory permissions
     try:
@@ -76,7 +80,26 @@ def get_metrics(db: Session = Depends(get_db)):
         pass
         
     total_jobs = total_jobs_run + total_jobs_failed
-    failure_rate = (total_jobs_failed / total_jobs * 100) if total_jobs > 0 else 0.0
+    
+    # Calculate real average processing time from completed analyses
+    avg_dur = db.query(func.avg(Analysis.duration)).filter(Analysis.status == "completed").scalar()
+    avg_latency = round(float(avg_dur), 2) if avg_dur is not None else "N/A"
+
+    # Calculate real failure rate from analyses or jobs
+    failed_analyses = db.query(Analysis).filter(Analysis.status == "failed").count()
+    if total_analyses > 0:
+        failure_rate = f"{(failed_analyses / total_analyses * 100):.1f}%"
+    elif total_jobs > 0:
+        failure_rate = f"{(total_jobs_failed / total_jobs * 100):.1f}%"
+    else:
+        failure_rate = "0.0%"
+
+    try:
+        cache_hits = int(redis_service.client.get("metrics:cache_hits") or 0)
+        cache_misses = int(redis_service.client.get("metrics:cache_misses") or 0)
+    except Exception:
+        cache_hits = 0
+        cache_misses = 0
     
     return {
         "projects": total_projects,
@@ -85,10 +108,10 @@ def get_metrics(db: Session = Depends(get_db)):
         "tests": total_tests,
         "queue_size": queue_size,
         "active_workers": active_workers,
-        "average_processing_time": 4.5,
-        "failure_rate": f"{failure_rate:.1f}%",
-        "cache_hits": 182,
-        "cache_misses": 27
+        "average_processing_time": avg_latency,
+        "failure_rate": failure_rate,
+        "cache_hits": cache_hits,
+        "cache_misses": cache_misses
     }
 
 from app.projects.services.diagnostics_service import DiagnosticsService

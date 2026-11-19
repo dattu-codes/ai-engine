@@ -8,6 +8,14 @@ class PythonASTVisitor(ast.NodeVisitor):
     def __init__(self):
         self.complexity = 1  # Base complexity is 1
         self.vulnerabilities = []
+        self.pickle_aliases = set()
+
+    def visit_ImportFrom(self, node):
+        if node.module in ["pickle", "_pickle"]:
+            for alias in node.names:
+                if alias.name in ["loads", "load"]:
+                    self.pickle_aliases.add(alias.asname or alias.name)
+        self.generic_visit(node)
 
     def visit_If(self, node):
         self.complexity += 1
@@ -76,7 +84,7 @@ class PythonASTVisitor(ast.NodeVisitor):
                     "description": "Executing system commands directly allows command injection.",
                     "recommendation": "Use subprocess.run with argument vectors and shell=False."
                 })
-            elif func_name in ["loads", "load"]:
+            elif func_name in self.pickle_aliases:
                 self.vulnerabilities.append({
                     "severity": "High",
                     "line": node.lineno,
@@ -481,8 +489,8 @@ class CodeAnalyzerService:
                             "recommendation": "Save the return value to a variable, check for nil, and then access its fields."
                         })
 
-            # 1. Check for eval
-            if ("eval(" in line_str or "eval (" in line_str) and "literal_eval" not in line_str:
+            # 1. Check for eval (non-Python only; Python security detection uses ONLY AST)
+            if language != "python" and ("eval(" in line_str or "eval (" in line_str) and "literal_eval" not in line_str:
                 vulnerabilities.append({
                     "severity": "High",
                     "line": idx,
@@ -492,8 +500,8 @@ class CodeAnalyzerService:
                     "recommendation": "Use structural serializers, parsers (JSON.parse), or switch to safe arithmetic operators."
                 })
 
-            # Check for pickle deserialization
-            if ("pickle.loads(" in line_str or "pickle.load(" in line_str) and not line_str.startswith("#"):
+            # Check for pickle deserialization (non-Python only; Python security detection uses ONLY AST)
+            if language != "python" and ("pickle.loads(" in line_str or "pickle.load(" in line_str) and not line_str.startswith("#"):
                 vulnerabilities.append({
                     "severity": "High",
                     "line": idx,
