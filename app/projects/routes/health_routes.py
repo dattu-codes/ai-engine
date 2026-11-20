@@ -92,7 +92,7 @@ def get_metrics(db: Session = Depends(get_db)):
     elif total_jobs > 0:
         failure_rate = f"{(total_jobs_failed / total_jobs * 100):.1f}%"
     else:
-        failure_rate = "0.0%"
+        failure_rate = "N/A"
 
     try:
         cache_hits = int(redis_service.client.get("metrics:cache_hits") or 0)

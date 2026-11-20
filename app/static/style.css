@@ -5258,27 +5258,186 @@ button:focus-visible {
 .project-items {
     min-height: 110px;
 }
-/* Keep authenticated user controls visible at the bottom of the sidebar */
-.app-sidebar {
-    display: flex !important;
-    flex-direction: column !important;
+/* ==========================================================================
+   PINNED SIDEBAR & FIXED 100vh LAYOUT
+   ========================================================================== */
+:root {
+    --sidebar-width: 260px;
+    --sidebar-collapsed-width: 68px;
 }
 
+html, body {
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+.app-layout {
+    display: flex !important;
+    width: 100% !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    position: relative !important;
+}
+
+/* Sidebar: fixed at 100vh in a flex column */
+.app-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width) !important;
+    max-width: var(--sidebar-width) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    z-index: 100 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background-color: var(--sidebar-bg, #0b0c0f) !important;
+    border-right: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.app-sidebar.collapsed {
+    width: var(--sidebar-collapsed-width) !important;
+    min-width: var(--sidebar-collapsed-width) !important;
+    max-width: var(--sidebar-collapsed-width) !important;
+}
+
+.sidebar-header {
+    flex: 0 0 auto !important;
+    height: var(--top-nav-height, 60px) !important;
+    display: flex !important;
+    align-items: center !important;
+    padding: 0 16px !important;
+    border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;
+    gap: 12px !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+/* Nav links at the top; only internal scroll if content overflows */
 .sidebar-content {
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 16px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+    box-sizing: border-box !important;
 }
 
+/* User profile box pinned to the bottom of the sidebar with margin-top: auto */
 .sidebar-footer {
+    margin-top: auto !important;
     flex: 0 0 auto !important;
+    padding: 14px 16px !important;
+    border-top: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;
+    background: inherit !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     display: flex !important;
+    align-items: center !important;
     position: relative !important;
     z-index: 10 !important;
 }
 
 #header-auth {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     width: 100% !important;
+}
+
+/* Main content: only the main content scrolls */
+.app-main-content {
+    margin-left: var(--sidebar-width) !important;
+    width: calc(100% - var(--sidebar-width)) !important;
+    min-width: 0 !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.app-sidebar.collapsed ~ .app-main-content {
+    margin-left: var(--sidebar-collapsed-width) !important;
+    width: calc(100% - var(--sidebar-collapsed-width)) !important;
+}
+
+/* Collapsed state: show only the avatar, with Settings and Logout as icons */
+.app-sidebar.collapsed .sidebar-header {
+    padding: 0 !important;
+    justify-content: center !important;
+}
+
+.app-sidebar.collapsed .sidebar-brand-name,
+.app-sidebar.collapsed .sidebar-group-title,
+.app-sidebar.collapsed .nav-text,
+.app-sidebar.collapsed .user-meta,
+.app-sidebar.collapsed .action-label {
+    display: none !important;
+}
+
+.app-sidebar.collapsed .nav-item {
+    justify-content: center !important;
+    padding: 8px 0 !important;
+}
+
+.app-sidebar.collapsed .sidebar-footer {
+    padding: 12px 6px !important;
+    justify-content: center !important;
+}
+
+.app-sidebar.collapsed .user-profile-info {
+    justify-content: center !important;
+}
+
+.app-sidebar.collapsed .user-profile-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: 100% !important;
+}
+
+.app-sidebar.collapsed .user-profile-actions button {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    flex: none !important;
+}
+
+.app-sidebar.collapsed .action-icon {
+    display: inline-block !important;
+    font-size: 14px !important;
+    margin: 0 !important;
+}
+
+.action-icon {
+    display: inline-block;
+    font-size: 12px;
+    margin-right: 4px;
+}
+
+.action-label {
+    display: inline;
 }
 /* Consistent native dropdown colors */
 #project-model,

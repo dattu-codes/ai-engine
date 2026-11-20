@@ -92,6 +92,22 @@ def test_health_and_metrics_reports_degraded_redis_and_real_latency():
         # Processing time must be a real float or "N/A"
         avg_time = metrics_data["average_processing_time"]
         assert isinstance(avg_time, (int, float)) or avg_time == "N/A"
+        # Failure rate must be "N/A" when no jobs, or a real percentage
+        fail_rate = metrics_data["failure_rate"]
+        assert fail_rate == "N/A" or (isinstance(fail_rate, str) and fail_rate.endswith("%"))
     finally:
         redis_service.is_mock = orig_is_mock
+
+
+def test_failure_rate_shows_na_when_no_job_data():
+    """Verify /metrics returns 'N/A' for failure_rate when there is no job data, not '0.0%'."""
+    from unittest.mock import patch
+
+    with patch("app.projects.services.redis_service.redis_service.client.get", return_value=None):
+        with patch("sqlalchemy.orm.Query.count", return_value=0):
+            res = client.get("/metrics")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["failure_rate"] == "N/A"
+            assert data["failure_rate"] != "0.0%"
 
