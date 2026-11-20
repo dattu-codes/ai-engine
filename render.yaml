@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ai-engine
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: APP_ENVIRONMENT
+        value: development
+      - key: DATABASE_URL
+        value: sqlite:///./auth.db
