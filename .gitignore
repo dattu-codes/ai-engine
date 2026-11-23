@@ -25,3 +25,7 @@ Thumbs.db
 
 # Temp git clones
 app/temp_clones/
+
+# UI Check screenshots
+ui-check/
+

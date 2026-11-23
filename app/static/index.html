@@ -4,6 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Engine - Code Review Dashboard</title>
+    <!-- Prevent theme flash before first paint -->
+    <script>
+        (function() {
+            try {
+                var savedTheme = localStorage.getItem('theme');
+                var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                var theme = savedTheme ? savedTheme : (prefersDark ? 'dark' : 'light');
+                if (theme === 'light') {
+                    document.documentElement.classList.add('light-theme');
+                    document.documentElement.setAttribute('data-theme', 'light');
+                } else {
+                    document.documentElement.classList.remove('light-theme');
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                }
+            } catch (e) {}
+        })();
+    </script>
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -155,9 +172,9 @@
                             <span class="user-role-badge" id="user-display-role" style="font-size: 10px; color: var(--text-muted);">...</span>
                         </div>
                     </div>
-                    <div class="user-profile-actions" style="display: flex; gap: 8px; width: 100%;">
-                        <button id="btn-open-settings" title="Settings" style="flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-bright); padding: 6px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; font-weight: 600; text-align: center; transition: all 0.2s;"><span class="action-icon">⚙</span><span class="action-label">Settings</span></button>
-                        <button id="btn-logout" class="logout-btn-nav" title="Logout" style="flex: 1; margin: 0; padding: 6px 12px; font-size: 11px; border-radius: 6px; text-align: center;"><span class="action-icon">⏻</span><span class="action-label">Logout</span></button>
+                    <div class="user-profile-actions">
+                        <button id="btn-open-settings" title="Settings"><span class="action-icon">⚙</span><span class="action-label">Settings</span></button>
+                        <button id="btn-logout" class="logout-btn-nav" title="Logout"><span class="action-icon">⏻</span><span class="action-label">Logout</span></button>
                     </div>
                 </div>
             </div>
@@ -2232,160 +2249,181 @@
 
     <!-- User Settings Modal Dialog -->
     <div class="auth-overlay hidden" id="settings-modal" style="z-index: 9999;">
-        <div class="auth-card glass" style="max-width: 600px; width: 90%; min-height: 520px; display: flex; flex-direction: column;">
-            <div class="auth-card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
-                <div>
-                    <h2 style="font-size: 18px; margin: 0;">Account Settings</h2>
-                    <p style="margin: 0; font-size: 11px;">Configure developer tokens, AI providers, and platform preferences.</p>
+        <div class="settings-modal-dialog">
+            <div class="settings-modal-header">
+                <div class="settings-modal-title-group">
+                    <h2>Account Settings</h2>
+                    <p>Configure developer tokens, AI providers, and platform preferences.</p>
                 </div>
-                <button id="btn-settings-close" style="background: transparent; border: none; font-size: 18px; color: var(--text-muted); cursor: pointer; padding: 4px;">✕</button>
+                <button id="btn-settings-close" class="settings-close-btn" aria-label="Close settings">✕</button>
             </div>
             
-            <!-- Settings Modal Navigation Tabs -->
-            <div style="display: flex; gap: 12px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; margin-bottom: 16px; overflow-x: auto;">
-                <button class="auth-tab-btn active" id="settings-tab-llm-btn" style="font-size: 12px;">LLM Providers</button>
-                <button class="auth-tab-btn" id="settings-tab-notifications-btn" style="font-size: 12px;">Notifications</button>
-                <button class="auth-tab-btn" id="settings-tab-api-btn" style="font-size: 12px;">API Access</button>
-                <button class="auth-tab-btn" id="settings-tab-org-btn" style="font-size: 12px;">Workspace Organization</button>
-            </div>
-            
-            <div style="flex: 1; display: flex; flex-direction: column;">
+            <div class="settings-modal-body">
+                <!-- Left Vertical Tab List -->
+                <div class="settings-tabs-sidebar">
+                    <button class="settings-nav-tab auth-tab-btn active" id="settings-tab-llm-btn">
+                        <span class="tab-icon">🤖</span>
+                        <span class="tab-label">LLM Providers</span>
+                    </button>
+                    <button class="settings-nav-tab auth-tab-btn" id="settings-tab-notifications-btn">
+                        <span class="tab-icon">🔔</span>
+                        <span class="tab-label">Notifications</span>
+                    </button>
+                    <button class="settings-nav-tab auth-tab-btn" id="settings-tab-api-btn">
+                        <span class="tab-icon">🔑</span>
+                        <span class="tab-label">API Access</span>
+                    </button>
+                    <button class="settings-nav-tab auth-tab-btn" id="settings-tab-org-btn">
+                        <span class="tab-icon">👥</span>
+                        <span class="tab-label">Workspace Organization</span>
+                    </button>
+                </div>
                 
-                <!-- Tab Pane: LLM Providers (v3.1) -->
-                <div class="settings-pane" id="settings-pane-llm" style="display: block;">
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Configure AI Providers</span>
-                        
-                        <!-- Gemini connection -->
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h4 style="font-size: 13px; color: var(--text-bright); font-weight: 600;">Google Gemini</h4>
-                                <span id="status-gemini-connection" style="font-size: 11px; color: var(--text-muted);">Not Connected</span>
+                <!-- Right Content Panel -->
+                <div class="settings-content-panel">
+                    <!-- Tab Pane: LLM Providers (v3.1) -->
+                    <div class="settings-pane" id="settings-pane-llm" style="display: block;">
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Configure AI Providers</span>
+                            
+                            <!-- Gemini connection -->
+                            <div class="provider-card" style="background: var(--surface-raised); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <h4 style="font-size: 13px; color: var(--text); font-weight: 600; margin: 0;">Google Gemini</h4>
+                                    <span id="status-gemini-connection" class="status-pill not-configured">Not Connected</span>
+                                </div>
+                                <div class="key-input-wrapper" style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="password" id="settings-gemini-key" placeholder="Enter Gemini API key..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); color: var(--text);">
+                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-gemini-key" title="Toggle visibility" style="padding: 8px 12px; margin: 0; font-size: 12px;">👁️</button>
+                                </div>
+                                <button id="btn-test-gemini" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
                             </div>
-                            <input type="password" id="settings-gemini-key" placeholder="Enter Gemini API key..." style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
-                            <button id="btn-test-gemini" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
-                        </div>
-                        
-                        <!-- OpenAI connection -->
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h4 style="font-size: 13px; color: var(--text-bright); font-weight: 600;">OpenAI (ChatGPT)</h4>
-                                <span id="status-openai-connection" style="font-size: 11px; color: var(--text-muted);">Not Connected</span>
+                            
+                            <!-- OpenAI connection -->
+                            <div class="provider-card" style="background: var(--surface-raised); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <h4 style="font-size: 13px; color: var(--text); font-weight: 600; margin: 0;">OpenAI (ChatGPT)</h4>
+                                    <span id="status-openai-connection" class="status-pill not-configured">Not Connected</span>
+                                </div>
+                                <div class="key-input-wrapper" style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="password" id="settings-openai-key" placeholder="Enter OpenAI API key..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); color: var(--text);">
+                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-openai-key" title="Toggle visibility" style="padding: 8px 12px; margin: 0; font-size: 12px;">👁️</button>
+                                </div>
+                                <button id="btn-test-openai" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
                             </div>
-                            <input type="password" id="settings-openai-key" placeholder="Enter OpenAI API key..." style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
-                            <button id="btn-test-openai" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
-                        </div>
-                        
-                        <!-- Anthropic connection -->
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <h4 style="font-size: 13px; color: var(--text-bright); font-weight: 600;">Anthropic (Claude)</h4>
-                                <span id="status-anthropic-connection" style="font-size: 11px; color: var(--text-muted);">Not Connected</span>
+                            
+                            <!-- Anthropic connection -->
+                            <div class="provider-card" style="background: var(--surface-raised); border: 1px solid var(--border); padding: 14px; border-radius: 8px; display: flex; flex-direction: column; gap: 10px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <h4 style="font-size: 13px; color: var(--text); font-weight: 600; margin: 0;">Anthropic (Claude)</h4>
+                                    <span id="status-anthropic-connection" class="status-pill not-configured">Not Connected</span>
+                                </div>
+                                <div class="key-input-wrapper" style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="password" id="settings-anthropic-key" placeholder="Enter Anthropic API key..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); color: var(--text);">
+                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-anthropic-key" title="Toggle visibility" style="padding: 8px 12px; margin: 0; font-size: 12px;">👁️</button>
+                                </div>
+                                <button id="btn-test-anthropic" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
                             </div>
-                            <input type="password" id="settings-anthropic-key" placeholder="Enter Anthropic API key..." style="width: 100%; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
-                            <button id="btn-test-anthropic" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
                         </div>
                     </div>
-                </div>
 
-                
-                <!-- Tab Pane: Notifications Preferences -->
-                <div class="settings-pane" id="settings-pane-notifications" style="display: none;">
-                    <form id="settings-notifications-form" style="display: flex; flex-direction: column; gap: 14px;">
-                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 8px;">Email Notification Alerts</span>
-                        <div style="display: flex; flex-direction: column; gap: 10px;">
-                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
-                                <input type="checkbox" id="pref-analysis" checked style="width: 16px; height: 16px;">
-                                Send email when an AI Review Analysis completes
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
-                                <input type="checkbox" id="pref-fix" checked style="width: 16px; height: 16px;">
-                                Send email when an AI Fix Generation completes
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
-                                <input type="checkbox" id="pref-tests" checked style="width: 16px; height: 16px;">
-                                Send email when Unit Test executions complete
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
-                                <input type="checkbox" id="pref-sync" checked style="width: 16px; height: 16px;">
-                                Send email when Git Repository auto-syncs
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
-                                <input type="checkbox" id="pref-invite" checked style="width: 16px; height: 16px;">
-                                Send email when team membership invites are accepted
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-main); cursor: pointer;">
-                                <input type="checkbox" id="pref-deployment" checked style="width: 16px; height: 16px;">
-                                Send email when deployment checks complete
-                            </label>
+                    <!-- Tab Pane: Notifications Preferences -->
+                    <div class="settings-pane" id="settings-pane-notifications" style="display: none;">
+                        <form id="settings-notifications-form" style="display: flex; flex-direction: column; gap: 14px;">
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 8px;">Email Notification Alerts</span>
+                            <div style="display: flex; flex-direction: column; gap: 10px;">
+                                <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+                                    <input type="checkbox" id="pref-analysis" checked style="width: 16px; height: 16px;">
+                                    Send email when an AI Review Analysis completes
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+                                    <input type="checkbox" id="pref-fix" checked style="width: 16px; height: 16px;">
+                                    Send email when an AI Fix Generation completes
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+                                    <input type="checkbox" id="pref-tests" checked style="width: 16px; height: 16px;">
+                                    Send email when Unit Test executions complete
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+                                    <input type="checkbox" id="pref-sync" checked style="width: 16px; height: 16px;">
+                                    Send email when Git Repository auto-syncs
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+                                    <input type="checkbox" id="pref-invite" checked style="width: 16px; height: 16px;">
+                                    Send email when team membership invites are accepted
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text); cursor: pointer;">
+                                    <input type="checkbox" id="pref-deployment" checked style="width: 16px; height: 16px;">
+                                    Send email when deployment checks complete
+                                </label>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Save Preferences</button>
+                        </form>
+                    </div>
+                    
+                    <!-- Tab Pane: Public API keys -->
+                    <div class="settings-pane" id="settings-pane-api" style="display: none;">
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Generate Developer API Key</span>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <input type="text" id="input-api-key-name" placeholder="Token name (e.g. CLI key)..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface-raised); border: 1px solid var(--border); color: var(--text);">
+                                <button id="btn-generate-api-key" class="btn btn-primary" style="margin: 0; padding: 8px 16px;">Generate</button>
+                            </div>
+                            
+                            <div id="api-key-display-box" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 12px; word-break: break-all; color: var(--success);">
+                                <span style="font-weight: bold; font-family: var(--font-sans); display: block; margin-bottom: 4px; font-size: 11px;">COPY KEY NOW (IT WILL NOT BE SHOWN AGAIN):</span>
+                                <span id="label-new-api-key">ae_xxxx</span>
+                            </div>
+                            
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Active Access Tokens</span>
+                            <div class="table-container" style="max-height: 160px; overflow-y: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Expires</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="api-keys-list-tbody">
+                                        <tr>
+                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">No active API keys found.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <button type="submit" class="btn btn-primary" style="margin-top: 10px;">Save Preferences</button>
-                    </form>
-                </div>
-                
-                <!-- Tab Pane: Public API keys -->
-                <div class="settings-pane" id="settings-pane-api" style="display: none;">
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Generate Developer API Key</span>
-                        <div style="display: flex; gap: 12px; align-items: center;">
-                            <input type="text" id="input-api-key-name" placeholder="Token name (e.g. CLI key)..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
-                            <button id="btn-generate-api-key" class="btn btn-primary" style="margin: 0; padding: 8px 16px;">Generate</button>
-                        </div>
-                        
-                        <div id="api-key-display-box" style="display: none; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 12px; border-radius: 6px; font-family: var(--font-mono); font-size: 12px; word-break: break-all; color: var(--accent-green);">
-                            <span style="font-weight: bold; font-family: var(--font-sans); display: block; margin-bottom: 4px; font-size: 11px;">COPY KEY NOW (IT WILL NOT BE SHOWN AGAIN):</span>
-                            <span id="label-new-api-key">ae_xxxx</span>
-                        </div>
-                        
-                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Active Access Tokens</span>
-                        <div class="table-container" style="max-height: 160px; overflow-y: auto;">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Expires</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="api-keys-list-tbody">
-                                    <tr>
-                                        <td colspan="3" style="text-align: center; color: var(--text-muted);">No active API keys found.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    </div>
+                    
+                    <!-- Tab Pane: Organization Members -->
+                    <div class="settings-pane" id="settings-pane-org" style="display: none;">
+                        <div style="display: flex; flex-direction: column; gap: 16px;">
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Invite Team Member</span>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <input type="email" id="input-invite-email" placeholder="Enter member email..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface-raised); border: 1px solid var(--border); color: var(--text);">
+                                <button id="btn-invite-member" class="btn btn-primary" style="margin: 0; padding: 8px 16px;">Send Invite</button>
+                            </div>
+                            
+                            <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Workspace Team Members</span>
+                            <div class="table-container" style="max-height: 160px; overflow-y: auto;">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Member Username</th>
+                                            <th>Role</th>
+                                            <th>Joined At</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="org-members-list-tbody">
+                                        <tr>
+                                            <td colspan="3" style="text-align: center; color: var(--text-muted);">Select a workspace to view members list.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Tab Pane: Organization Members -->
-                <div class="settings-pane" id="settings-pane-org" style="display: none;">
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Invite Team Member</span>
-                        <div style="display: flex; gap: 12px; align-items: center;">
-                            <input type="email" id="input-invite-email" placeholder="Enter member email..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); color: var(--text-bright);">
-                            <button id="btn-invite-member" class="btn btn-primary" style="margin: 0; padding: 8px 16px;">Send Invite</button>
-                        </div>
-                        
-                        <span style="font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Workspace Team Members</span>
-                        <div class="table-container" style="max-height: 160px; overflow-y: auto;">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>Member Username</th>
-                                        <th>Role</th>
-                                        <th>Joined At</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="org-members-list-tbody">
-                                    <tr>
-                                        <td colspan="3" style="text-align: center; color: var(--text-muted);">Select a workspace to view members list.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
     </div>

@@ -54,9 +54,10 @@ function initFormControls() {
         const max = parseFloat(thresholdSlider.max) || 95;
         const current = parseFloat(val) || 80;
         const pct = Math.max(0, Math.min(100, ((current - min) / (max - min)) * 100));
-        thresholdSlider.style.background = `linear-gradient(to right, #6f61f6 ${pct}%, rgba(255, 255, 255, 0.15) ${pct}%)`;
+        thresholdSlider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--border) ${pct}%)`;
         if (thresholdVal) thresholdVal.textContent = `${current}%`;
     }
+    window.updateThresholdTrack = updateThresholdTrack;
     if (thresholdSlider) {
         thresholdSlider.addEventListener('input', (e) => updateThresholdTrack(e.target.value));
         updateThresholdTrack(thresholdSlider.value);
@@ -6011,16 +6012,37 @@ function drawRadarChart(svgId, scores) {
 
 
 function initSassSettings() {
-    // Theme Toggle
+    // Theme Toggle & Persistence
     const themeBtn = document.getElementById('btn-theme-toggle');
-    if (themeBtn) {
-        if (localStorage.getItem('theme') === 'light') {
+    function applyTheme(mode) {
+        if (mode === 'light') {
+            document.documentElement.classList.add('light-theme');
             document.body.classList.add('light-theme');
+            document.documentElement.setAttribute('data-theme', 'light');
+            document.body.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.classList.remove('light-theme');
+            document.body.classList.remove('light-theme');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.body.setAttribute('data-theme', 'dark');
         }
+        localStorage.setItem('theme', mode);
+        if (typeof window.updateThresholdTrack === 'function') {
+            const slider = document.getElementById('threshold');
+            if (slider) window.updateThresholdTrack(slider.value);
+        }
+    }
+
+    const savedTheme = localStorage.getItem('theme');
+    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    const initialTheme = savedTheme || (prefersLight ? 'light' : 'dark');
+    applyTheme(initialTheme);
+
+    if (themeBtn) {
         themeBtn.addEventListener('click', () => {
-            document.body.classList.toggle('light-theme');
-            const mode = document.body.classList.contains('light-theme') ? 'light' : 'dark';
-            localStorage.setItem('theme', mode);
+            const isLight = document.body.classList.contains('light-theme') || 
+                            document.documentElement.getAttribute('data-theme') === 'light';
+            applyTheme(isLight ? 'dark' : 'light');
         });
     }
 
@@ -6043,6 +6065,35 @@ function initSassSettings() {
             settingsModal.classList.add('hidden');
         });
     }
+
+    // Close on Escape key
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && settingsModal && !settingsModal.classList.contains('hidden')) {
+            settingsModal.classList.add('hidden');
+        }
+    });
+
+    // Close on backdrop click
+    if (settingsModal) {
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                settingsModal.classList.add('hidden');
+            }
+        });
+    }
+
+    // Password reveal toggles for API keys
+    document.querySelectorAll('.btn-reveal-key').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = btn.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (input) {
+                input.type = input.type === 'password' ? 'text' : 'password';
+                btn.textContent = input.type === 'password' ? '👁️' : '🔒';
+            }
+        });
+    });
 
     // Tab switcher
     const settingsTabs = [
@@ -6071,6 +6122,20 @@ function initSassSettings() {
         }
     });
 
+    // Helper for status pill styling
+    function updateStatusPill(spanId, keyVal) {
+        const span = document.getElementById(spanId);
+        if (span) {
+            if (keyVal) {
+                span.textContent = 'Configured ✓';
+                span.className = 'status-pill configured';
+            } else {
+                span.textContent = 'Not configured';
+                span.className = 'status-pill not-configured';
+            }
+        }
+    }
+
     // Load LLM keys into inputs
     function loadLLMKeys() {
         const geminiKey = localStorage.getItem('gemini_api_key') || '';
@@ -6085,10 +6150,10 @@ function initSassSettings() {
         if (openaiInput) openaiInput.value = openaiKey;
         if (anthropicInput) anthropicInput.value = anthropicKey;
         
-        // Update connection status
-        document.getElementById('status-gemini-connection').textContent = geminiKey ? 'Saved ✓' : 'Not Connected';
-        document.getElementById('status-openai-connection').textContent = openaiKey ? 'Saved ✓' : 'Not Connected';
-        document.getElementById('status-anthropic-connection').textContent = anthropicKey ? 'Saved ✓' : 'Not Connected';
+        // Update connection status pills
+        updateStatusPill('status-gemini-connection', geminiKey);
+        updateStatusPill('status-openai-connection', openaiKey);
+        updateStatusPill('status-anthropic-connection', anthropicKey);
     }
 
     async function testAndSaveLLMKey(provider, keyInputId, statusSpanId, storageKeyName) {
@@ -6116,12 +6181,12 @@ function initSassSettings() {
                 const data = await res.json();
                 if (data.status === 'connected') {
                     localStorage.setItem(storageKeyName, keyVal);
-                    statusSpan.textContent = 'Connected ✓';
-                    statusSpan.style.color = 'var(--accent-green)';
+                    statusSpan.textContent = 'Configured ✓';
+                    statusSpan.className = 'status-pill configured';
                     alert(`${provider.toUpperCase()} connection test succeeded! Key saved.`);
                 } else {
                     statusSpan.textContent = 'Invalid Key ✗';
-                    statusSpan.style.color = 'var(--accent-red)';
+                    statusSpan.className = 'status-pill not-configured';
                     alert('Connection failed: ' + (data.error || 'Invalid API key.'));
                 }
             } else {
