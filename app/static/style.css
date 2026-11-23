@@ -51,6 +51,7 @@
     --focus: rgba(99, 102, 241, 0.35);
     --text-main: var(--text-muted);
     --text-bright: var(--text);
+    --text-on-accent: #ffffff;
 
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-mono: 'Geist Mono', 'JetBrains Mono', Courier, monospace;
@@ -110,6 +111,7 @@ body.light-theme, [data-theme="light"], html.light-theme {
     --focus: rgba(79, 70, 229, 0.25);
     --text-main: var(--text-muted);
     --text-bright: var(--text);
+    --text-on-accent: #ffffff;
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
     --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
@@ -4879,14 +4881,15 @@ button.btn-primary:hover {
 .btn-secondary,
 button.btn-secondary {
     background: var(--surface-raised) !important;
-    border: 1px solid rgba(255,255,255,.09) !important;
+    border: 1px solid var(--border) !important;
     color: var(--text) !important;
 }
 
 .btn-secondary:hover,
 button.btn-secondary:hover {
     background: var(--surface-raised) !important;
-    border-color: rgba(255,255,255,.15) !important;
+    border-color: var(--accent) !important;
+    color: var(--text) !important;
 }
 
 .btn-danger {
@@ -5694,7 +5697,7 @@ select option,
 select option:checked,
 select option:hover {
     background-color: var(--accent) !important;
-    color: var(--text) !important;
+    color: var(--text-on-accent) !important;
 }
 
 /* Threshold slider filled track */
@@ -5709,11 +5712,23 @@ input[type="range"]#threshold,
     appearance: none !important;
     height: 6px !important;
     border-radius: 999px !important;
-    background: var(--surface-raised) !important;
+    background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--slider-pct, 66.6%), var(--surface-raised) var(--slider-pct, 66.6%), var(--surface-raised) 100%) !important;
     outline: none !important;
     cursor: pointer !important;
     accent-color: var(--accent) !important;
     border: none !important;
+}
+input[type="range"]#threshold::-moz-range-progress,
+.dashboard-top-bar .slider-container input[type="range"]::-moz-range-progress {
+    background: var(--accent) !important;
+    border-radius: 999px !important;
+    height: 6px !important;
+}
+input[type="range"]#threshold::-moz-range-track,
+.dashboard-top-bar .slider-container input[type="range"]::-moz-range-track {
+    background: var(--surface-raised) !important;
+    border-radius: 999px !important;
+    height: 6px !important;
 }
 input[type="range"]#threshold::-webkit-slider-thumb,
 .dashboard-top-bar .slider-container input[type="range"]::-webkit-slider-thumb {
@@ -5941,4 +5956,127 @@ input[type="range"]#threshold::-moz-range-thumb,
     .settings-content-panel {
         padding: 16px;
     }
+}
+
+/* Primary Button Contrast Fix: Crisp white text on indigo in both themes */
+.btn-primary,
+button.btn-primary,
+#btn-auth-submit,
+#btn-run,
+#btn-run .btn-text,
+#btn-start-project-analysis,
+#btn-generate-api-key,
+#btn-invite-member,
+button[type="submit"].btn-primary {
+    background: var(--accent) !important;
+    border: 1px solid var(--accent) !important;
+    color: var(--text-on-accent) !important;
+}
+
+.btn-primary:hover,
+button.btn-primary:hover,
+#btn-auth-submit:hover,
+#btn-run:hover,
+#btn-start-project-analysis:hover,
+#btn-generate-api-key:hover,
+#btn-invite-member:hover {
+    background: var(--accent-hover) !important;
+    border-color: var(--accent-hover) !important;
+    color: var(--text-on-accent) !important;
+}
+
+/* Mobile Login Brand Header */
+.auth-mobile-brand {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+.auth-mobile-brand .auth-logo {
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+    border-radius: 8px;
+    background: var(--accent);
+}
+.auth-mobile-brand .auth-brand-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+}
+@media (max-width: 900px) {
+    .auth-mobile-brand {
+        display: flex !important;
+    }
+}
+
+/* Proper Secondary Button for Test & Save Key */
+.btn-test-key,
+button.btn-test-key,
+button.btn-secondary.btn-test-key {
+    align-self: flex-start !important;
+    margin: 0 !important;
+    padding: 7px 14px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    border-radius: 6px !important;
+    background: var(--surface-raised) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text) !important;
+    cursor: pointer !important;
+    transition: all var(--transition-fast) !important;
+}
+.btn-test-key:hover,
+button.btn-test-key:hover,
+button.btn-secondary.btn-test-key:hover {
+    background: var(--surface) !important;
+    border-color: var(--accent) !important;
+    color: var(--accent) !important;
+    box-shadow: var(--shadow-sm) !important;
+}
+
+/* Findings Table and Diff Container theme adaptation */
+#diff-view-content {
+    background: var(--surface-raised) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+.bugs-table td,
+.dashboard-bottom-area .bugs-table td {
+    border-bottom: 1px solid var(--border) !important;
+    color: var(--text) !important;
+}
+.bugs-table tr:hover td {
+    background: var(--surface-raised) !important;
+}
+
+/* SVG Line Icons styling in settings tabs and inputs */
+.settings-nav-tab .tab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: currentColor;
+}
+.settings-nav-tab .tab-icon svg {
+    display: block;
+    stroke: currentColor;
+}
+.btn-reveal-key,
+#toggle-key-visibility {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.btn-reveal-key:hover,
+#toggle-key-visibility:hover {
+    color: var(--text);
+}
+.btn-reveal-key svg,
+#toggle-key-visibility svg {
+    display: inline-block;
+    vertical-align: middle;
+    stroke: currentColor;
 }

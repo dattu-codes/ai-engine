@@ -418,7 +418,16 @@
                             <span class="top-bar-label" id="api-key-label">Gemini API Key</span>
                             <div class="api-key-container">
                                 <input type="password" id="api-key" placeholder="Enter API Key to enable Live Mode..." autocomplete="new-password">
-                                <button type="button" id="toggle-key-visibility" class="btn-icon">👁️</button>
+                                <button type="button" id="toggle-key-visibility" class="btn-icon" aria-label="Toggle API Key visibility" title="Toggle visibility">
+                                    <svg class="icon-eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                        <circle cx="12" cy="12" r="3"/>
+                                    </svg>
+                                    <svg class="icon-eye-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                        <line x1="1" y1="1" x2="23" y2="23"/>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                         <div class="top-bar-item">
@@ -624,7 +633,7 @@
                                         <div class="verification-sections" style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
                                             <!-- Section 1: Resolved -->
                                             <div class="section-box" style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; padding: 12px 16px;">
-                                                <h4 style="font-size: 13px; font-weight: 700; color: #34d399; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                                <h4 style="font-size: 13px; font-weight: 700; color: var(--success); margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
                                                     <span>✅</span> Resolved (<span id="resolved-count">0</span>)
                                                 </h4>
                                                 <ul id="resolved-list" style="margin: 0; padding-left: 20px; font-size: 12px; color: var(--text-main); line-height: 1.6;">
@@ -634,7 +643,7 @@
 
                                             <!-- Section 2: Still open (needs manual fix) -->
                                             <div class="section-box" style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 12px 16px;">
-                                                <h4 style="font-size: 13px; font-weight: 700; color: #f87171; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                                <h4 style="font-size: 13px; font-weight: 700; color: var(--danger); margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
                                                     <span>⚠️</span> Still open (needs manual fix) (<span id="remaining-count">0</span>)
                                                 </h4>
                                                 <ul id="remaining-list" style="margin: 0; padding-left: 20px; font-size: 12px; color: var(--text-main); line-height: 1.6;">
@@ -644,7 +653,7 @@
 
                                             <!-- Section 3: Verification (syntax OK / re-scan result) -->
                                             <div class="section-box" style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.2); border-radius: 8px; padding: 12px 16px;">
-                                                <h4 style="font-size: 13px; font-weight: 700; color: #c084fc; margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
+                                                <h4 style="font-size: 13px; font-weight: 700; color: var(--accent); margin: 0 0 8px 0; display: flex; align-items: center; gap: 8px;">
                                                     <span>🔍</span> Verification (syntax OK / re-scan result)
                                                 </h4>
                                                 <div id="verification-summary-text" style="font-size: 12px; color: var(--text-main); line-height: 1.5;">
@@ -659,11 +668,11 @@
                                                 <div class="code-view-header" style="display: flex; justify-content: space-between; align-items: center;">
                                                     <span>Patch Diff</span>
                                                     <div style="display: flex; gap: 14px; font-size: 11px; font-weight: 600;">
-                                                        <span style="color: #fca5a5;"><span style="display:inline-block; width:8px; height:8px; background:#ef4444; border-radius:2px; margin-right:4px;"></span>- Removed</span>
-                                                        <span style="color: #86efac;"><span style="display:inline-block; width:8px; height:8px; background:#22c55e; border-radius:2px; margin-right:4px;"></span>+ Added</span>
+                                                        <span style="color: var(--danger);"><span style="display:inline-block; width:8px; height:8px; background:var(--danger); border-radius:2px; margin-right:4px;"></span>- Removed</span>
+                                                        <span style="color: var(--success);"><span style="display:inline-block; width:8px; height:8px; background:var(--success); border-radius:2px; margin-right:4px;"></span>+ Added</span>
                                                     </div>
                                                 </div>
-                                                <div id="diff-view-content" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6; padding: 14px; background: #0b1120; border-radius: 0 0 8px 8px; overflow-x: auto; max-height: 500px; white-space: pre;">
+                                                <div id="diff-view-content" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6; padding: 14px; background: var(--surface-raised); border: 1px solid var(--border); border-radius: 0 0 8px 8px; overflow-x: auto; max-height: 500px; white-space: pre; color: var(--text);">
 <span style="color: var(--text-muted); font-style: italic;">Unified diff will appear here after review execution...</span>
                                                 </div>
                                                 <!-- Keep hidden pre/code so copy button or scripts can access clean refactored code -->
@@ -1474,7 +1483,7 @@
                                             <!-- list of modified file items -->
                                         </div>
                                         <!-- Diff patch code container -->
-                                        <div style="flex: 2; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px; background: #12131a; overflow: auto; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px;" id="pr-diff-code-panel">
+                                        <div style="flex: 2; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-raised); color: var(--text); overflow: auto; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px;" id="pr-diff-code-panel">
                                             <span style="color: var(--text-muted); font-style: italic;">Select a modified file to view diff patch</span>
                                         </div>
                                     </div>
@@ -2162,7 +2171,7 @@
                         <span class="auth-feature-icon">02</span>  
                         <div class="auth-feature-text">
                             <h3>AI-Driven Patch Generation</h3>
-                            <p>Cursor AI-style code repair diffs.</p>
+                            <p>Review-ready code repair diffs.</p>
                         </div>
                     </div>
                     <div class="auth-feature-item">
@@ -2182,6 +2191,11 @@
         
         <div class="auth-split-right">
             <div class="auth-card">
+                <!-- Mobile brand header (shown on mobile <= 900px when hero column is hidden) -->
+                <div class="auth-mobile-brand">
+                    <div class="auth-logo" aria-label="AI Engine logo"><img src="/static/ae-logo.svg" alt="" /></div>
+                    <span class="auth-brand-name">AI Engine</span>
+                </div>
                 <div class="auth-card-header">
                     <h2>Secure Access Gateway</h2>
                     <p>Enter credentials to access your workspaces</p>
@@ -2262,20 +2276,42 @@
                 <!-- Left Vertical Tab List -->
                 <div class="settings-tabs-sidebar">
                     <button class="settings-nav-tab auth-tab-btn active" id="settings-tab-llm-btn">
-                        <span class="tab-icon">🤖</span>
+                        <span class="tab-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="4" y="4" width="16" height="16" rx="2"/>
+                                <rect x="9" y="9" width="6" height="6"/>
+                                <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+                            </svg>
+                        </span>
                         <span class="tab-label">LLM Providers</span>
                     </button>
                     <button class="settings-nav-tab auth-tab-btn" id="settings-tab-notifications-btn">
-                        <span class="tab-icon">🔔</span>
+                        <span class="tab-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                            </svg>
+                        </span>
                         <span class="tab-label">Notifications</span>
                     </button>
                     <button class="settings-nav-tab auth-tab-btn" id="settings-tab-api-btn">
-                        <span class="tab-icon">🔑</span>
+                        <span class="tab-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="7.5" cy="15.5" r="5.5"/>
+                                <path d="M21 2l-9.6 9.6"/>
+                                <path d="M15.5 7.5l3 3L21 8l-2-2 2-2"/>
+                            </svg>
+                        </span>
                         <span class="tab-label">API Access</span>
                     </button>
                     <button class="settings-nav-tab auth-tab-btn" id="settings-tab-org-btn">
-                        <span class="tab-icon">👥</span>
-                        <span class="tab-label">Workspace Organization</span>
+                        <span class="tab-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                            </svg>
+                        </span>
+                        <span class="tab-label">Workspace</span>
                     </button>
                 </div>
                 
@@ -2294,9 +2330,18 @@
                                 </div>
                                 <div class="key-input-wrapper" style="display: flex; gap: 8px; align-items: center;">
                                     <input type="password" id="settings-gemini-key" placeholder="Enter Gemini API key..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); color: var(--text);">
-                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-gemini-key" title="Toggle visibility" style="padding: 8px 12px; margin: 0; font-size: 12px;">👁️</button>
+                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-gemini-key" title="Toggle visibility" aria-label="Toggle visibility">
+                                        <svg class="icon-eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                        <svg class="icon-eye-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                            <line x1="1" y1="1" x2="23" y2="23"/>
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button id="btn-test-gemini" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
+                                <button id="btn-test-gemini" class="btn btn-secondary btn-test-key">Test & Save Key</button>
                             </div>
                             
                             <!-- OpenAI connection -->
@@ -2307,9 +2352,18 @@
                                 </div>
                                 <div class="key-input-wrapper" style="display: flex; gap: 8px; align-items: center;">
                                     <input type="password" id="settings-openai-key" placeholder="Enter OpenAI API key..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); color: var(--text);">
-                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-openai-key" title="Toggle visibility" style="padding: 8px 12px; margin: 0; font-size: 12px;">👁️</button>
+                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-openai-key" title="Toggle visibility" aria-label="Toggle visibility">
+                                        <svg class="icon-eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                        <svg class="icon-eye-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                            <line x1="1" y1="1" x2="23" y2="23"/>
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button id="btn-test-openai" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
+                                <button id="btn-test-openai" class="btn btn-secondary btn-test-key">Test & Save Key</button>
                             </div>
                             
                             <!-- Anthropic connection -->
@@ -2320,9 +2374,18 @@
                                 </div>
                                 <div class="key-input-wrapper" style="display: flex; gap: 8px; align-items: center;">
                                     <input type="password" id="settings-anthropic-key" placeholder="Enter Anthropic API key..." style="flex: 1; padding: 8px 12px; border-radius: 8px; font-size: 13px; background: var(--surface); border: 1px solid var(--border); color: var(--text);">
-                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-anthropic-key" title="Toggle visibility" style="padding: 8px 12px; margin: 0; font-size: 12px;">👁️</button>
+                                    <button type="button" class="btn btn-secondary btn-reveal-key" data-target="settings-anthropic-key" title="Toggle visibility" aria-label="Toggle visibility">
+                                        <svg class="icon-eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                            <circle cx="12" cy="12" r="3"/>
+                                        </svg>
+                                        <svg class="icon-eye-off" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                            <line x1="1" y1="1" x2="23" y2="23"/>
+                                        </svg>
+                                    </button>
                                 </div>
-                                <button id="btn-test-anthropic" class="btn btn-secondary" style="align-self: flex-start; margin: 0; padding: 6px 12px; font-size: 11px;">Test & Save Key</button>
+                                <button id="btn-test-anthropic" class="btn btn-secondary btn-test-key">Test & Save Key</button>
                             </div>
                         </div>
                     </div>

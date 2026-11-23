@@ -54,7 +54,8 @@ function initFormControls() {
         const max = parseFloat(thresholdSlider.max) || 95;
         const current = parseFloat(val) || 80;
         const pct = Math.max(0, Math.min(100, ((current - min) / (max - min)) * 100));
-        thresholdSlider.style.background = `linear-gradient(to right, var(--accent) ${pct}%, var(--border) ${pct}%)`;
+        thresholdSlider.style.setProperty('--slider-pct', `${pct}%`);
+        thresholdSlider.style.setProperty('background', `linear-gradient(to right, var(--accent) ${pct}%, var(--surface-raised) ${pct}%)`, 'important');
         if (thresholdVal) thresholdVal.textContent = `${current}%`;
     }
     window.updateThresholdTrack = updateThresholdTrack;
@@ -68,9 +69,14 @@ function initFormControls() {
     const toggleKeyBtn = document.getElementById('toggle-key-visibility');
     if (toggleKeyBtn && apiKeyInput) {
         toggleKeyBtn.addEventListener('click', () => {
-            const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            apiKeyInput.setAttribute('type', type);
-            toggleKeyBtn.textContent = type === 'password' ? '👁️' : '🔒';
+            const isPassword = apiKeyInput.getAttribute('type') === 'password';
+            apiKeyInput.setAttribute('type', isPassword ? 'text' : 'password');
+            const eyeOpen = toggleKeyBtn.querySelector('.icon-eye-open');
+            const eyeOff = toggleKeyBtn.querySelector('.icon-eye-off');
+            if (eyeOpen && eyeOff) {
+                eyeOpen.style.display = isPassword ? 'none' : 'inline-block';
+                eyeOff.style.display = isPassword ? 'inline-block' : 'none';
+            }
         });
     }
 
@@ -725,11 +731,11 @@ function renderPatchDiffView(diffText, originalCode, patchedCode) {
         if (line.startsWith('+++') || line.startsWith('---')) {
             html += `<div style="color: var(--text-muted); font-weight: 600; padding: 2px 6px;">${escapeHtml(line)}</div>`;
         } else if (line.startsWith('+')) {
-            html += `<div style="background: rgba(34, 197, 94, 0.15); color: #86efac; border-left: 3px solid #22c55e; padding: 2px 8px; margin: 1px 0;">${escapeHtml(line)}</div>`;
+            html += `<div style="background: rgba(34, 197, 94, 0.15); color: var(--success); border-left: 3px solid var(--success); padding: 2px 8px; margin: 1px 0;">${escapeHtml(line)}</div>`;
         } else if (line.startsWith('-')) {
-            html += `<div style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border-left: 3px solid #ef4444; padding: 2px 8px; margin: 1px 0;">${escapeHtml(line)}</div>`;
+            html += `<div style="background: rgba(239, 68, 68, 0.15); color: var(--danger); border-left: 3px solid var(--danger); padding: 2px 8px; margin: 1px 0;">${escapeHtml(line)}</div>`;
         } else if (line.startsWith('@@')) {
-            html += `<div style="color: var(--accent-purple); font-weight: 600; padding: 3px 6px; margin: 2px 0;">${escapeHtml(line)}</div>`;
+            html += `<div style="color: var(--accent); font-weight: 600; padding: 3px 6px; margin: 2px 0;">${escapeHtml(line)}</div>`;
         } else {
             html += `<div style="color: var(--text-muted); padding: 1px 6px;">${escapeHtml(line)}</div>`;
         }
@@ -2645,11 +2651,11 @@ function renderGitDiff(diffText) {
     lines.forEach(line => {
         let lineClass = '';
         if (line.startsWith('+') && !line.startsWith('+++')) {
-            lineClass = 'style="background: rgba(16, 185, 129, 0.15); color: #34d399; display: block; width: 100%;"';
+            lineClass = 'style="background: rgba(16, 185, 129, 0.15); color: var(--success); display: block; width: 100%;"';
         } else if (line.startsWith('-') && !line.startsWith('---')) {
-            lineClass = 'style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; display: block; width: 100%;"';
+            lineClass = 'style="background: rgba(239, 68, 68, 0.15); color: var(--danger); display: block; width: 100%;"';
         } else if (line.startsWith('@@')) {
-            lineClass = 'style="color: var(--accent-purple); font-weight: 600; display: block;"';
+            lineClass = 'style="color: var(--accent); font-weight: 600; display: block;"';
         }
         highlightedHTML += `<div ${lineClass}>${escapeHtml(line)}</div>`;
     });
@@ -3261,11 +3267,11 @@ function renderPRDiff(patchText) {
     lines.forEach(line => {
         let style = '';
         if (line.startsWith('+') && !line.startsWith('+++')) {
-            style = 'background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 500; display: block;';
+            style = 'background: rgba(16, 185, 129, 0.12); color: var(--success); font-weight: 500; display: block;';
         } else if (line.startsWith('-') && !line.startsWith('---')) {
-            style = 'background: rgba(239, 68, 68, 0.12); color: #fca5a5; display: block; text-decoration: line-through;';
+            style = 'background: rgba(239, 68, 68, 0.12); color: var(--danger); display: block; text-decoration: line-through;';
         } else if (line.startsWith('@@')) {
-            style = 'color: var(--accent-purple); font-weight: 600; display: block;';
+            style = 'color: var(--accent); font-weight: 600; display: block;';
         }
         output += `<div style="${style}">${escapeHtml(line)}</div>`;
     });
@@ -6089,8 +6095,14 @@ function initSassSettings() {
             const targetId = btn.getAttribute('data-target');
             const input = document.getElementById(targetId);
             if (input) {
-                input.type = input.type === 'password' ? 'text' : 'password';
-                btn.textContent = input.type === 'password' ? '👁️' : '🔒';
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                const eyeOpen = btn.querySelector('.icon-eye-open');
+                const eyeOff = btn.querySelector('.icon-eye-off');
+                if (eyeOpen && eyeOff) {
+                    eyeOpen.style.display = isPassword ? 'none' : 'inline-block';
+                    eyeOff.style.display = isPassword ? 'inline-block' : 'none';
+                }
             }
         });
     });
