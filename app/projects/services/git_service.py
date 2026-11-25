@@ -44,15 +44,7 @@ class GitService:
 
     @staticmethod
     def _get_git_base_cmd() -> List[str]:
-        cmd = ["git", "-c", "credential.helper="]
-        try:
-            import certifi
-            ca_path = certifi.where()
-            if os.path.exists(ca_path):
-                cmd.extend(["-c", "http.sslBackend=openssl", "-c", f"http.sslCAInfo={ca_path}"])
-        except Exception:
-            pass
-        return cmd
+        return ["git", "-c", "credential.helper="]
 
     @classmethod
     def check_public_repo(cls, repo_url: str) -> Dict[str, Any]:
@@ -207,29 +199,61 @@ class GitService:
         return "", "Imported from GitHub"
 
     @classmethod
-    def get_remote_head_sha(cls, repo_url: str) -> Optional[str]:
+    def get_remote_head_sha(cls, repo_url: str, branch: Optional[str] = None) -> Optional[str]:
         """
-        Retrieves the latest commit SHA of HEAD from remote repository.
-        Attempts GitHub API first; falls back to git ls-remote if git binary is available.
+        Retrieves the latest commit SHA of HEAD (or specific branch) from remote repository.
+        Attempts GitHub API first (GET /repos/{owner}/{name}/commits/{branch}); falls back to git ls-remote only when git exists.
         """
         is_valid, owner, repo = cls.validate_url(repo_url)
-        if is_valid:
+        if is_valid and owner and repo:
+            target_branch = branch
+            if not target_branch:
+                try:
+                    repo_data = cls.check_public_repo(repo_url)
+                    target_branch = repo_data.get("default_branch") or "main"
+                except Exception as e:
+                    logger.warning("Could not determine default branch for %s: %s", repo_url, e)
+                    target_branch = "HEAD"
+
+            commit_url = f"https://api.github.com/repos/{owner}/{repo}/commits/{target_branch}"
+            headers = {
+                "User-Agent": GITHUB_USER_AGENT,
+                "Accept": "application/vnd.github.v3+json"
+            }
             try:
-                repo_data = cls.check_public_repo(repo_url)
-                default_branch = repo_data.get("default_branch") or "main"
-                sha, _ = cls.fetch_commit_metadata(owner, repo, default_branch)
-                if sha:
-                    return sha
+                resp = httpx.get(
+                    commit_url,
+                    headers=headers,
+                    timeout=10.0,
+                    verify=True,
+                    follow_redirects=True
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    sha = data.get("sha")
+                    if sha:
+                        return sha
+                elif resp.status_code == 404:
+                    logger.warning("Commit endpoint returned 404 for %s/%s branch %s", owner, repo, target_branch)
+                elif resp.status_code in (403, 429):
+                    logger.warning("GitHub rate limit encountered fetching commit SHA for %s/%s (HTTP %s)", owner, repo, resp.status_code)
+                else:
+                    logger.warning("GitHub commits endpoint returned HTTP %s for %s/%s", resp.status_code, owner, repo)
+            except httpx.TimeoutException as e:
+                logger.warning("GitHub API timeout checking commit SHA for %s: %s", repo_url, e)
+            except (httpx.NetworkError, httpx.RequestError) as e:
+                logger.warning("GitHub API network error checking commit SHA for %s: %s", repo_url, e)
             except Exception as e:
                 logger.warning("Could not fetch remote HEAD SHA via API for %s: %s", repo_url, e)
 
-        # Fallback to git binary if present
+        # Fallback to git binary only if present
         if shutil.which("git"):
             try:
                 env = os.environ.copy()
                 env["GIT_TERMINAL_PROMPT"] = "0"
                 env["GCM_INTERACTIVE"] = "never"
-                cmd = cls._get_git_base_cmd() + ["ls-remote", repo_url.strip(), "HEAD"]
+                target_ref = branch if branch else "HEAD"
+                cmd = cls._get_git_base_cmd() + ["ls-remote", repo_url.strip(), target_ref]
                 result = subprocess.run(
                     cmd,
                     stdout=subprocess.PIPE,
@@ -242,8 +266,8 @@ class GitService:
                     parts = result.stdout.strip().split()
                     if parts:
                         return parts[0]
-            except Exception:
-                pass
+            except Exception as ge:
+                logger.warning("git ls-remote fallback failed for %s: %s", repo_url, ge)
         return None
 
     @classmethod

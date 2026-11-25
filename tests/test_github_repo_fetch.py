@@ -217,3 +217,76 @@ def test_git_unavailable_re_raises_zipball_error():
         with patch("shutil.which", return_value=None):
             with pytest.raises(ValueError, match="Repository branch or archive does not exist on GitHub."):
                 GitService.clone_and_parse_repository(repo_url)
+
+
+def test_git_base_cmd_flags():
+    """Verify _get_git_base_cmd() returns only ['git', '-c', 'credential.helper='] and has no sslBackend/sslCAInfo/sslVerify."""
+    cmd = GitService._get_git_base_cmd()
+    assert cmd == ["git", "-c", "credential.helper="]
+    cmd_str = " ".join(cmd)
+    assert "http.sslBackend" not in cmd_str
+    assert "http.sslCAInfo" not in cmd_str
+    assert "sslVerify" not in cmd_str
+
+
+def test_get_remote_head_sha_via_api():
+    """Verify get_remote_head_sha retrieves commit SHA via GitHub API with exact httpx settings."""
+    repo_url = "https://github.com/testowner/testrepo"
+    calls = []
+
+    def mock_httpx_get(url, *args, **kwargs):
+        calls.append({"url": url, "kwargs": kwargs})
+        resp = MagicMock()
+        resp.status_code = 200
+        if "commits" in url:
+            resp.json.return_value = {"sha": "head-sha-1234567890"}
+        else:
+            resp.json.return_value = {"private": False, "default_branch": "main"}
+        return resp
+
+    with patch("httpx.get", side_effect=mock_httpx_get):
+        sha = GitService.get_remote_head_sha(repo_url)
+
+    assert sha == "head-sha-1234567890"
+    commit_calls = [c for c in calls if "commits" in c["url"]]
+    assert len(commit_calls) == 1
+    call = commit_calls[0]
+    assert call["url"] == "https://api.github.com/repos/testowner/testrepo/commits/main"
+    assert call["kwargs"].get("verify") is True
+    assert call["kwargs"].get("follow_redirects") is True
+    assert call["kwargs"].get("timeout") == 10.0
+    headers = call["kwargs"].get("headers", {})
+    assert headers.get("User-Agent") == GITHUB_USER_AGENT
+
+
+def test_get_remote_head_sha_fallback_to_git_ls_remote():
+    """Verify get_remote_head_sha falls back to git ls-remote when GitHub API fails and git exists."""
+    repo_url = "https://github.com/testowner/testrepo"
+
+    with patch("httpx.get", side_effect=httpx.ConnectError("Network offline")):
+        with patch("shutil.which", return_value="/usr/bin/git"):
+            mock_proc = MagicMock()
+            mock_proc.returncode = 0
+            mock_proc.stdout = "git-ls-remote-sha-999\trefs/heads/main\n"
+            with patch("subprocess.run", return_value=mock_proc) as mock_run:
+                sha = GitService.get_remote_head_sha(repo_url)
+
+    assert sha == "git-ls-remote-sha-999"
+    assert mock_run.called
+    cmd_run = mock_run.call_args[0][0]
+    assert cmd_run[:3] == ["git", "-c", "credential.helper="]
+    assert "ls-remote" in cmd_run
+
+
+def test_get_remote_head_sha_no_git_fallback_when_git_missing():
+    """Verify get_remote_head_sha returns None without error when API fails and git binary is absent."""
+    repo_url = "https://github.com/testowner/testrepo"
+
+    with patch("httpx.get", side_effect=httpx.ConnectError("Network offline")):
+        with patch("shutil.which", return_value=None):
+            with patch("subprocess.run") as mock_run:
+                sha = GitService.get_remote_head_sha(repo_url)
+
+    assert sha is None
+    assert not mock_run.called
+
