@@ -36,7 +36,7 @@ class ZipProcessor:
     }
 
     @classmethod
-    def process_zip(cls, zip_bytes: bytes) -> List[Dict[str, Any]]:
+    def process_zip(cls, zip_bytes: bytes, strip_root_dir: bool = False) -> List[Dict[str, Any]]:
         """
         Processes a raw ZIP archive, extracting file details for supported files.
         Enforces upload size limit, file count limit, and zip-bomb decompression protection.
@@ -70,6 +70,19 @@ class ZipProcessor:
                 if len(zip_bytes) > 0 and (total_declared_uncompressed / len(zip_bytes)) > cls.MAX_COMPRESSION_RATIO:
                     raise ZipBombDetectedError("Potential ZIP bomb detected: compression ratio exceeds 100:1 safe threshold.")
 
+                # If strip_root_dir is requested (e.g. GitHub zipballs), detect common single top directory
+                prefix = ""
+                if strip_root_dir and non_dir_members:
+                    first_norm = os.path.normpath(non_dir_members[0].filename.replace("\\", "/")).replace("\\", "/")
+                    first_parts = first_norm.split("/")
+                    if len(first_parts) > 1:
+                        cand = first_parts[0] + "/"
+                        if all(
+                            os.path.normpath(m.filename.replace("\\", "/")).replace("\\", "/").startswith(cand)
+                            for m in non_dir_members
+                        ):
+                            prefix = cand
+
                 running_extracted_bytes = 0
 
                 for member in non_dir_members:
@@ -84,6 +97,10 @@ class ZipProcessor:
                     ):
                         # Block malicious archive paths attempting directory traversal
                         continue
+
+                    # Strip top-level directory if present (e.g., owner-repo-sha/ in GitHub zipballs)
+                    if prefix and norm_path.startswith(prefix):
+                        norm_path = norm_path[len(prefix):]
 
                     # Split path components to check if any part is ignored
                     path_parts = norm_path.split("/")
