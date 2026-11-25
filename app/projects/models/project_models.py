@@ -401,7 +401,7 @@ class TestExecution(Base):
     passed_tests = Column(Integer, default=0, nullable=False)
     failed_tests = Column(Integer, default=0, nullable=False)
     skipped_tests = Column(Integer, default=0, nullable=False)
-    coverage_percentage = Column(Float, default=0.0, nullable=False)
+    coverage_percentage = Column(Float, nullable=True, default=None)
     execution_time = Column(Float, nullable=True)
     status = Column(String(50), default="Pending", nullable=False)  # Pending, Generating, Running, Completed, Failed
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

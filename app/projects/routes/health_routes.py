@@ -16,7 +16,7 @@ def get_health(db: Session = Depends(get_db)):
         "database": "Healthy",
         "redis": "Healthy",
         "storage": "Healthy",
-        "version": "2.6.0"
+        "version": "1.0.0"
     }
     
     # 1. Test database engine connectivity

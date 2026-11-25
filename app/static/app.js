@@ -1127,7 +1127,7 @@ async function fetchDeploymentMetrics() {
         }
         
         const healthRes = await fetch('/health', { headers });
-        let healthData = { status: 'Unhealthy', database: 'Offline', redis: 'Offline', storage: 'Offline', version: '2.6.0' };
+        let healthData = { status: 'Unhealthy', database: 'Offline', redis: 'Offline', storage: 'Offline', version: '1.0.0' };
         if (healthRes.ok) {
             healthData = await healthRes.json();
         }
@@ -1206,7 +1206,7 @@ async function fetchDeploymentMetrics() {
         
         const logsList = document.getElementById('diagnostics-logs-list');
         let logsHTML = `
-            <div>[INFO] Platform Version: v${healthData.version || '2.6.0'}</div>
+            <div>[INFO] Platform Version: v${healthData.version || '1.0.0'}</div>
             <div>[INFO] Database Status check: ${healthData.database}</div>
             <div>[INFO] Redis Cache pool check: ${healthData.redis}</div>
             <div>[INFO] Storage Layer write check: ${healthData.storage}</div>
@@ -5526,20 +5526,32 @@ async function loadTestCenter(projectId) {
             card.style.cssText = `padding: 12px; border-radius: 8px; border: 1px solid ${activeTestExecutionId === t.id ? 'var(--accent-purple)' : 'rgba(255,255,255,0.06)'}; cursor: pointer; transition: all 0.2s ease; background: ${activeTestExecutionId === t.id ? 'rgba(167, 139, 250, 0.1)' : 'rgba(255,255,255,0.01)'}`;
             
             let statusColor = '#94a3b8';
-            if (t.status === 'Completed') statusColor = '#34d399';
-            if (t.status === 'Failed') statusColor = '#ef4444';
-            if (t.status === 'Running' || t.status === 'Generating') statusColor = '#facc15';
+            let displayStatus = t.status;
+            if (t.total_tests === 0 || t.status === 'No tests found') {
+                displayStatus = 'No tests found';
+                statusColor = 'var(--text-muted)';
+            } else if (t.status === 'Completed') {
+                statusColor = '#34d399';
+            } else if (t.status === 'Failed') {
+                statusColor = '#ef4444';
+            } else if (t.status === 'Running' || t.status === 'Generating') {
+                statusColor = '#facc15';
+            }
+
+            const covDisplay = (t.coverage_percentage !== null && t.coverage_percentage !== undefined && typeof t.coverage_percentage === 'number' && !isNaN(t.coverage_percentage) && t.coverage_percentage > 0)
+                ? `${t.coverage_percentage}%`
+                : 'N/A';
 
             card.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <span style="font-weight: 700; font-size: 13px; color: var(--text-bright);">Run #${t.id}</span>
-                    <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.3); color: ${statusColor}; font-weight: 600;">${t.status}</span>
+                    <span style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.3); color: ${statusColor}; font-weight: 600;">${displayStatus}</span>
                 </div>
                 <div style="font-size: 11px; color: var(--text-muted);">
                     <div>Framework: ${t.framework || 'N/A'}</div>
                     <div style="margin-top: 4px; display: flex; justify-content: space-between;">
                         <span>Passed: ${t.passed_tests}/${t.total_tests}</span>
-                        <span>Coverage: ${t.coverage_percentage}%</span>
+                        <span>Coverage: ${covDisplay}</span>
                     </div>
                 </div>
             `;
@@ -5582,7 +5594,7 @@ function resetTestMetrics() {
     document.getElementById('test-metric-passed').innerText = '0';
     document.getElementById('test-metric-failed').innerText = '0';
     document.getElementById('test-metric-skipped').innerText = '0';
-    document.getElementById('test-metric-coverage').innerText = '0%';
+    document.getElementById('test-metric-coverage').innerText = 'N/A';
     document.getElementById('test-metric-regression').innerText = 'N/A';
     document.getElementById('test-metric-regression').style.color = 'var(--text-muted)';
     document.getElementById('test-metric-time').innerText = '0.0s';
@@ -5593,10 +5605,20 @@ function updateTestMetrics(t) {
     document.getElementById('test-metric-passed').innerText = t.passed_tests;
     document.getElementById('test-metric-failed').innerText = t.failed_tests;
     document.getElementById('test-metric-skipped').innerText = t.skipped_tests;
-    document.getElementById('test-metric-coverage').innerText = t.coverage_percentage + '%';
+    
+    // Real coverage or N/A (no default numbers)
+    const covEl = document.getElementById('test-metric-coverage');
+    if (t.coverage_percentage !== null && t.coverage_percentage !== undefined && typeof t.coverage_percentage === 'number' && !isNaN(t.coverage_percentage) && t.coverage_percentage > 0) {
+        covEl.innerText = t.coverage_percentage + '%';
+    } else {
+        covEl.innerText = 'N/A';
+    }
     
     const regressionEl = document.getElementById('test-metric-regression');
-    if (t.failed_tests === 0 && t.status === 'Completed') {
+    if (t.total_tests === 0 || t.status === 'No tests found') {
+        regressionEl.innerText = 'No tests found';
+        regressionEl.style.color = 'var(--text-muted)';
+    } else if (t.failed_tests === 0 && t.status === 'Completed') {
         regressionEl.innerText = 'Clean';
         regressionEl.style.color = '#34d399';
     } else if (t.status === 'Failed') {
@@ -5620,11 +5642,20 @@ function showTestDetails(t) {
     document.getElementById('active-test-framework').innerText = t.framework || 'pytest';
     
     const badge = document.getElementById('active-test-status-badge');
-    badge.innerText = t.status;
     badge.className = 'badge';
-    if (t.status === 'Completed') badge.style.cssText = 'background: rgba(52, 211, 153, 0.1); color: #34d399;';
-    else if (t.status === 'Failed') badge.style.cssText = 'background: rgba(239, 68, 68, 0.1); color: #ef4444;';
-    else badge.style.cssText = 'background: rgba(250, 204, 21, 0.1); color: #facc15;';
+    if (t.total_tests === 0 || t.status === 'No tests found') {
+        badge.innerText = 'No tests found';
+        badge.style.cssText = 'background: rgba(161, 161, 170, 0.1); color: var(--text-muted);';
+    } else if (t.status === 'Completed') {
+        badge.innerText = 'Completed';
+        badge.style.cssText = 'background: rgba(52, 211, 153, 0.1); color: #34d399;';
+    } else if (t.status === 'Failed') {
+        badge.innerText = 'Failed';
+        badge.style.cssText = 'background: rgba(239, 68, 68, 0.1); color: #ef4444;';
+    } else {
+        badge.innerText = t.status;
+        badge.style.cssText = 'background: rgba(250, 204, 21, 0.1); color: #facc15;';
+    }
 
     // Show button only if executable or pending
     const runBtn = document.getElementById('btn-test-run-execute');

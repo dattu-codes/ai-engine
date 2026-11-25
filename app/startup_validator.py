@@ -12,7 +12,7 @@ def run_startup_validation():
         "storage": "Healthy",
         "workers": "Healthy",
         "environment": settings.APP_ENVIRONMENT,
-        "version": "2.6.0",
+        "version": "1.0.0",
         "errors": []
     }
     

@@ -83,19 +83,54 @@ class TestRunnerService:
                     skipped = int(skipped_match.group(1))
                 
                 total = passed + failed + skipped
-                if total == 0 and result.returncode != 0:
-                    failed = 1
-                    total = 1
                 
-                test_exec.total_tests = total
-                test_exec.passed_tests = passed
-                test_exec.failed_tests = failed
-                test_exec.skipped_tests = skipped
+                # If no tests were collected, status must be 'No tests found', never 'passed'
+                if total == 0:
+                    test_exec.total_tests = 0
+                    test_exec.passed_tests = 0
+                    test_exec.failed_tests = 0
+                    test_exec.skipped_tests = 0
+                    test_exec.status = "No tests found"
+                    test_exec.coverage_percentage = None
+                else:
+                    test_exec.total_tests = total
+                    test_exec.passed_tests = passed
+                    test_exec.failed_tests = failed
+                    test_exec.skipped_tests = skipped
+                    test_exec.status = "Completed" if failed == 0 else "Failed"
+                    
+                    # Coverage must come from a real coverage run or show N/A (None). No default numbers.
+                    real_coverage_pct = None
+                    try:
+                        cov_res = subprocess.run(
+                            [python_bin, "-m", "coverage", "run", "-m", "pytest", "-v"],
+                            cwd=abs_temp_dir,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            text=True,
+                            timeout=20
+                        )
+                        if cov_res.returncode in (0, 1):
+                            cov_json_res = subprocess.run(
+                                [python_bin, "-m", "coverage", "json", "-o", "coverage.json"],
+                                cwd=abs_temp_dir,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True,
+                                timeout=10
+                            )
+                            cov_path = os.path.join(abs_temp_dir, "coverage.json")
+                            if os.path.exists(cov_path):
+                                with open(cov_path, "r", encoding="utf-8") as cf:
+                                    cov_data = json.load(cf)
+                                    if "totals" in cov_data and "percent_covered" in cov_data["totals"]:
+                                        real_coverage_pct = round(float(cov_data["totals"]["percent_covered"]), 1)
+                    except Exception:
+                        real_coverage_pct = None
+                    
+                    test_exec.coverage_percentage = real_coverage_pct
+
                 test_exec.execution_log = execution_log.strip()
-                
-                # Compute coverage percentage
-                coverage_data = CoverageService.calculate_coverage(vfs, modified_files=[], language="python")
-                test_exec.coverage_percentage = coverage_data.get("overall_coverage", 75.0)
 
             except subprocess.TimeoutExpired:
                 test_exec.execution_log = "Test execution timed out after 30 seconds."
@@ -146,25 +181,35 @@ class TestRunnerService:
                 test_exec.passed_tests = 0
                 test_exec.failed_tests = 0
                 test_exec.skipped_tests = 0
-                test_exec.coverage_percentage = 0.0
+                test_exec.coverage_percentage = None
                 test_exec.execution_log = (
                     f"Test runner for '{language}' skipped: Native toolchain (e.g. Maven, npm, or Go) "
                     f"is not installed on the host environment.\n"
                     f"Platform policy strictly forbids reporting simulated test results.\n"
                     f"To run {language} tests, install the toolchain or deploy via Docker."
                 )
-                test_exec.status = "Skipped"
+                test_exec.status = "No tests found"
 
         # Validate Regression
         regression_report = RegressionService.verify_behavior(db, test_exec)
         # If regression checks fail, update status
         
         test_exec.execution_time = time.time() - start_time
-        test_exec.status = "Completed" if test_exec.failed_tests == 0 else "Failed"
+        if test_exec.total_tests == 0 or test_exec.status == "No tests found":
+            test_exec.status = "No tests found"
+        else:
+            test_exec.status = "Completed" if test_exec.failed_tests == 0 else "Failed"
         db.commit()
 
         # Log Activity Run Completed
-        activity_type = "Test Run Completed" if test_exec.status == "Completed" else "Test Run Failed"
+        if test_exec.status == "No tests found":
+            activity_type = "Test Run (No Tests Found)"
+        elif test_exec.status == "Completed":
+            activity_type = "Test Run Completed"
+        else:
+            activity_type = "Test Run Failed"
+
+        cov_str = f"{test_exec.coverage_percentage}%" if test_exec.coverage_percentage is not None else "N/A"
         ActivityService.log_activity(
             db=db,
             workspace_id=project.workspace_id,
@@ -173,7 +218,7 @@ class TestRunnerService:
             activity_type=activity_type,
             entity_type="test_execution",
             entity_id=test_exec.id,
-            description=f"Automated tests run completed for version {test_exec.version.version_number if test_exec.version else 'N/A'}. Pass rate: {test_exec.passed_tests}/{test_exec.total_tests} ({test_exec.coverage_percentage}% coverage)."
+            description=f"Automated tests run completed for version {test_exec.version.version_number if test_exec.version else 'N/A'}. Pass rate: {test_exec.passed_tests}/{test_exec.total_tests} ({cov_str} coverage)."
         )
 
         return test_exec

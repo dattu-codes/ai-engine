@@ -209,11 +209,11 @@ func TestEdgeCases(t *testing.T) {{
             test_type="Unit & Regression",
             generated_tests_json=json.dumps({"files": generated_files}),
             execution_log="Test suite compiled successfully. Pending execution runs.",
-            total_tests=len(generated_files) * 2,  # Simulated counts initially
+            total_tests=0,
             passed_tests=0,
             failed_tests=0,
             skipped_tests=0,
-            coverage_percentage=0.0,
+            coverage_percentage=None,
             status="Pending",
             created_at=datetime.utcnow()
         )

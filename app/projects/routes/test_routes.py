@@ -29,7 +29,7 @@ class TestExecutionResponse(BaseModel):
     passed_tests: int
     failed_tests: int
     skipped_tests: int
-    coverage_percentage: float
+    coverage_percentage: Optional[float] = None
     execution_time: Optional[float] = None
     status: str
     created_at: datetime
@@ -129,7 +129,12 @@ def get_test_coverage(
         except Exception:
             pass
             
-    coverage_data = CoverageService.calculate_coverage(vfs, modified_files, test_exec.language)
+    coverage_data = CoverageService.calculate_coverage(
+        files=vfs,
+        modified_files=modified_files,
+        language=test_exec.language,
+        real_coverage_pct=test_exec.coverage_percentage
+    )
     return coverage_data
 
 @test_router.get("/projects/{project_id}/tests", response_model=List[TestExecutionResponse])
