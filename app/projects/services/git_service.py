@@ -7,6 +7,7 @@ import subprocess
 import uuid
 import hashlib
 import logging
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Tuple, Optional
 import httpx
 from app.projects.services.zip_processor import ZipProcessor
@@ -47,6 +48,46 @@ class GitService:
         return ["git", "-c", "credential.helper="]
 
     @classmethod
+    def _get_github_headers(cls) -> Dict[str, str]:
+        """
+        Returns standard headers for GitHub REST API requests.
+        If GITHUB_API_TOKEN environment variable is set, includes Authorization header.
+        Never logs or exposes the token in error messages.
+        """
+        headers = {
+            "User-Agent": GITHUB_USER_AGENT,
+            "Accept": "application/vnd.github.v3+json"
+        }
+        token = os.environ.get("GITHUB_API_TOKEN")
+        if token and token.strip():
+            headers["Authorization"] = f"Bearer {token.strip()}"
+        return headers
+
+    @staticmethod
+    def _get_rate_limit_message(resp: httpx.Response) -> str:
+        """
+        Extracts X-RateLimit-Reset timestamp if present and returns formatted rate limit message.
+        Example: 'GitHub rate limit reached, try again at 18:45'
+        """
+        reset_header = None
+        try:
+            raw_val = resp.headers.get("X-RateLimit-Reset") or resp.headers.get("x-ratelimit-reset")
+            if isinstance(raw_val, (str, int, float)) and str(raw_val).isdigit():
+                reset_header = raw_val
+        except Exception:
+            pass
+
+        if reset_header is not None:
+            try:
+                reset_ts = int(reset_header)
+                # GitHub's X-RateLimit-Reset is in UTC epoch seconds
+                reset_time = datetime.fromtimestamp(reset_ts, tz=timezone.utc).strftime("%H:%M")
+                return f"GitHub rate limit reached, try again at {reset_time}"
+            except Exception:
+                pass
+        return "GitHub rate limit reached, try again later"
+
+    @classmethod
     def check_public_repo(cls, repo_url: str) -> Dict[str, Any]:
         """
         Validates the GitHub URL and checks repository accessibility using GitHub REST API.
@@ -57,10 +98,7 @@ class GitService:
             raise ValueError("Invalid GitHub Repository URL format.")
 
         api_url = f"https://api.github.com/repos/{owner}/{repo}"
-        headers = {
-            "User-Agent": GITHUB_USER_AGENT,
-            "Accept": "application/vnd.github.v3+json"
-        }
+        headers = cls._get_github_headers()
 
         try:
             resp = httpx.get(
@@ -95,8 +133,9 @@ class GitService:
             raise ValueError("Repository does not exist on GitHub.")
 
         elif resp.status_code in (403, 429):
-            logger.warning("GitHub API rate limit encountered (%s) for %s.", resp.status_code, repo_url)
-            raise ValueError("GitHub rate limit, try again later.")
+            msg = cls._get_rate_limit_message(resp)
+            logger.warning("GitHub API rate limit encountered (%s) for %s: %s", resp.status_code, repo_url, msg)
+            raise ValueError(msg)
 
         else:
             logger.warning("GitHub API error (%s) checking %s: %s", resp.status_code, repo_url, resp.text)
@@ -131,10 +170,7 @@ class GitService:
         extracts supported code files enforcing all security and zip-slip limits.
         """
         zip_url = f"https://api.github.com/repos/{owner}/{repo}/zipball/{branch}"
-        headers = {
-            "User-Agent": GITHUB_USER_AGENT,
-            "Accept": "application/vnd.github.v3+json"
-        }
+        headers = cls._get_github_headers()
 
         try:
             resp = httpx.get(
@@ -155,8 +191,9 @@ class GitService:
             logger.warning("Zipball not found for %s/%s branch %s (HTTP 404)", owner, repo, branch)
             raise ValueError("Repository branch or archive does not exist on GitHub.")
         elif resp.status_code in (403, 429):
-            logger.warning("GitHub API rate limited downloading zipball for %s/%s (HTTP %s)", owner, repo, resp.status_code)
-            raise ValueError("GitHub rate limit, try again later.")
+            msg = cls._get_rate_limit_message(resp)
+            logger.warning("GitHub API rate limited downloading zipball for %s/%s (HTTP %s): %s", owner, repo, resp.status_code, msg)
+            raise ValueError(msg)
         elif resp.status_code != 200:
             logger.warning("Failed to download zipball for %s/%s (HTTP %s): %s", owner, repo, resp.status_code, resp.text)
             raise ValueError(f"Failed to download repository archive (HTTP {resp.status_code}).")
@@ -174,10 +211,7 @@ class GitService:
         Retrieves the latest commit SHA and message for the branch via GitHub Commits API.
         """
         commit_url = f"https://api.github.com/repos/{owner}/{repo}/commits/{branch}"
-        headers = {
-            "User-Agent": GITHUB_USER_AGENT,
-            "Accept": "application/vnd.github.v3+json"
-        }
+        headers = cls._get_github_headers()
         try:
             resp = httpx.get(
                 commit_url,
@@ -191,6 +225,9 @@ class GitService:
                 sha = data.get("sha", "")
                 msg = data.get("commit", {}).get("message", "Imported from GitHub")
                 return sha, msg
+            elif resp.status_code in (403, 429):
+                rate_msg = cls._get_rate_limit_message(resp)
+                logger.warning("GitHub API rate limit encountered fetching commit metadata for %s/%s: %s", owner, repo, rate_msg)
             else:
                 logger.warning("GitHub commits endpoint returned HTTP %s for %s/%s", resp.status_code, owner, repo)
         except Exception as e:
@@ -216,10 +253,7 @@ class GitService:
                     target_branch = "HEAD"
 
             commit_url = f"https://api.github.com/repos/{owner}/{repo}/commits/{target_branch}"
-            headers = {
-                "User-Agent": GITHUB_USER_AGENT,
-                "Accept": "application/vnd.github.v3+json"
-            }
+            headers = cls._get_github_headers()
             try:
                 resp = httpx.get(
                     commit_url,
@@ -236,7 +270,8 @@ class GitService:
                 elif resp.status_code == 404:
                     logger.warning("Commit endpoint returned 404 for %s/%s branch %s", owner, repo, target_branch)
                 elif resp.status_code in (403, 429):
-                    logger.warning("GitHub rate limit encountered fetching commit SHA for %s/%s (HTTP %s)", owner, repo, resp.status_code)
+                    rate_msg = cls._get_rate_limit_message(resp)
+                    logger.warning("GitHub rate limit encountered fetching commit SHA for %s/%s (HTTP %s): %s", owner, repo, resp.status_code, rate_msg)
                 else:
                     logger.warning("GitHub commits endpoint returned HTTP %s for %s/%s", resp.status_code, owner, repo)
             except httpx.TimeoutException as e:
@@ -457,9 +492,50 @@ class GitService:
         if not is_valid:
             raise ValueError("Invalid GitHub Repository URL format.")
 
+        def _attempt_git_clone_fallback(default_br: str) -> Optional[Tuple[Dict[str, str], List[Dict[str, Any]]]]:
+            if not shutil.which("git"):
+                return None
+            logger.info("Attempting git CLI clone fallback for %s", repo_url)
+            base_temp_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "temp_clones"))
+            os.makedirs(base_temp_path, exist_ok=True)
+            dest_dir = os.path.join(base_temp_path, str(uuid.uuid4()))
+            try:
+                success = cls.clone_repository(repo_url, dest_dir)
+                if success:
+                    metadata = cls.get_repo_metadata(dest_dir)
+                    metadata["repo_url"] = repo_url
+                    metadata["repo_name"] = repo
+                    metadata["repo_owner"] = owner
+                    if not metadata.get("default_branch"):
+                        metadata["default_branch"] = default_br
+                    if not metadata.get("current_branch"):
+                        metadata["current_branch"] = default_br
+                    files = cls.parse_files(dest_dir)
+                    return metadata, files
+                else:
+                    logger.warning("Git CLI clone command failed for %s", repo_url)
+            except Exception as ge:
+                logger.warning("Exception during git CLI clone fallback for %s: %s", repo_url, ge)
+            finally:
+                if os.path.exists(dest_dir):
+                    shutil.rmtree(dest_dir, onerror=remove_readonly)
+            return None
+
         # 1. Check repository accessibility via GitHub REST API (distinguishes 404, private, rate limit, network)
-        repo_data = cls.check_public_repo(repo_url)
-        default_branch = repo_data.get("default_branch") or "main"
+        default_branch = "main"
+        try:
+            repo_data = cls.check_public_repo(repo_url)
+            default_branch = repo_data.get("default_branch") or "main"
+        except ValueError as e:
+            if "GitHub rate limit" in str(e):
+                logger.warning("GitHub API rate limit hit checking repo %s: %s", repo_url, e)
+                fallback_res = _attempt_git_clone_fallback(default_branch)
+                if fallback_res:
+                    return fallback_res
+                # Only show rate-limit message if both paths fail
+                raise e
+            else:
+                raise e
 
         # 2. Attempt fetching code via GitHub zipball archive
         zip_error: Optional[Exception] = None
@@ -481,31 +557,9 @@ class GitService:
             logger.warning("Zipball download/extraction failed for %s/%s: %s", owner, repo, e)
 
         # 3. Fallback to git binary if available on system
-        if shutil.which("git"):
-            logger.info("Attempting git CLI clone fallback for %s", repo_url)
-            base_temp_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "temp_clones"))
-            os.makedirs(base_temp_path, exist_ok=True)
-            dest_dir = os.path.join(base_temp_path, str(uuid.uuid4()))
-            try:
-                success = cls.clone_repository(repo_url, dest_dir)
-                if success:
-                    metadata = cls.get_repo_metadata(dest_dir)
-                    metadata["repo_url"] = repo_url
-                    metadata["repo_name"] = repo
-                    metadata["repo_owner"] = owner
-                    if not metadata.get("default_branch"):
-                        metadata["default_branch"] = default_branch
-                    if not metadata.get("current_branch"):
-                        metadata["current_branch"] = default_branch
-                    files = cls.parse_files(dest_dir)
-                    return metadata, files
-                else:
-                    logger.warning("Git CLI clone command failed for %s", repo_url)
-            except Exception as ge:
-                logger.warning("Exception during git CLI clone fallback for %s: %s", repo_url, ge)
-            finally:
-                if os.path.exists(dest_dir):
-                    shutil.rmtree(dest_dir, onerror=remove_readonly)
+        fallback_res = _attempt_git_clone_fallback(default_branch)
+        if fallback_res:
+            return fallback_res
 
         # 4. If zipball failed and git fallback unavailable/failed, raise the specific zip_error
         if isinstance(zip_error, ValueError):

@@ -97,7 +97,7 @@ def test_repo_rate_limited(caplog):
         resp.text = "rate limit exceeded"
 
         with patch("httpx.get", return_value=resp):
-            with pytest.raises(ValueError, match="GitHub rate limit, try again later."):
+            with pytest.raises(ValueError, match="GitHub rate limit reached, try again later"):
                 GitService.check_public_repo(repo_url)
 
         assert any(
@@ -289,4 +289,119 @@ def test_get_remote_head_sha_no_git_fallback_when_git_missing():
 
     assert sha is None
     assert not mock_run.called
+
+
+def test_github_token_header_present_when_env_set(monkeypatch):
+    """Verify Authorization header is included in GitHub API requests when GITHUB_API_TOKEN is set."""
+    monkeypatch.setenv("GITHUB_API_TOKEN", "ghp_secrettoken123456789")
+    repo_url = "https://github.com/testowner/testrepo"
+    captured_headers = []
+
+    def mock_httpx_get(url, *args, **kwargs):
+        captured_headers.append(kwargs.get("headers", {}))
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {"private": False, "default_branch": "main"}
+        return resp
+
+    with patch("httpx.get", side_effect=mock_httpx_get):
+        GitService.check_public_repo(repo_url)
+
+    assert len(captured_headers) == 1
+    assert captured_headers[0].get("Authorization") == "Bearer ghp_secrettoken123456789"
+
+
+def test_github_token_header_absent_when_env_not_set(monkeypatch):
+    """Verify Authorization header is absent when GITHUB_API_TOKEN is not set."""
+    monkeypatch.delenv("GITHUB_API_TOKEN", raising=False)
+    repo_url = "https://github.com/testowner/testrepo"
+    captured_headers = []
+
+    def mock_httpx_get(url, *args, **kwargs):
+        captured_headers.append(kwargs.get("headers", {}))
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {"private": False, "default_branch": "main"}
+        return resp
+
+    with patch("httpx.get", side_effect=mock_httpx_get):
+        GitService.check_public_repo(repo_url)
+
+    assert len(captured_headers) == 1
+    assert "Authorization" not in captured_headers[0]
+
+
+def test_repo_rate_limited_with_reset_time():
+    """Verify rate limit (403/429) reads X-RateLimit-Reset and shows HH:MM reset time in error."""
+    repo_url = "https://github.com/testowner/ratelimited-repo"
+    # Epoch 1700000000 corresponds to 22:13 UTC
+    resp = MagicMock()
+    resp.status_code = 403
+    resp.headers = {"X-RateLimit-Reset": "1700000000"}
+
+    with patch("httpx.get", return_value=resp):
+        with pytest.raises(ValueError) as excinfo:
+            GitService.check_public_repo(repo_url)
+
+    assert "GitHub rate limit reached, try again at 22:13" in str(excinfo.value)
+
+    # Also test 429 status code
+    resp_429 = MagicMock()
+    resp_429.status_code = 429
+    resp_429.headers = {"X-RateLimit-Reset": "1700003600"}  # 23:13 UTC
+
+    with patch("httpx.get", return_value=resp_429):
+        with pytest.raises(ValueError) as excinfo:
+            GitService.check_public_repo(repo_url)
+
+    assert "GitHub rate limit reached, try again at 23:13" in str(excinfo.value)
+
+
+def test_rate_limited_git_fallback_when_git_available():
+    """Verify that when API is rate limited and git binary is available, clone_and_parse_repository falls back to git clone --depth 1."""
+    repo_url = "https://github.com/testowner/fallback-repo"
+
+    resp = MagicMock()
+    resp.status_code = 403
+    resp.headers = {"X-RateLimit-Reset": "1700000000"}
+
+    mock_metadata = {
+        "repo_url": repo_url,
+        "repo_name": "fallback-repo",
+        "repo_owner": "testowner",
+        "default_branch": "main",
+        "current_branch": "main",
+        "last_commit_sha": "git-clone-sha-12345",
+        "last_commit_message": "Fetched via git fallback"
+    }
+    mock_files = [{"filename": "app.py", "content": "print('hello')", "extension": ".py", "size": 14, "language": "Python"}]
+
+    with patch("httpx.get", return_value=resp):
+        with patch("shutil.which", return_value="/usr/bin/git"):
+            with patch.object(GitService, "clone_repository", return_value=True):
+                with patch.object(GitService, "get_repo_metadata", return_value=mock_metadata):
+                    with patch.object(GitService, "parse_files", return_value=mock_files):
+                        metadata, files = GitService.clone_and_parse_repository(repo_url)
+
+    assert metadata["last_commit_sha"] == "git-clone-sha-12345"
+    assert len(files) == 1
+    assert files[0]["filename"] == "app.py"
+
+
+def test_rate_limited_git_fallback_fails_shows_rate_limit_error():
+    """Verify that if API is rate limited and git clone fallback fails, the rate limit message with reset time is shown."""
+    repo_url = "https://github.com/testowner/fallback-repo"
+
+    resp = MagicMock()
+    resp.status_code = 403
+    resp.headers = {"X-RateLimit-Reset": "1700000000"}
+
+    with patch("httpx.get", return_value=resp):
+        with patch("shutil.which", return_value="/usr/bin/git"):
+            with patch.object(GitService, "clone_repository", return_value=False):
+                with pytest.raises(ValueError) as excinfo:
+                    GitService.clone_and_parse_repository(repo_url)
+
+    assert "GitHub rate limit reached, try again at 22:13" in str(excinfo.value)
+
 
