@@ -432,6 +432,7 @@
                         </div>
                         <div class="top-bar-item">
                             <span class="top-bar-label">Threshold</span>
+                            <span class="top-bar-hint">Minimum quality score to pass</span>
                             <div class="slider-container">
                                 <input type="range" id="threshold" min="50" max="95" value="80">
                                 <span id="threshold-val">80%</span>
@@ -439,10 +440,11 @@
                         </div>
                         <div class="top-bar-item">
                             <span class="top-bar-label">Model Engine</span>
-                            <select id="model">
+                            <select id="model" disabled>
+                                 <option value="offline" selected>Offline analyzer (no API key)</option>
                                  <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-<option value="gpt-4o">GPT-4o</option>
-<option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
+                                 <option value="gpt-4o">GPT-4o</option>
+                                 <option value="claude-3-5-sonnet">Claude 3.5 Sonnet</option>
                              </select>
                         </div>
                         <button id="btn-run" class="btn btn-primary pulse-btn">
@@ -508,7 +510,7 @@
                                     </div>
                                     <div class="summary-details">
                                         <h3>Executive Summary</h3>
-                                        <p id="summary-text" class="placeholder-text">Run the review execution to generate an AI codebase report...</p>
+                                        <p id="summary-text" class="placeholder-text">Run Review to analyze your code.</p>
                                         <div id="functions-list-container" style="display: none;">
                                             <h4>Detected Functions:</h4>
                                             <ul id="functions-list" class="function-pills"></ul>

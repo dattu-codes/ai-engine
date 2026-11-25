@@ -84,6 +84,30 @@ function initFormControls() {
     const modelEngineSelect = document.getElementById('model');
     const apiKeyLabel = document.getElementById('api-key-label');
     
+    function syncModelEngineState() {
+        if (!modelEngineSelect) return;
+        const key = apiKeyInput ? apiKeyInput.value.trim() : '';
+        let offlineOpt = modelEngineSelect.querySelector('option[value="offline"]');
+        if (!key) {
+            if (!offlineOpt) {
+                offlineOpt = document.createElement('option');
+                offlineOpt.value = 'offline';
+                offlineOpt.textContent = 'Offline analyzer (no API key)';
+                modelEngineSelect.insertBefore(offlineOpt, modelEngineSelect.firstChild);
+            }
+            offlineOpt.selected = true;
+            modelEngineSelect.disabled = true;
+        } else {
+            modelEngineSelect.disabled = false;
+            if (offlineOpt) {
+                offlineOpt.remove();
+            }
+            if (!modelEngineSelect.value || modelEngineSelect.value === 'offline') {
+                modelEngineSelect.value = 'gemini-2.5-flash';
+            }
+        }
+    }
+
     function updatePlaygroundKeyLabelAndValue() {
         if (!modelEngineSelect || !apiKeyLabel || !apiKeyInput) return;
         const selectedModel = modelEngineSelect.value;
@@ -100,13 +124,20 @@ function initFormControls() {
             apiKeyInput.placeholder = 'Enter API Key to enable Live Mode...';
             apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
         }
+        syncModelEngineState();
     }
     
+    if (apiKeyInput) {
+        apiKeyInput.addEventListener('input', syncModelEngineState);
+        apiKeyInput.addEventListener('change', syncModelEngineState);
+    }
+
     if (modelEngineSelect) {
         modelEngineSelect.addEventListener('change', updatePlaygroundKeyLabelAndValue);
         // Run once on load to initialize correct state
         updatePlaygroundKeyLabelAndValue();
     }
+    syncModelEngineState();
 
     // Execute Button
     const runBtn = document.getElementById('btn-run');
@@ -233,7 +264,8 @@ async  function executeWorkflow() {
     const code = document.getElementById('code-input').value;
     let apiKey = document.getElementById('api-key').value;
     const threshold = document.getElementById('threshold').value;
-    const model = document.getElementById('model').value;
+    const rawModel = document.getElementById('model').value;
+    const model = (rawModel === 'offline' || !rawModel) ? 'gemini-2.5-flash' : rawModel;
     const runBtn = document.getElementById('btn-run');
     
     // Auto-fill from settings if playground key is empty
@@ -960,7 +992,7 @@ async function checkUserSession() {
 
             // Auto-load projects on login
             const workspaceBtn = document.getElementById('nav-item-workspace');
-            if (workspaceBtn) workspaceBtn.style.display = 'block';
+            if (workspaceBtn) workspaceBtn.style.display = 'flex';
             loadProjects();
         } else if (res.status === 401) {
             // Attempt rotation
@@ -1738,19 +1770,19 @@ async function selectProject(id) {
         const chatBtn = document.getElementById('nav-item-chat');
         if (chatBtn) chatBtn.style.display = 'block';
         const prBtn = document.getElementById('nav-item-pull-requests');
-        if (prBtn) prBtn.style.display = 'block';
+        if (prBtn) prBtn.style.display = 'flex';
         const findingsBtn = document.getElementById('nav-item-findings');
-        if (findingsBtn) findingsBtn.style.display = 'block';
+        if (findingsBtn) findingsBtn.style.display = 'flex';
         const semanticBtn = document.getElementById('nav-item-semantic');
-        if (semanticBtn) semanticBtn.style.display = 'block';
+        if (semanticBtn) semanticBtn.style.display = 'flex';
         const fixCenterBtn = document.getElementById('nav-item-fix-center');
-        if (fixCenterBtn) fixCenterBtn.style.display = 'block';
+        if (fixCenterBtn) fixCenterBtn.style.display = 'flex';
         const testCenterBtn = document.getElementById('nav-item-test-center');
-        if (testCenterBtn) testCenterBtn.style.display = 'block';
+        if (testCenterBtn) testCenterBtn.style.display = 'flex';
         const workspaceBtn = document.getElementById('nav-item-workspace');
-        if (workspaceBtn) workspaceBtn.style.display = 'block';
+        if (workspaceBtn) workspaceBtn.style.display = 'flex';
         const insightsBtn = document.getElementById('nav-item-insights');
-        if (insightsBtn) insightsBtn.style.display = 'block';
+        if (insightsBtn) insightsBtn.style.display = 'flex';
 
         // Load files list
         await loadProjectFiles(id);
