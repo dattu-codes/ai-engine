@@ -116,17 +116,17 @@
 
 
         <button class="nav-item" data-view="view-findings" id="nav-item-findings" style="display: none;">
-            <span class="nav-icon nav-icon-mark">05</span>
+            <span class="nav-icon nav-icon-mark">06</span>
             <span class="nav-text">Review Findings</span>
         </button>
 
         <button class="nav-item" data-view="view-pull-requests" id="nav-item-pull-requests" style="display: none;">
-            <span class="nav-icon nav-icon-mark">06</span>
+            <span class="nav-icon nav-icon-mark">07</span>
             <span class="nav-text">Pull Requests</span>
         </button>
 
         <button class="nav-item" data-view="view-semantic" id="nav-item-semantic" style="display: none;">
-            <span class="nav-icon nav-icon-mark">07</span>
+            <span class="nav-icon nav-icon-mark">08</span>
             <span class="nav-text">Semantic Explorer</span>
         </button>
 
@@ -415,9 +415,16 @@
                             <div class="top-bar-val" id="dashboard-branch">—</div>
                         </div>
                         <div class="top-bar-item">
-                            <span class="top-bar-label" id="api-key-label">Gemini API Key</span>
+                            <div class="provider-select-header" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px;">
+                                <select id="provider-select" class="provider-dropdown" aria-label="Select AI Provider" style="background: var(--surface-raised); border: 1px solid var(--border); color: var(--text-bright); border-radius: 6px; font-size: 11px; font-weight: 600; padding: 2px 8px; cursor: pointer; outline: none;">
+                                    <option value="gemini" selected>Gemini</option>
+                                    <option value="openai">OpenAI</option>
+                                    <option value="claude">Claude</option>
+                                </select>
+                                <span class="top-bar-label" id="api-key-label" style="margin-bottom: 0; font-size: 11px; text-transform: uppercase;">API Key</span>
+                            </div>
                             <div class="api-key-container">
-                                <input type="password" id="api-key" placeholder="Enter API Key to enable Live Mode..." autocomplete="new-password">
+                                <input type="password" id="api-key" placeholder="Enter Gemini API Key to enable Live Mode..." autocomplete="new-password">
                                 <button type="button" id="toggle-key-visibility" class="btn-icon" aria-label="Toggle API Key visibility" title="Toggle visibility">
                                     <svg class="icon-eye-open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>

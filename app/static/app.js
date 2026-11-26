@@ -80,64 +80,127 @@ function initFormControls() {
         });
     }
 
-    // Dynamic API key label and loading based on selected model engine (v3.1 UX refinement)
+    // Provider configuration and model engine synchronization
+    const PROVIDER_CONFIG = {
+        gemini: {
+            name: 'Gemini',
+            label: 'Gemini API Key',
+            storageKey: 'gemini_api_key',
+            placeholder: 'Enter Gemini API Key to enable Live Mode...',
+            models: [
+                { value: 'gemini-2.5-flash', text: 'Gemini 2.5 Flash' },
+                { value: 'gemini-1.5-pro', text: 'Gemini 1.5 Pro' },
+                { value: 'gemini-1.5-flash', text: 'Gemini 1.5 Flash' }
+            ]
+        },
+        openai: {
+            name: 'OpenAI',
+            label: 'OpenAI API Key',
+            storageKey: 'openai_api_key',
+            placeholder: 'Enter OpenAI API Key to enable Live Mode...',
+            models: [
+                { value: 'gpt-4o', text: 'GPT-4o (OpenAI)' },
+                { value: 'gpt-4o-mini', text: 'GPT-4o Mini (OpenAI)' },
+                { value: 'gpt-4-turbo', text: 'GPT-4 Turbo (OpenAI)' }
+            ]
+        },
+        claude: {
+            name: 'Claude',
+            label: 'Claude API Key',
+            storageKey: 'anthropic_api_key',
+            placeholder: 'Enter Claude API Key to enable Live Mode...',
+            models: [
+                { value: 'claude-3-5-sonnet', text: 'Claude 3.5 Sonnet' },
+                { value: 'claude-3-haiku', text: 'Claude 3 Haiku' },
+                { value: 'claude-3-opus', text: 'Claude 3 Opus' }
+            ]
+        }
+    };
+
+    const providerSelect = document.getElementById('provider-select');
     const modelEngineSelect = document.getElementById('model');
     const apiKeyLabel = document.getElementById('api-key-label');
-    
-    function syncModelEngineState() {
-        if (!modelEngineSelect) return;
-        const key = apiKeyInput ? apiKeyInput.value.trim() : '';
-        let offlineOpt = modelEngineSelect.querySelector('option[value="offline"]');
-        if (!key) {
-            if (!offlineOpt) {
-                offlineOpt = document.createElement('option');
+
+    function syncProviderAndModel(triggerSource = 'provider') {
+        const selectedProvider = providerSelect ? providerSelect.value : 'gemini';
+        const config = PROVIDER_CONFIG[selectedProvider] || PROVIDER_CONFIG.gemini;
+
+        if (apiKeyLabel) {
+            apiKeyLabel.textContent = `${config.name} API Key`;
+        }
+
+        // When switching providers, populate the API key field with the key saved in Account Settings
+        if (triggerSource === 'provider' && apiKeyInput) {
+            const savedKey = localStorage.getItem(config.storageKey) || '';
+            apiKeyInput.value = savedKey;
+            apiKeyInput.placeholder = config.placeholder;
+            apiKeyInput.dispatchEvent(new Event('input'));
+        }
+
+        const currentKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+
+        // If the key is updated directly, save it to the selected provider's localStorage slot
+        if (triggerSource === 'input' && apiKeyInput) {
+            if (currentKey) {
+                localStorage.setItem(config.storageKey, currentKey);
+            }
+        }
+
+        // Populate model dropdown for selected provider
+        if (modelEngineSelect) {
+            const previousModel = modelEngineSelect.value;
+            modelEngineSelect.innerHTML = '';
+
+            if (!currentKey) {
+                // Disabled state only when the chosen provider has no key
+                const offlineOpt = document.createElement('option');
                 offlineOpt.value = 'offline';
                 offlineOpt.textContent = 'Offline analyzer (no API key)';
-                modelEngineSelect.insertBefore(offlineOpt, modelEngineSelect.firstChild);
-            }
-            offlineOpt.selected = true;
-            modelEngineSelect.disabled = true;
-        } else {
-            modelEngineSelect.disabled = false;
-            if (offlineOpt) {
-                offlineOpt.remove();
-            }
-            if (!modelEngineSelect.value || modelEngineSelect.value === 'offline') {
-                modelEngineSelect.value = 'gemini-2.5-flash';
+                offlineOpt.selected = true;
+                modelEngineSelect.appendChild(offlineOpt);
+                modelEngineSelect.disabled = true;
+            } else {
+                modelEngineSelect.disabled = false;
+                config.models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.value;
+                    opt.textContent = m.text;
+                    if (m.value === previousModel) {
+                        opt.selected = true;
+                    }
+                    modelEngineSelect.appendChild(opt);
+                });
+                if (!modelEngineSelect.value || modelEngineSelect.value === 'offline') {
+                    modelEngineSelect.value = config.models[0].value;
+                }
             }
         }
     }
 
-    function updatePlaygroundKeyLabelAndValue() {
-        if (!modelEngineSelect || !apiKeyLabel || !apiKeyInput) return;
-        const selectedModel = modelEngineSelect.value;
-        if (selectedModel.startsWith('gpt-')) {
-            apiKeyLabel.textContent = 'OpenAI API Key';
-            apiKeyInput.placeholder = 'Enter OpenAI API Key to enable Live Mode...';
-            apiKeyInput.value = localStorage.getItem('openai_api_key') || '';
-        } else if (selectedModel.startsWith('claude-')) {
-            apiKeyLabel.textContent = 'Anthropic API Key';
-            apiKeyInput.placeholder = 'Enter Anthropic API Key to enable Live Mode...';
-            apiKeyInput.value = localStorage.getItem('anthropic_api_key') || '';
-        } else {
-            apiKeyLabel.textContent = 'Gemini API Key';
-            apiKeyInput.placeholder = 'Enter API Key to enable Live Mode...';
-            apiKeyInput.value = localStorage.getItem('gemini_api_key') || '';
-        }
-        syncModelEngineState();
+    function syncModelEngineState() {
+        syncProviderAndModel('input');
     }
-    
+
+    window.syncProviderAndModel = syncProviderAndModel;
+    window.syncModelEngineState = syncModelEngineState;
+
+    if (providerSelect) {
+        providerSelect.addEventListener('change', () => {
+            syncProviderAndModel('provider');
+        });
+    }
+
     if (apiKeyInput) {
-        apiKeyInput.addEventListener('input', syncModelEngineState);
-        apiKeyInput.addEventListener('change', syncModelEngineState);
+        apiKeyInput.addEventListener('input', () => {
+            syncProviderAndModel('input');
+        });
+        apiKeyInput.addEventListener('change', () => {
+            syncProviderAndModel('input');
+        });
     }
 
-    if (modelEngineSelect) {
-        modelEngineSelect.addEventListener('change', updatePlaygroundKeyLabelAndValue);
-        // Run once on load to initialize correct state
-        updatePlaygroundKeyLabelAndValue();
-    }
-    syncModelEngineState();
+    // Run once on load to initialize correct state
+    syncProviderAndModel('provider');
 
     // Execute Button
     const runBtn = document.getElementById('btn-run');
@@ -1786,6 +1849,9 @@ async function selectProject(id) {
 
         // Load files list
         await loadProjectFiles(id);
+        if (typeof updateSidebarSections === 'function') {
+            updateSidebarSections();
+        }
         
         // Auto-load project key label and values based on selected model (v3.1)
         if (typeof updateProjectAnalysisKeyLabelAndValue === 'function') {
@@ -6259,6 +6325,9 @@ function initSassSettings() {
                     statusSpan.textContent = 'Configured ✓';
                     statusSpan.className = 'status-pill configured';
                     alert(`${provider.toUpperCase()} connection test succeeded! Key saved.`);
+                    if (typeof syncProviderAndModel === 'function') {
+                        syncProviderAndModel('provider');
+                    }
                 } else {
                     statusSpan.textContent = 'Invalid Key ✗';
                     statusSpan.className = 'status-pill not-configured';
@@ -6426,31 +6495,22 @@ function initSassSettings() {
         });
     }
 }
-function updateSidebarSections() {
-    const sections = [
-        {
-            section: document.getElementById('sidebar-analysis'),
-            items: ['nav-item-findings', 'nav-item-pull-requests', 'nav-item-semantic']
-        },
-        {
-            section: document.getElementById('sidebar-heal'),
-            items: ['nav-item-fix-center', 'nav-item-test-center', 'nav-item-versions', 'nav-item-chat']
+function updateSidebarNavNumbers() {
+    const navItems = document.querySelectorAll('.app-sidebar .sidebar-nav .nav-item');
+    let count = 0;
+    navItems.forEach(item => {
+        const isHidden = item.style.display === 'none' || (item.offsetParent === null && getComputedStyle(item).display === 'none');
+        if (!isHidden) {
+            count++;
+            const mark = item.querySelector('.nav-icon-mark');
+            if (mark) {
+                mark.textContent = String(count).padStart(2, '0');
+            }
         }
-    ];
-
-    sections.forEach(({ section, items }) => {
-        if (!section) return;
-
-        const hasVisibleItem = items.some(id => {
-            const item = document.getElementById(id);
-            return item && item.style.display !== 'none';
-        });
-
-        section.style.display = hasVisibleItem ? '' : 'none';
     });
 }
+window.updateSidebarNavNumbers = updateSidebarNavNumbers;
 
-updateSidebarSections();
 function updateSidebarSections() {
     const sections = [
         {
@@ -6483,6 +6543,25 @@ function updateSidebarSections() {
 
         section.style.display = hasVisibleItem ? '' : 'none';
     });
+
+    updateSidebarNavNumbers();
+}
+window.updateSidebarSections = updateSidebarSections;
+
+function initSidebarNavNumbering() {
+    updateSidebarNavNumbers();
+    const sidebar = document.querySelector('.app-sidebar');
+    if (sidebar && window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+            updateSidebarNavNumbers();
+        });
+        observer.observe(sidebar, {
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+        });
+    }
 }
 
 updateSidebarSections();
+initSidebarNavNumbering();

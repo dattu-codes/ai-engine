@@ -5684,8 +5684,9 @@ body.light-theme .table-container {
 /* Sidebar Profile Box: 1-line icon and label */
 .user-profile-actions {
     display: flex !important;
-    gap: 8px !important;
+    gap: 4px !important;
     width: 100% !important;
+    box-sizing: border-box !important;
 }
 .user-profile-actions button,
 #btn-open-settings,
@@ -5693,17 +5694,19 @@ body.light-theme .table-container {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 6px !important;
+    gap: 4px !important;
     white-space: nowrap !important;
-    padding: 6px 10px !important;
+    padding: 6px 4px !important;
     font-size: 11px !important;
     border-radius: 6px !important;
     background: var(--surface-raised) !important;
     border: 1px solid var(--border) !important;
     color: var(--text) !important;
-    overflow: hidden !important;
-    flex: 1 !important;
+    flex: 1 1 0 !important;
+    width: 50% !important;
+    min-width: 0 !important;
     text-align: center !important;
+    box-sizing: border-box !important;
 }
 .user-profile-actions button:hover,
 #btn-open-settings:hover,
@@ -5723,8 +5726,8 @@ body.light-theme .table-container {
     display: inline-block !important;
     line-height: 1 !important;
     white-space: nowrap !important;
-    text-overflow: ellipsis !important;
-    overflow: hidden !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
 }
 .app-sidebar.collapsed .user-profile-actions {
     display: flex !important;
@@ -5754,6 +5757,22 @@ body.light-theme .table-container {
     display: inline-block !important;
     font-size: 14px !important;
     margin: 0 !important;
+}
+
+/* Provider selector dropdown styling */
+.provider-dropdown {
+    background-color: var(--surface-raised) !important;
+    border: 1px solid var(--border) !important;
+    color: var(--text-bright) !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 2px 8px !important;
+    cursor: pointer !important;
+    outline: none !important;
+}
+.provider-dropdown:focus {
+    border-color: var(--accent) !important;
 }
 
 /* Native select & dropdown styling for full contrast */
